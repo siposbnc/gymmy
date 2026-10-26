@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <title>Gymmy</title>
+    <meta name="description" content="Log your sets. Build your plan. Watch the numbers go up." />
+
+    <!-- Matches the resolved theme so the status bar never flashes the wrong colour. -->
+    <meta name="theme-color" content="#F6F3EE" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#14110F" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- Still required by older iOS, which ignores the standard tag above. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Gymmy" />
+
+    <script>
+      // Resolve the theme before first paint. Anything later and the user gets a
+      // white flash in a dark gym — the single most jarring bug a dark-first app
+      // can ship. Mirrors resolveTheme() in src/app/theme.ts.
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('gymmy.theme')
+          var resolved =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          document.documentElement.dataset.theme = resolved
+          document.documentElement.style.colorScheme = resolved
+        } catch (_) {
+          document.documentElement.dataset.theme = 'light'
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

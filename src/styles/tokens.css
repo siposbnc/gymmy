@@ -1,0 +1,124 @@
+/* ============================================================================
+   Gymmy — design tokens
+   ----------------------------------------------------------------------------
+   THE source of truth for the visual system. `design/tokens.css` and the preview
+   files published to Claude Design mirror these values; when you change one
+   here, regenerate those.
+
+   Concept: "precision instrument". Warm charcoal and paper rather than cold
+   grey; one molten accent; numerals treated as the hero data they are.
+
+   Contrast ratios in the comments were computed, not estimated.
+   ========================================================================= */
+
+:root {
+  /* --- Surfaces: warm paper, never pure white ---------------------------- */
+  --bg: #f6f3ee;
+  --surface: #fffdfa;
+  --surface-raised: #ffffff;
+  --surface-sunken: #ede8e1;
+
+  --border: #e3dcd2;
+  --border-strong: #c9bfb2;
+
+  /* --- Text ------------------------------------------------------------- */
+  --text: #1a1614; /* 16.2:1 on --bg */
+  --text-muted: #6b625a; /*  5.4:1 on --bg */
+  --text-faint: #9a9087;
+
+  /* --- Accent: molten orange. Effort, heat, iron under sodium light ----- */
+  --accent: #c7430f; /*  4.7:1 with --on-accent */
+  --accent-bright: #e2521a;
+  --accent-wash: #fbeae1;
+  --on-accent: #fff8f4;
+
+  /* --- Success: a logged set ------------------------------------------- */
+  --success: #0c7a52; /*  5.2:1 with --on-success */
+  --success-wash: #dff3ea;
+  --on-success: #f2fffa;
+
+  /* --- PR: earned. Luminance-distinct from the accent ------------------- */
+  --pr: #8a6410; /*  4.9:1 on --bg */
+  --pr-fill: #f7e3ae; /* 12.3:1 with --on-pr */
+  --on-pr: #2e2206;
+
+  /* --- Destructive ------------------------------------------------------ */
+  --danger: #b03a2e;
+  --danger-wash: #f8e6e3;
+
+  /* --- The status rail: Gymmy's signature element ----------------------- */
+  --rail-empty: #ded7cd;
+
+  /* --- Elevation: soft, warm-tinted, never grey -------------------------- */
+  --shadow-sm: 0 1px 2px rgba(42, 32, 24, 0.06), 0 2px 8px rgba(42, 32, 24, 0.05);
+  --shadow-md: 0 2px 4px rgba(42, 32, 24, 0.06), 0 10px 26px rgba(42, 32, 24, 0.08);
+  --shadow-lg: 0 4px 8px rgba(42, 32, 24, 0.07), 0 24px 56px rgba(42, 32, 24, 0.12);
+
+  --grain-opacity: 0.035;
+  --glow: rgba(199, 67, 15, 0.1);
+}
+
+[data-theme='dark'] {
+  /* Warm near-black. Blue-blacks read clinical; this reads like a gym bag. */
+  --bg: #14110f;
+  --surface: #1d1917;
+  --surface-raised: #262120;
+  --surface-sunken: #0e0c0b;
+
+  --border: #332c29;
+  --border-strong: #4a4138;
+
+  --text: #f5f0e9; /* 16.6:1 on --bg */
+  --text-muted: #a79c91; /*  7.0:1 on --bg */
+  --text-faint: #7c7268;
+
+  --accent: #ff6a33; /*  6.6:1 with --on-accent */
+  --accent-bright: #ff8354;
+  --accent-wash: #2e1810;
+  --on-accent: #1a0e07;
+
+  --success: #2dd48f; /*  9.8:1 on --bg */
+  --success-wash: #0d2e22;
+  --on-success: #05281c;
+
+  --pr: #ffd98a; /* 13.9:1 on --bg */
+  --pr-fill: #4a3a16;
+  --on-pr: #ffe9b8;
+
+  --danger: #f2685a;
+  --danger-wash: #341613;
+
+  --rail-empty: #3a322e;
+
+  /* Shadows read as mud on dark. Lean on borders and surface lift instead. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.55);
+
+  --grain-opacity: 0.05;
+  --glow: rgba(255, 106, 51, 0.13);
+}
+
+/* ============================================================================
+   Motion
+   ----------------------------------------------------------------------------
+   Reduced motion is handled once, here. Components inherit the behaviour rather
+   than each re-implementing the media query.
+   ========================================================================= */
+
+:root {
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --dur-slow: 360ms;
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.25, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur: 1ms;
+    --dur-slow: 1ms;
+  }
+}

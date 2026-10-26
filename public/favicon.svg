@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Gymmy">
+  <!-- The status rail, Gymmy's signature element, as the app mark: three
+       ascending bars reading as progress. One hue so it stays legible at 32px. -->
+  <rect width="512" height="512" rx="112" fill="#14110F"/>
+  <g fill="#FF6A33">
+    <rect x="112" y="296" width="60" height="112" rx="30" opacity="0.38"/>
+    <rect x="226" y="216" width="60" height="192" rx="30" opacity="0.68"/>
+    <rect x="340" y="104" width="60" height="304" rx="30"/>
+  </g>
+</svg>

@@ -3,8 +3,18 @@
 A gym buddy app. Log your sets and reps fast, build your own training plans, and watch the
 numbers go up.
 
-> **Status: planning.** No implementation yet. The full design lives in
-> **[docs/PLAN.md](docs/PLAN.md)**.
+> **Status: M0 complete — foundations.** The app runs; set logging arrives in M1.
+> The full design lives in **[docs/PLAN.md](docs/PLAN.md)**, the visual system in
+> **[design/](design/)**.
+
+## Getting started
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run check      # typecheck + lint + tests
+npm run build      # production PWA build
+```
 
 ## What it is
 
@@ -51,7 +61,29 @@ Recharts. Native app-store builds later via Capacitor.
 
 ```
 docs/PLAN.md     the full application plan — product, data model, architecture, milestones
+design/          the design system, published to Claude Design
+src/
+  domain/        PURE: the maths, the model, and the words that explain them.
+                 No React, no Dexie, no DOM — enforced by lint.
+  db/            Dexie schema, versioned migrations, seed data, repositories
+  lib/platform/  adapters for notifications, vibration, audio, files, storage
+  ui/            the design-system components
+  features/      one folder per screen
+  app/           router, tab shell, theme, error boundary
 ```
+
+### The rule that keeps this maintainable
+
+`src/domain` is pure and may not import React, Dexie, or anything in `db/`,
+`ui/` or `features/` — ESLint fails the build if it does. Every calculation
+worth being correct about lives there and is unit-tested directly, with no
+component mounted and no database opened.
+
+Each metric also exports its own explainer copy, formula, and worked-example
+function **in the same module as the calculation**. Changing the 12-rep cap on
+estimated 1RM means editing the file that holds the sentence describing that
+cap, so the user-facing explanation cannot drift from the maths. A registry
+test fails the build if any metric ships without copy.
 
 ## License
 

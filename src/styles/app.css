@@ -1,0 +1,263 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* ============================================================================
+   Token → Tailwind bridge
+   ----------------------------------------------------------------------------
+   `@theme inline` is deliberate: it makes utilities emit `var(--surface)` rather
+   than the resolved colour, so every utility follows the runtime theme swap on
+   [data-theme]. Without `inline`, Tailwind would bake in the light values and
+   dark mode would silently do nothing.
+
+   Spacing is NOT redefined — Tailwind's default 0.25rem step already is our 4px
+   base, so `p-4` is 16px exactly as the design system specifies.
+   ========================================================================= */
+
+@theme inline {
+  /* Surfaces */
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-sunken: var(--surface-sunken);
+
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+
+  /* Text */
+  --color-ink: var(--text);
+  --color-ink-muted: var(--text-muted);
+  --color-ink-faint: var(--text-faint);
+
+  /* Accent */
+  --color-accent: var(--accent);
+  --color-accent-bright: var(--accent-bright);
+  --color-accent-wash: var(--accent-wash);
+  --color-on-accent: var(--on-accent);
+
+  /* Success — a logged set, and nothing else */
+  --color-success: var(--success);
+  --color-success-wash: var(--success-wash);
+  --color-on-success: var(--on-success);
+
+  /* Personal record */
+  --color-pr: var(--pr);
+  --color-pr-fill: var(--pr-fill);
+  --color-on-pr: var(--on-pr);
+
+  /* Destructive */
+  --color-danger: var(--danger);
+  --color-danger-wash: var(--danger-wash);
+
+  /* The status rail */
+  --color-rail: var(--rail-empty);
+
+  /* Type */
+  --font-ui: 'Archivo Variable', 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+
+  /* Seven steps, no more. An eighth is a layout problem, not a type problem. */
+  --text-meta: 0.8125rem; /* 13px — labels, units, the ghost line */
+  --text-body: 0.9375rem; /* 15px */
+  --text-lead: 1.0625rem; /* 17px — exercise names */
+  --text-title: 1.3125rem; /* 21px — set values, section headers */
+  --text-display: 1.75rem; /* 28px — screen titles, stat values */
+  --text-hero: 2.5rem; /* 40px */
+  --text-mega: 3.5rem; /* 56px — the numeric pad readout */
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Elevation */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  /* Motion */
+  --ease-out-soft: var(--ease-out-soft);
+  --ease-spring: var(--ease-spring);
+}
+
+/* ============================================================================
+   Custom utilities
+   ========================================================================= */
+
+/* Every number in the app. Tabular figures stop values jittering as they
+   change — unforgivable on a screen full of live data. */
+@utility num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.02em;
+}
+
+/* Hero numerals widen slightly for presence, via Archivo's width axis.
+   The face declares `font-stretch: 62% 125%`, so the high-level properties are
+   the right API here — font-variation-settings would fight font-stretch's
+   default of 100%. */
+@utility num-hero {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.03em;
+  font-stretch: 112%;
+  font-weight: 600;
+}
+
+/* Non-negotiable: a sweaty thumb at arm's length, mid-set. */
+@utility touch-min {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+@utility touch-comfortable {
+  min-width: 52px;
+  min-height: 52px;
+}
+
+/* Small-caps label treatment, used for every key/meta line. */
+@utility label-caps {
+  font-size: 0.65rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+/* Atmosphere without noise. Applied to full-bleed surfaces only. */
+@utility grain {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: var(--grain-opacity);
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* ============================================================================
+   Keyframes
+   ----------------------------------------------------------------------------
+   Durations come from the motion tokens, so `prefers-reduced-motion` collapses
+   these to 1ms without any component needing to know.
+   ========================================================================= */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The set-complete sequence: rail fills from the bottom with a slight
+   overshoot, then settles. Fires dozens of times a session, so it stays short
+   and never blocks the next tap. */
+@keyframes rail-fill {
+  0% {
+    transform: scaleY(0);
+  }
+  70% {
+    transform: scaleY(1.08);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes check-in {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ============================================================================
+   Base
+   ========================================================================= */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: var(--text-body);
+    line-height: 1.55;
+    overscroll-behavior-y: none;
+  }
+
+  /* The app is a single full-height surface; only panes scroll. */
+  #root {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  button {
+    font-family: inherit;
+    color: inherit;
+  }
+
+  /* Visible, and it matches the accent rather than the browser default. */
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Mid-workout, an accidental text selection is pure friction. Inputs and
+     anything explicitly marked stay selectable. */
+  body {
+    user-select: none;
+  }
+  input,
+  textarea,
+  [data-selectable] {
+    user-select: text;
+  }
+}
