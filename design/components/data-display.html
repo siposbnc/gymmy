@@ -1,0 +1,261 @@
+<!-- @dsCard group="Components" name="Data display" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gymmy · Data display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+.t{
+  --bg:#F6F3EE;--surface:#FFFDFA;--surface-raised:#FFFFFF;--surface-sunken:#EDE8E1;
+  --border:#E3DCD2;--border-strong:#C9BFB2;
+  --text:#1A1614;--text-muted:#6B625A;--text-faint:#9A9087;
+  --accent:#C7430F;--accent-wash:#FBEAE1;--on-accent:#FFF8F4;
+  --success:#0C7A52;--success-wash:#DFF3EA;--on-success:#F2FFFA;
+  --pr:#8A6410;--pr-fill:#F7E3AE;--on-pr:#2E2206;
+  --shadow-sm:0 1px 2px rgba(42,32,24,.06),0 2px 8px rgba(42,32,24,.05);
+  --grain-opacity:.035;--glow:rgba(199,67,15,.10);color-scheme:light;
+}
+.t[data-theme="dark"]{
+  --bg:#14110F;--surface:#1D1917;--surface-raised:#262120;--surface-sunken:#0E0C0B;
+  --border:#332C29;--border-strong:#4A4138;
+  --text:#F5F0E9;--text-muted:#A79C91;--text-faint:#7C7268;
+  --accent:#FF6A33;--accent-wash:#2E1810;--on-accent:#1A0E07;
+  --success:#2DD48F;--success-wash:#0D2E22;--on-success:#05281C;
+  --pr:#FFD98A;--pr-fill:#4A3A16;--on-pr:#FFE9B8;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.40);
+  --grain-opacity:.05;--glow:rgba(255,106,51,.13);color-scheme:dark;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;background:#2A2422;padding:28px;
+  display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(410px,1fr));align-items:start;
+}
+.t{
+  background:var(--bg);color:var(--text);border-radius:20px;padding:26px;
+  position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.t::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  opacity:var(--grain-opacity);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.t>*{position:relative;z-index:1}
+
+.theme-tag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--text-faint);margin-bottom:6px}
+h1{font-family:"Instrument Serif",Georgia,serif;font-size:26px;font-weight:400;margin-bottom:16px;line-height:1.1}
+h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--accent);margin:22px 0 10px}
+h2:first-of-type{margin-top:0}
+.desc{font-size:11.5px;line-height:1.5;color:var(--text-muted);margin-top:9px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.info{
+  width:17px;height:17px;border-radius:50%;border:1.2px solid var(--text-faint);
+  color:var(--text-faint);font-size:10px;font-weight:800;display:inline-grid;place-items:center;
+  flex:none;cursor:pointer;font-style:normal;vertical-align:1px;
+}
+
+/* ===== stat tiles ========================================================= */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:13px 14px;box-shadow:var(--shadow-sm);
+}
+.tile-k{
+  font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;
+  color:var(--text-faint);display:flex;align-items:center;gap:5px;margin-bottom:5px;
+}
+.tile-v{font-size:28px;font-weight:600;line-height:1.05}
+.tile-u{font-size:12px;font-weight:600;color:var(--text-muted);margin-left:2px}
+.tile-sub{font-size:11px;color:var(--text-muted);margin-top:3px}
+.tile-sub.up{color:var(--success);font-weight:600}
+.tile--wide{grid-column:span 3}
+
+/* ===== estimate treatment — the typographic half of the PR rule ========== */
+.est-row{display:grid;gap:9px}
+.est-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:13px;
+  padding:12px 14px;display:flex;align-items:center;gap:12px;
+}
+.est-k{
+  font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;
+  color:var(--text-faint);flex:none;width:92px;line-height:1.3;
+}
+.est-v{flex:1;font-size:24px;font-weight:600;letter-spacing:-.025em}
+.est-v .pre{font-size:11px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;color:var(--text-faint);margin-right:5px;vertical-align:3px}
+.est-v .dash{color:var(--text-faint);font-weight:400}
+.est-tag{
+  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;
+  padding:4px 8px;border-radius:999px;flex:none;
+}
+.est-tag--analysis{background:var(--surface-sunken);color:var(--text-muted)}
+.est-tag--record{background:var(--pr);color:var(--on-pr)}
+.t[data-theme="dark"] .est-tag--record{color:#2E2206}
+
+/* ===== PR board =========================================================== */
+.board{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:13px;overflow:hidden}
+.pr{background:var(--surface);display:flex;align-items:center;gap:11px;padding:11px 13px}
+.pr-rail{width:3px;height:30px;border-radius:999px;background:var(--pr);flex:none}
+.pr-meta{flex:1;min-width:0}
+.pr-kind{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--text-faint)}
+.pr-val{font-size:17px;font-weight:600;letter-spacing:-.02em}
+.pr-date{font-size:11px;color:var(--text-muted);flex:none;font-variant-numeric:tabular-nums}
+
+/* ===== ghost line ========================================================= */
+.ghosts{display:grid;gap:8px}
+.ghost{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px;
+}
+.ghost-ex{font-size:15px;font-weight:600;letter-spacing:-.02em;margin-bottom:3px}
+.ghost-l{font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.ghost-l .lbl{font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;color:var(--text-faint);margin-right:5px}
+.ghost-l b{color:var(--text);font-weight:600}
+.ghost-l .none{font-style:italic;color:var(--text-faint)}
+
+/* ===== session summary =================================================== */
+.sum{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:17px;box-shadow:var(--shadow-sm);
+}
+.sum-h{font-family:"Instrument Serif",Georgia,serif;font-size:22px;font-weight:400;margin-bottom:2px}
+.sum-sub{font-size:11.5px;color:var(--text-muted);margin-bottom:14px;font-variant-numeric:tabular-nums}
+.sum-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:14px}
+.sum-s .k{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--text-faint)}
+.sum-s .v{font-size:21px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sum-s .d{font-size:10.5px;color:var(--success);font-weight:600}
+.sum-prs{background:var(--pr-fill);border-radius:12px;padding:11px 13px}
+.sum-prs .k{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--pr);margin-bottom:5px}
+.t[data-theme="light"] .sum-prs .k{color:var(--on-pr);opacity:.7}
+.sum-prs li{font-size:13px;list-style:none;line-height:1.55;font-variant-numeric:tabular-nums;color:var(--on-pr)}
+.sum-prs li b{font-weight:700}
+
+.note{margin-top:22px;padding-top:15px;border-top:1px solid var(--border);font-size:12px;line-height:1.6;color:var(--text-muted)}
+.note b{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+
+<section class="t" data-theme="light">
+  <p class="theme-tag">Light</p>
+  <h1>Data display</h1>
+
+  <h2>Stat tiles</h2>
+  <div class="tiles">
+    <div class="tile">
+      <p class="tile-k">Volume<i class="info">i</i></p>
+      <p class="tile-v num">8,420<span class="tile-u">kg</span></p>
+      <p class="tile-sub up">↑ 6% vs last</p>
+    </div>
+    <div class="tile">
+      <p class="tile-k">Sets</p>
+      <p class="tile-v num">24</p>
+      <p class="tile-sub">4 warm-up</p>
+    </div>
+    <div class="tile">
+      <p class="tile-k">Duration</p>
+      <p class="tile-v num">1:04</p>
+      <p class="tile-sub">hh:mm</p>
+    </div>
+  </div>
+
+  <h2>Estimate vs. record — never confusable</h2>
+  <div class="est-row">
+    <div class="est-card">
+      <span class="est-k">Heaviest logged</span>
+      <span class="est-v num">140<span style="font-size:13px;color:var(--text-muted)">kg</span> × 3</span>
+      <span class="est-tag est-tag--record">★ Record</span>
+    </div>
+    <div class="est-card">
+      <span class="est-k">Estimated 1RM</span>
+      <span class="est-v num"><span class="pre">est.</span>154<span style="font-size:13px;color:var(--text-muted)">kg</span></span>
+      <span class="est-tag est-tag--analysis">Analysis</span>
+    </div>
+    <div class="est-card">
+      <span class="est-k">Estimated 1RM<br>on a 20-rep set</span>
+      <span class="est-v num"><span class="pre">est.</span><span class="dash">—</span></span>
+      <span class="est-tag est-tag--analysis">Above 12 reps</span>
+    </div>
+  </div>
+  <p class="desc">Records get gold and a star. Estimates get an <b>est.</b> prefix
+    and a grey "Analysis" tag. The third shows the 12-rep cap: a dash, with the
+    reason stated rather than a silent blank.</p>
+
+  <h2>"Last time" ghost line</h2>
+  <div class="ghosts">
+    <div class="ghost">
+      <p class="ghost-ex">Bench Press</p>
+      <p class="ghost-l"><span class="lbl">last time</span><b>77.5 kg</b> × 8, 8, 7</p>
+    </div>
+    <div class="ghost">
+      <p class="ghost-ex">Pull-up</p>
+      <p class="ghost-l"><span class="lbl">last time</span><b>bodyweight</b> × 9, 8, 8, 6</p>
+    </div>
+    <div class="ghost">
+      <p class="ghost-ex">Pendlay Row</p>
+      <p class="ghost-l"><span class="lbl">last time</span><span class="none">first time — no history yet</span></p>
+    </div>
+  </div>
+  <p class="desc">The most-read text in the app, so it's never behind a tap. The
+    empty state says so plainly instead of showing a zero.</p>
+
+  <p class="note"><b>Every tile with a derived number carries an ⓘ.</b> If it's
+    computed, it's explainable.</p>
+</section>
+
+<section class="t" data-theme="dark">
+  <p class="theme-tag">Dark</p>
+  <h1>Records &amp; summary</h1>
+
+  <h2>PR board — three kinds, all observed</h2>
+  <div class="board">
+    <div class="pr">
+      <i class="pr-rail"></i>
+      <span class="pr-meta"><span class="pr-kind">Heaviest weight</span>
+        <span class="pr-val num">140 kg × 3</span></span>
+      <span class="pr-date">26 Oct</span>
+    </div>
+    <div class="pr">
+      <i class="pr-rail"></i>
+      <span class="pr-meta"><span class="pr-kind">Most reps at 120 kg</span>
+        <span class="pr-val num">8 reps</span></span>
+      <span class="pr-date">12 Oct</span>
+    </div>
+    <div class="pr">
+      <i class="pr-rail"></i>
+      <span class="pr-meta"><span class="pr-kind">Biggest session volume</span>
+        <span class="pr-val num">9,180 kg</span></span>
+      <span class="pr-date">5 Oct</span>
+    </div>
+  </div>
+  <p class="desc">No fourth row for estimated 1RM — <b>by construction</b>, not
+    by omission.</p>
+
+  <h2>Session summary</h2>
+  <div class="sum">
+    <p class="sum-h">Push A</p>
+    <p class="sum-sub">Monday 26 October · 1:04 · 24 sets</p>
+    <div class="sum-grid">
+      <div class="sum-s"><p class="k">Volume</p><p class="v num">8,420<span style="font-size:12px">kg</span></p><p class="d">↑ 6%</p></div>
+      <div class="sum-s"><p class="k">Top set</p><p class="v num">82.5<span style="font-size:12px">kg</span></p><p class="d">↑ 2.5</p></div>
+      <div class="sum-s"><p class="k">Records</p><p class="v num">2</p><p class="d">new</p></div>
+    </div>
+    <div class="sum-prs">
+      <p class="k">★ Records set today</p>
+      <ul>
+        <li><b>Bench Press</b> — heaviest 82.5 kg × 8</li>
+        <li><b>Cable Fly</b> — most reps at 15 kg, 14</li>
+      </ul>
+    </div>
+  </div>
+  <p class="desc">Ends with a link straight into the routine, because tuning a
+    plan happens right after training it, not days later.</p>
+
+  <p class="note"><b>Comparisons are always "vs. last time"</b>, never against a
+    target you didn't set. Gymmy reports; it doesn't judge.</p>
+</section>
+
+</body>
+</html>

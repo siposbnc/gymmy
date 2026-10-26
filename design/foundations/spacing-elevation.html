@@ -1,0 +1,178 @@
+<!-- @dsCard group="Foundations" name="Spacing, shape & elevation" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gymmy · Spacing, shape & elevation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+.t{
+  --bg:#F6F3EE;--surface:#FFFDFA;--surface-raised:#FFFFFF;--surface-sunken:#EDE8E1;
+  --border:#E3DCD2;--border-strong:#C9BFB2;
+  --text:#1A1614;--text-muted:#6B625A;--text-faint:#9A9087;
+  --accent:#C7430F;--accent-wash:#FBEAE1;--on-accent:#FFF8F4;
+  --shadow-sm:0 1px 2px rgba(42,32,24,.06),0 2px 8px rgba(42,32,24,.05);
+  --shadow-md:0 2px 4px rgba(42,32,24,.06),0 10px 26px rgba(42,32,24,.08);
+  --shadow-lg:0 4px 8px rgba(42,32,24,.07),0 24px 56px rgba(42,32,24,.12);
+  --grain-opacity:.035;color-scheme:light;
+}
+.t[data-theme="dark"]{
+  --bg:#14110F;--surface:#1D1917;--surface-raised:#262120;--surface-sunken:#0E0C0B;
+  --border:#332C29;--border-strong:#4A4138;
+  --text:#F5F0E9;--text-muted:#A79C91;--text-faint:#7C7268;
+  --accent:#FF6A33;--accent-wash:#2E1810;--on-accent:#1A0E07;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.40);
+  --shadow-md:0 4px 20px rgba(0,0,0,.45);
+  --shadow-lg:0 8px 40px rgba(0,0,0,.55);
+  --grain-opacity:.05;color-scheme:dark;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;background:#2A2422;padding:28px;
+  display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));align-items:start;
+}
+.t{
+  background:var(--bg);color:var(--text);border-radius:20px;padding:28px;
+  position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.t::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  opacity:var(--grain-opacity);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.t>*{position:relative;z-index:1}
+
+.theme-tag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--text-faint);margin-bottom:6px}
+h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin:26px 0 12px}
+h2:first-of-type{margin-top:0}
+
+/* --- spacing ramp --------------------------------------------------------- */
+.ramp{display:flex;flex-direction:column;gap:5px}
+.sp{display:flex;align-items:center;gap:12px}
+.sp code{font-size:10.5px;color:var(--accent);font-weight:700;width:68px;flex:none;letter-spacing:.02em}
+.sp .bar{height:14px;background:var(--accent);border-radius:3px;opacity:.85}
+.sp .px{font-size:10.5px;color:var(--text-faint);font-variant-numeric:tabular-nums}
+
+/* --- radii ---------------------------------------------------------------- */
+.radii{display:flex;gap:10px;flex-wrap:wrap}
+.rad{
+  width:74px;height:74px;background:var(--surface);border:1px solid var(--border-strong);
+  display:grid;place-items:center;text-align:center;flex:none;
+}
+.rad span{font-size:10px;color:var(--text-muted);line-height:1.35;font-weight:600}
+.rad b{display:block;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
+
+/* --- elevation ------------------------------------------------------------ */
+.elev{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.el{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:16px 12px;text-align:center;
+}
+.el b{display:block;font-size:12px;font-weight:700;margin-bottom:3px}
+.el span{font-size:10.5px;color:var(--text-muted);line-height:1.4}
+.el--sm{box-shadow:var(--shadow-sm)}
+.el--md{box-shadow:var(--shadow-md)}
+.el--lg{box-shadow:var(--shadow-lg)}
+
+/* --- touch targets -------------------------------------------------------- */
+.touch{display:flex;gap:12px;align-items:flex-end}
+.tt{text-align:center;flex:none}
+.tt .box{
+  background:var(--accent-wash);border:1.5px dashed var(--accent);border-radius:12px;
+  display:grid;place-items:center;color:var(--accent);font-weight:700;font-size:12px;
+  font-variant-numeric:tabular-nums;
+}
+.tt .cap{font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.3;max-width:84px}
+.tt--bad .box{background:transparent;border-color:var(--text-faint);color:var(--text-faint)}
+
+.note{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;line-height:1.6;color:var(--text-muted)}
+.note b{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+
+<section class="t" data-theme="light">
+  <p class="theme-tag">Light</p>
+
+  <h2>Spacing — 4px base</h2>
+  <div class="ramp">
+    <div class="sp"><code>--space-1</code><i class="bar" style="width:4px"></i><span class="px">4</span></div>
+    <div class="sp"><code>--space-2</code><i class="bar" style="width:8px"></i><span class="px">8</span></div>
+    <div class="sp"><code>--space-3</code><i class="bar" style="width:12px"></i><span class="px">12</span></div>
+    <div class="sp"><code>--space-4</code><i class="bar" style="width:16px"></i><span class="px">16</span></div>
+    <div class="sp"><code>--space-5</code><i class="bar" style="width:20px"></i><span class="px">20</span></div>
+    <div class="sp"><code>--space-6</code><i class="bar" style="width:24px"></i><span class="px">24</span></div>
+    <div class="sp"><code>--space-8</code><i class="bar" style="width:32px"></i><span class="px">32</span></div>
+    <div class="sp"><code>--space-10</code><i class="bar" style="width:40px"></i><span class="px">40</span></div>
+    <div class="sp"><code>--space-12</code><i class="bar" style="width:48px"></i><span class="px">48</span></div>
+    <div class="sp"><code>--space-16</code><i class="bar" style="width:64px"></i><span class="px">64</span></div>
+  </div>
+
+  <h2>Radii — soft, but not bubbly</h2>
+  <div class="radii">
+    <div class="rad" style="border-radius:8px"><span><b>8</b>sm · chips</span></div>
+    <div class="rad" style="border-radius:12px"><span><b>12</b>md · rows</span></div>
+    <div class="rad" style="border-radius:16px"><span><b>16</b>lg · cards</span></div>
+    <div class="rad" style="border-radius:20px"><span><b>20</b>xl · sheets</span></div>
+    <div class="rad" style="border-radius:999px"><span><b>pill</b>buttons</span></div>
+  </div>
+
+  <h2>Elevation</h2>
+  <div class="elev">
+    <div class="el el--sm"><b>sm</b><span>Resting cards</span></div>
+    <div class="el el--md"><b>md</b><span>Sticky bars</span></div>
+    <div class="el el--lg"><b>lg</b><span>Bottom sheets</span></div>
+  </div>
+
+  <p class="note"><b>Warm-tinted shadows.</b> Pure-black shadows on warm paper
+    read grey and dirty; these carry <code>rgba(42,32,24,…)</code>.</p>
+</section>
+
+<section class="t" data-theme="dark">
+  <p class="theme-tag">Dark</p>
+
+  <h2>Touch targets — one sweaty hand, mid-set</h2>
+  <div class="touch">
+    <div class="tt tt--bad">
+      <div class="box" style="width:32px;height:32px">32</div>
+      <p class="cap">Too small. Never.</p>
+    </div>
+    <div class="tt">
+      <div class="box" style="width:44px;height:44px">44</div>
+      <p class="cap"><b>--touch-min</b><br>absolute floor</p>
+    </div>
+    <div class="tt">
+      <div class="box" style="width:52px;height:52px">52</div>
+      <p class="cap"><b>--touch-comfortable</b><br>log buttons, steppers</p>
+    </div>
+    <div class="tt">
+      <div class="box" style="width:64px;height:52px;border-style:solid;background:var(--accent);color:var(--on-accent)">Log</div>
+      <p class="cap">Primary action,<br>bottom third</p>
+    </div>
+  </div>
+
+  <h2>Elevation on dark — borders do the work</h2>
+  <div class="elev">
+    <div class="el" style="box-shadow:var(--shadow-sm)"><b>sm</b><span>+ border</span></div>
+    <div class="el" style="box-shadow:var(--shadow-md);background:var(--surface-raised)"><b>md</b><span>+ surface lift</span></div>
+    <div class="el" style="box-shadow:var(--shadow-lg);background:var(--surface-raised);border-color:var(--border-strong)"><b>lg</b><span>+ strong border</span></div>
+  </div>
+
+  <h2>Depth stack</h2>
+  <div class="radii">
+    <div class="rad" style="background:var(--surface-sunken);border-radius:16px"><span><b>sunken</b>inset wells</span></div>
+    <div class="rad" style="background:var(--bg);border-radius:16px"><span><b>bg</b>page</span></div>
+    <div class="rad" style="background:var(--surface);border-radius:16px"><span><b>surface</b>cards</span></div>
+    <div class="rad" style="background:var(--surface-raised);border-radius:16px"><span><b>raised</b>sheets</span></div>
+  </div>
+
+  <p class="note"><b>Dark mode gets four surface levels, not shadows.</b> A blur
+    behind a dark card just muddies the background — lift the surface instead.</p>
+</section>
+
+</body>
+</html>

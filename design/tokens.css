@@ -1,0 +1,191 @@
+/* ============================================================================
+   Gymmy — design tokens
+   ----------------------------------------------------------------------------
+   Canonical source of truth for the visual system. Preview files under design/
+   inline a copy of the :root / [data-theme="dark"] blocks so each card renders
+   standalone in the Design System pane — if you change a value here, change it
+   there too. Once implementation starts this file moves to src/styles/ and the
+   previews are regenerated from it.
+
+   Concept: "precision instrument". Warm charcoal and paper rather than cold
+   grey; one molten accent; numerals treated as the hero data they are.
+   ========================================================================= */
+
+:root {
+  /* --- Surfaces: warm paper, never pure white ---------------------------- */
+  --bg:              #F6F3EE;
+  --surface:         #FFFDFA;
+  --surface-raised:  #FFFFFF;
+  --surface-sunken:  #EDE8E1;
+
+  --border:          #E3DCD2;
+  --border-strong:   #C9BFB2;
+
+  /* --- Text ------------------------------------------------------------- */
+  --text:            #1A1614;
+  --text-muted:      #6B625A;
+  --text-faint:      #9A9087;
+
+  /* --- Accent: molten orange. Effort, heat, iron under sodium light ----- */
+  --accent:          #C7430F;   /* fills — 4.7:1 with --on-accent          */
+  --accent-bright:   #E2521A;   /* hover / emphasis                        */
+  --accent-wash:     #FBEAE1;   /* tinted backgrounds                      */
+  --on-accent:       #FFF8F4;
+
+  /* --- Success: a logged set ------------------------------------------- */
+  /* Darkened from #0E8A5F, which only reached 4.2:1 against --on-success. */
+  --success:         #0C7A52;   /* 5.2:1 with --on-success                 */
+  --success-wash:    #DFF3EA;
+  --on-success:      #F2FFFA;
+
+  /* --- PR: earned, precious. Kept luminance-distinct from the accent --- */
+  --pr:              #8A6410;
+  --pr-fill:         #F7E3AE;
+  --on-pr:           #2E2206;
+
+  /* --- Destructive ----------------------------------------------------- */
+  --danger:          #B03A2E;
+  --danger-wash:     #F8E6E3;
+
+  /* --- The status rail: Gymmy's signature element ----------------------- */
+  --rail-empty:      #DED7CD;
+
+  /* --- Elevation: soft, warm-tinted, never grey -------------------------- */
+  --shadow-sm: 0 1px 2px rgba(42, 32, 24, .06), 0 2px 8px rgba(42, 32, 24, .05);
+  --shadow-md: 0 2px 4px rgba(42, 32, 24, .06), 0 10px 26px rgba(42, 32, 24, .08);
+  --shadow-lg: 0 4px 8px rgba(42, 32, 24, .07), 0 24px 56px rgba(42, 32, 24, .12);
+
+  --grain-opacity: .035;
+  --glow: rgba(199, 67, 15, .10);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  /* Warm near-black. Blue-blacks read clinical; this reads like a gym bag. */
+  --bg:              #14110F;
+  --surface:         #1D1917;
+  --surface-raised:  #262120;
+  --surface-sunken:  #0E0C0B;
+
+  --border:          #332C29;
+  --border-strong:   #4A4138;
+
+  --text:            #F5F0E9;
+  --text-muted:      #A79C91;
+  --text-faint:      #7C7268;
+
+  --accent:          #FF6A33;   /* 6.6:1 with --on-accent                  */
+  --accent-bright:   #FF8354;
+  --accent-wash:     #2E1810;
+  --on-accent:       #1A0E07;
+
+  --success:         #2DD48F;
+  --success-wash:    #0D2E22;
+  --on-success:      #05281C;
+
+  --pr:              #FFD98A;
+  --pr-fill:         #4A3A16;
+  --on-pr:           #FFE9B8;
+
+  --danger:          #F2685A;
+  --danger-wash:     #341613;
+
+  --rail-empty:      #3A322E;
+
+  /* Shadows read as mud on dark. Lean on borders and surface lift instead. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .40);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, .45);
+  --shadow-lg: 0 8px 40px rgba(0, 0, 0, .55);
+
+  --grain-opacity: .05;
+  --glow: rgba(255, 106, 51, .13);
+
+  color-scheme: dark;
+}
+
+/* ============================================================================
+   Type
+   ----------------------------------------------------------------------------
+   Archivo carries the UI and — critically — the numerals: it has real tabular
+   figures and a width axis, so hero weights can be stretched for presence
+   without a second font. Instrument Serif handles headers and empty states,
+   which is the unexpected move: an editorial voice in a training log.
+   ========================================================================= */
+
+:root {
+  --font-ui:      "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+
+  /* Steps are deliberately few. More sizes means less hierarchy, not more. */
+  --step--1: 0.8125rem;  /* 13px — labels, units, meta                     */
+  --step-0:  0.9375rem;  /* 15px — body                                    */
+  --step-1:  1.0625rem;  /* 17px — emphasised body, exercise names         */
+  --step-2:  1.3125rem;  /* 21px — section headers                         */
+  --step-3:  1.75rem;    /* 28px — screen titles, stat values              */
+  --step-4:  2.5rem;     /* 40px — set weight in the log row               */
+  --step-5:  3.5rem;     /* 56px — hero numeral                            */
+
+  --leading-tight: 1.05;
+  --leading-snug:  1.3;
+  --leading-body:  1.55;
+
+  --tracking-tight: -0.02em;
+  --tracking-label:  0.08em;  /* small caps labels                         */
+}
+
+/* Every number in the app gets this. Tabular figures stop values from
+   jittering as they change — unforgivable on a screen full of live data. */
+.num {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: var(--tracking-tight);
+}
+
+/* Hero numerals widen slightly for presence. */
+.num--hero {
+  font-variation-settings: "wdth" 112, "wght" 600;
+}
+
+/* ============================================================================
+   Space, shape, motion
+   ========================================================================= */
+
+:root {
+  --space-1: 0.25rem;   /*  4px */
+  --space-2: 0.5rem;    /*  8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+
+  --radius-sm:   8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+  --radius-pill: 999px;
+
+  /* Non-negotiable: a sweaty thumb at arm's length, mid-set. */
+  --touch-min: 44px;
+  --touch-comfortable: 52px;
+
+  --dur-fast: 140ms;
+  --dur:      220ms;
+  --dur-slow: 360ms;
+
+  --ease-out:    cubic-bezier(.2, .8, .25, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur:      1ms;
+    --dur-slow: 1ms;
+  }
+}

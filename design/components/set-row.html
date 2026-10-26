@@ -1,0 +1,314 @@
+<!-- @dsCard group="Components" name="Set row" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gymmy · Set row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+.t{
+  --bg:#F6F3EE;--surface:#FFFDFA;--surface-raised:#FFFFFF;--surface-sunken:#EDE8E1;
+  --border:#E3DCD2;--border-strong:#C9BFB2;
+  --text:#1A1614;--text-muted:#6B625A;--text-faint:#9A9087;
+  --accent:#C7430F;--accent-bright:#E2521A;--accent-wash:#FBEAE1;--on-accent:#FFF8F4;
+  --success:#0C7A52;--success-wash:#DFF3EA;--on-success:#F2FFFA;
+  --pr:#8A6410;--pr-fill:#F7E3AE;--on-pr:#2E2206;
+  --danger:#B03A2E;--danger-wash:#F8E6E3;
+  --rail-empty:#DED7CD;
+  --shadow-sm:0 1px 2px rgba(42,32,24,.06),0 2px 8px rgba(42,32,24,.05);
+  --grain-opacity:.035;--glow:rgba(199,67,15,.10);color-scheme:light;
+}
+.t[data-theme="dark"]{
+  --bg:#14110F;--surface:#1D1917;--surface-raised:#262120;--surface-sunken:#0E0C0B;
+  --border:#332C29;--border-strong:#4A4138;
+  --text:#F5F0E9;--text-muted:#A79C91;--text-faint:#7C7268;
+  --accent:#FF6A33;--accent-bright:#FF8354;--accent-wash:#2E1810;--on-accent:#1A0E07;
+  --success:#2DD48F;--success-wash:#0D2E22;--on-success:#05281C;
+  --pr:#FFD98A;--pr-fill:#4A3A16;--on-pr:#FFE9B8;
+  --danger:#F2685A;--danger-wash:#341613;
+  --rail-empty:#3A322E;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.40);
+  --grain-opacity:.05;--glow:rgba(255,106,51,.13);color-scheme:dark;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;background:#2A2422;padding:28px;
+  display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));align-items:start;
+}
+.t{
+  background:var(--bg);color:var(--text);border-radius:20px;padding:26px;
+  position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.t::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  opacity:var(--grain-opacity);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.t>*{position:relative;z-index:1}
+
+.theme-tag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--text-faint);margin-bottom:6px}
+h1{font-family:"Instrument Serif",Georgia,serif;font-size:26px;font-weight:400;margin-bottom:18px;line-height:1.1}
+.state{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--accent);margin:18px 0 7px}
+.state:first-of-type{margin-top:0}
+.desc{font-size:11.5px;line-height:1.5;color:var(--text-muted);margin-top:6px}
+
+/* ===== exercise block ===================================================== */
+.block{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:var(--shadow-sm)}
+.ex-head{display:flex;align-items:baseline;gap:8px;margin-bottom:3px}
+.ex-name{font-size:17px;font-weight:600;letter-spacing:-.02em;flex:1}
+.ex-count{font-size:11px;font-weight:700;color:var(--text-faint);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+/* the always-visible ghost line — the most-read text in the app */
+.ghost{font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums;letter-spacing:-.01em;margin-bottom:10px}
+.ghost b{color:var(--text);font-weight:600}
+.ghost .lbl{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--text-faint);margin-right:5px}
+
+/* ===== the set row ======================================================== */
+.rows{display:grid;gap:5px}
+.row{
+  display:flex;align-items:center;gap:11px;min-height:52px;padding:7px 11px;
+  border-radius:12px;background:var(--surface-sunken);position:relative;overflow:hidden;
+}
+.rail{width:4px;height:36px;border-radius:999px;background:var(--rail-empty);flex:none}
+.idx{
+  font-size:11px;font-weight:700;color:var(--text-faint);width:15px;flex:none;
+  font-variant-numeric:tabular-nums;text-align:center;
+}
+.vals{flex:1;display:flex;align-items:baseline;gap:3px;font-variant-numeric:tabular-nums}
+.v{font-size:21px;font-weight:600;letter-spacing:-.025em}
+.u{font-size:12px;font-weight:600;color:var(--text-muted)}
+.x{font-size:15px;color:var(--text-faint);margin:0 7px}
+.act{
+  min-width:52px;height:38px;border-radius:999px;border:0;flex:none;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:700;letter-spacing:-.01em;
+  background:var(--accent);color:var(--on-accent);
+}
+.check{
+  width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--success);color:var(--on-success);font-size:15px;font-weight:700;
+}
+
+/* --- pending: prefilled, inputs look tappable ---------------------------- */
+.row--pending{background:var(--surface-raised);border:1.5px solid var(--border-strong)}
+.row--pending .field{
+  background:var(--surface-sunken);border-radius:9px;padding:3px 9px;
+  border-bottom:2px solid var(--accent);
+}
+.row--pending .v{color:var(--text)}
+
+/* --- logged -------------------------------------------------------------- */
+.row--done{background:var(--success-wash)}
+.row--done .rail{background:var(--success)}
+
+/* --- warm-up: present but discounted ------------------------------------- */
+.row--warm{background:transparent;border:1px dashed var(--border-strong);min-height:44px}
+.row--warm .rail{background:transparent;border-left:4px dotted var(--rail-empty);width:4px;border-radius:0}
+.row--warm .v{font-size:17px;color:var(--text-muted);font-weight:500}
+.row--warm .u,.row--warm .x{color:var(--text-faint)}
+.row--warm .idx{font-size:9.5px;letter-spacing:.06em}
+.row--warm .check{width:26px;height:26px;background:transparent;border:1.5px solid var(--border-strong);color:var(--text-faint);font-size:12px}
+
+/* --- PR ------------------------------------------------------------------ */
+.row--pr{background:var(--pr-fill);outline:1.5px solid var(--pr);outline-offset:-1.5px}
+.row--pr .rail{background:var(--pr)}
+.row--pr .v,.row--pr .u,.row--pr .idx{color:var(--on-pr)}
+.pr-badge{
+  display:inline-flex;align-items:center;gap:4px;flex:none;
+  font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;
+  background:var(--pr);color:var(--pr-fill);border-radius:999px;padding:4px 8px;
+}
+.t[data-theme="dark"] .pr-badge{background:var(--pr);color:#2E2206}
+.t[data-theme="dark"] .row--pr .v,
+.t[data-theme="dark"] .row--pr .u,
+.t[data-theme="dark"] .row--pr .idx{color:var(--on-pr)}
+
+/* --- dropset: hangs off the parent set ----------------------------------- */
+.row--drop{background:var(--surface-sunken);min-height:44px;margin-left:18px}
+.row--drop::before{
+  content:"";position:absolute;left:-13px;top:-7px;bottom:50%;width:11px;
+  border-left:1.5px solid var(--border-strong);border-bottom:1.5px solid var(--border-strong);
+  border-bottom-left-radius:8px;
+}
+.row--drop .v{font-size:17px}
+
+/* --- swipe-to-delete: destructive needs intent --------------------------- */
+.swipe{position:relative;border-radius:12px;overflow:hidden}
+.swipe-bg{
+  position:absolute;inset:0;background:var(--danger-wash);display:flex;
+  align-items:center;justify-content:flex-end;padding-right:16px;
+  color:var(--danger);font-size:12px;font-weight:700;letter-spacing:.02em;
+}
+.swipe .row{transform:translateX(-84px);box-shadow:-4px 0 12px rgba(0,0,0,.12)}
+
+/* --- RPE ----------------------------------------------------------------- */
+.rpe{
+  font-size:10px;font-weight:700;color:var(--text-muted);background:var(--surface);
+  border:1px solid var(--border);border-radius:7px;padding:3px 6px;flex:none;
+  font-variant-numeric:tabular-nums;letter-spacing:.02em;
+}
+
+/* --- plate hint ---------------------------------------------------------- */
+.plates{
+  display:flex;align-items:center;gap:6px;margin-top:9px;padding-top:9px;
+  border-top:1px dashed var(--border);font-size:11.5px;color:var(--text-muted);
+  font-variant-numeric:tabular-nums;
+}
+.plates .lbl{font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--text-faint)}
+.plates b{color:var(--text);font-weight:600}
+.info{
+  width:15px;height:15px;border-radius:50%;border:1.2px solid var(--text-faint);
+  color:var(--text-faint);font-size:9.5px;font-weight:800;display:grid;place-items:center;
+  flex:none;cursor:pointer;font-style:normal;
+}
+
+.note{margin-top:22px;padding-top:15px;border-top:1px solid var(--border);font-size:12px;line-height:1.6;color:var(--text-muted)}
+.note b{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- ======================= LIGHT: states ======================= -->
+<section class="t" data-theme="light">
+  <p class="theme-tag">Light · all states</p>
+  <h1>The set row</h1>
+
+  <p class="state">Pending — prefilled from last session</p>
+  <div class="block">
+    <div class="ex-head"><span class="ex-name">Bench Press</span><span class="ex-count">3 of 4</span></div>
+    <p class="ghost"><span class="lbl">last time</span><b>77.5 kg</b> × 8, 8, 7</p>
+    <div class="rows">
+      <div class="row row--pending">
+        <i class="rail"></i><span class="idx">3</span>
+        <span class="vals">
+          <span class="field"><span class="v">80</span><span class="u">kg</span></span>
+          <span class="x">×</span>
+          <span class="field"><span class="v">8</span></span>
+        </span>
+        <button class="act">Log</button>
+      </div>
+    </div>
+    <p class="plates"><span class="lbl">plates / side</span><b>20 + 10 + 2.5</b><i class="info">i</i></p>
+  </div>
+  <p class="desc">Values arrive filled in, so the common case is <b>one tap</b>.
+    The underline marks them as editable without a box around each.</p>
+
+  <p class="state">Logged</p>
+  <div class="block">
+    <div class="rows">
+      <div class="row row--done">
+        <i class="rail"></i><span class="idx">1</span>
+        <span class="vals"><span class="v">80</span><span class="u">kg</span><span class="x">×</span><span class="v">8</span></span>
+        <span class="rpe">RPE 8</span>
+        <span class="check">✓</span>
+      </div>
+      <div class="row row--done">
+        <i class="rail"></i><span class="idx">2</span>
+        <span class="vals"><span class="v">80</span><span class="u">kg</span><span class="x">×</span><span class="v">8</span></span>
+        <span class="check">✓</span>
+      </div>
+    </div>
+  </div>
+  <p class="desc">RPE is optional and collapsed by default — it only appears once
+    you've entered one.</p>
+
+  <p class="state">Warm-up — kept, but excluded from every total</p>
+  <div class="block">
+    <div class="rows">
+      <div class="row row--warm">
+        <i class="rail"></i><span class="idx">W</span>
+        <span class="vals"><span class="v">20</span><span class="u">kg</span><span class="x">×</span><span class="v">12</span></span>
+        <span class="check">✓</span>
+      </div>
+      <div class="row row--warm">
+        <i class="rail"></i><span class="idx">W</span>
+        <span class="vals"><span class="v">60</span><span class="u">kg</span><span class="x">×</span><span class="v">5</span></span>
+        <span class="check">✓</span>
+      </div>
+    </div>
+  </div>
+  <p class="desc">Dashed border, dotted rail, smaller numerals, hollow check.
+    Visibly <b>not working sets</b> — so an excluded set never looks like a bug.</p>
+
+  <p class="note"><b>The rail is the whole idea.</b> Glance down the left edge and
+    you know how much of the session is done without reading one number.</p>
+</section>
+
+<!-- ======================= DARK: states ======================= -->
+<section class="t" data-theme="dark">
+  <p class="theme-tag">Dark · all states</p>
+  <h1>Records, dropsets,<br>and deletion</h1>
+
+  <p class="state">Personal record</p>
+  <div class="block">
+    <div class="ex-head"><span class="ex-name">Squat</span><span class="ex-count">3 of 3</span></div>
+    <p class="ghost"><span class="lbl">last time</span><b>135 kg</b> × 3, 3, 2</p>
+    <div class="rows">
+      <div class="row row--pr">
+        <i class="rail"></i><span class="idx">3</span>
+        <span class="vals"><span class="v">140</span><span class="u">kg</span><span class="x">×</span><span class="v">3</span></span>
+        <span class="pr-badge">★ Record</span>
+        <span class="check">✓</span>
+      </div>
+    </div>
+  </div>
+  <p class="desc">Gold rail, gold field, one badge. Awarded for <b>heaviest weight
+    logged</b> — an estimated 1RM can never produce this state.</p>
+
+  <p class="state">Dropset — hangs off its parent</p>
+  <div class="block">
+    <div class="rows">
+      <div class="row row--done">
+        <i class="rail"></i><span class="idx">2</span>
+        <span class="vals"><span class="v">80</span><span class="u">kg</span><span class="x">×</span><span class="v">8</span></span>
+        <span class="check">✓</span>
+      </div>
+      <div class="row row--drop row--done">
+        <i class="rail"></i><span class="idx">D</span>
+        <span class="vals"><span class="v">60</span><span class="u">kg</span><span class="x">×</span><span class="v">6</span></span>
+        <span class="check">✓</span>
+      </div>
+    </div>
+  </div>
+  <p class="desc">Indented with an elbow connector, so the relationship is
+    structural rather than something you have to remember.</p>
+
+  <p class="state">Swipe to delete</p>
+  <div class="block">
+    <div class="rows">
+      <div class="swipe">
+        <div class="swipe-bg">Delete</div>
+        <div class="row">
+          <i class="rail"></i><span class="idx">4</span>
+          <span class="vals"><span class="v">80</span><span class="u">kg</span><span class="x">×</span><span class="v">6</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="desc">Destructive actions need a deliberate gesture. A fat-fingered
+    tap at arm's length must never be able to delete a set.</p>
+
+  <p class="state">Rest-only / bodyweight</p>
+  <div class="block">
+    <div class="ex-head"><span class="ex-name">Pull-up</span><span class="ex-count">2 of 4</span></div>
+    <p class="ghost"><span class="lbl">last time</span><b>bodyweight</b> × 9, 8, 8, 6</p>
+    <div class="rows">
+      <div class="row row--pending">
+        <i class="rail"></i><span class="idx">2</span>
+        <span class="vals"><span class="u" style="font-size:13px">bodyweight</span><span class="x">×</span>
+          <span class="field"><span class="v">9</span></span></span>
+        <button class="act">Log</button>
+      </div>
+    </div>
+  </div>
+  <p class="desc">Reps-only exercises drop the weight field entirely rather than
+    showing a disabled zero.</p>
+
+  <p class="note"><b>52px minimum row height</b>, 38px pill actions, and the
+    primary button always on the right where the thumb already is.</p>
+</section>
+
+</body>
+</html>

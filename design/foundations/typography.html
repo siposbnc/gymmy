@@ -1,0 +1,186 @@
+<!-- @dsCard group="Foundations" name="Typography" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gymmy · Typography</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+.t{
+  --bg:#F6F3EE;--surface:#FFFDFA;--surface-sunken:#EDE8E1;
+  --border:#E3DCD2;--border-strong:#C9BFB2;
+  --text:#1A1614;--text-muted:#6B625A;--text-faint:#9A9087;
+  --accent:#C7430F;--accent-wash:#FBEAE1;--on-accent:#FFF8F4;
+  --success:#0C7A52;--pr:#8A6410;--pr-fill:#F7E3AE;--on-pr:#2E2206;
+  --grain-opacity:.035;--glow:rgba(199,67,15,.10);color-scheme:light;
+}
+.t[data-theme="dark"]{
+  --bg:#14110F;--surface:#1D1917;--surface-sunken:#0E0C0B;
+  --border:#332C29;--border-strong:#4A4138;
+  --text:#F5F0E9;--text-muted:#A79C91;--text-faint:#7C7268;
+  --accent:#FF6A33;--accent-wash:#2E1810;--on-accent:#1A0E07;
+  --success:#2DD48F;--pr:#FFD98A;--pr-fill:#4A3A16;--on-pr:#FFE9B8;
+  --grain-opacity:.05;--glow:rgba(255,106,51,.13);color-scheme:dark;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;background:#2A2422;padding:28px;
+  display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));align-items:start;
+}
+.t{
+  background:var(--bg);color:var(--text);border-radius:20px;padding:28px;
+  position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.t::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  opacity:var(--grain-opacity);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.t>*{position:relative;z-index:1}
+
+.theme-tag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--text-faint);margin-bottom:6px}
+h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin:26px 0 12px}
+
+/* --- the two faces -------------------------------------------------------- */
+.faces{display:grid;gap:12px}
+.face{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px}
+.face-spec{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--accent);margin-bottom:8px}
+.specimen-serif{font-family:"Instrument Serif","Iowan Old Style",Georgia,serif;font-size:40px;font-weight:400;line-height:1.02;letter-spacing:-.01em}
+.specimen-sans{font-size:28px;font-weight:600;line-height:1.1;letter-spacing:-.025em}
+.face-why{font-size:12px;line-height:1.55;color:var(--text-muted);margin-top:10px}
+
+/* --- the hero numeral: the whole point of the app ------------------------- */
+.hero{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:24px;text-align:center;position:relative;overflow:hidden;
+}
+.hero::before{
+  content:"";position:absolute;left:50%;top:40%;width:260px;height:260px;
+  transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,var(--glow) 0%,transparent 70%);
+}
+.hero>*{position:relative}
+.hero-num{
+  font-size:56px;line-height:1;font-variant-numeric:tabular-nums;
+  font-variation-settings:"wdth" 112,"wght" 600;letter-spacing:-.03em;
+}
+.hero-unit{font-size:17px;font-weight:600;color:var(--text-muted);margin-left:4px;letter-spacing:0}
+.hero-x{font-size:28px;color:var(--text-faint);margin:0 10px;font-weight:400}
+.hero-cap{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:700;color:var(--text-faint);margin-top:10px}
+
+/* --- scale ---------------------------------------------------------------- */
+.scale{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.row{background:var(--surface);display:flex;align-items:baseline;gap:14px;padding:9px 14px}
+.row code{font-size:10.5px;color:var(--accent);font-weight:700;flex:none;width:58px;font-family:"Archivo",monospace;letter-spacing:.02em}
+.row .px{font-size:10.5px;color:var(--text-faint);flex:none;width:34px;font-variant-numeric:tabular-nums}
+.row .sample{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;letter-spacing:-.02em}
+
+/* --- tabular proof -------------------------------------------------------- */
+.tab{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tab-col{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.tab-h{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.tab-col:first-child .tab-h{color:var(--text-faint)}
+.tab-col:last-child .tab-h{color:var(--success)}
+.tab-n{font-size:21px;line-height:1.45;font-weight:600;letter-spacing:-.02em}
+.prop{font-variant-numeric:proportional-nums}
+.tnum{font-variant-numeric:tabular-nums}
+
+.note{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;line-height:1.6;color:var(--text-muted)}
+.note b{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+
+<section class="t" data-theme="light">
+  <p class="theme-tag">Light</p>
+
+  <h2>Two faces, strictly divided</h2>
+  <div class="faces">
+    <div class="face">
+      <p class="face-spec">Instrument Serif · display only</p>
+      <p class="specimen-serif">Push A — week four</p>
+      <p class="face-why">Headers, screen titles and empty states. The unexpected
+        move: an editorial voice in a training log. <b>Never on data.</b></p>
+    </div>
+    <div class="face">
+      <p class="face-spec">Archivo variable · UI + all numerals</p>
+      <p class="specimen-sans">Incline Dumbbell Press</p>
+      <p class="face-why">Real tabular figures and a width axis, so hero weights
+        get presence without a third font.</p>
+    </div>
+  </div>
+
+  <h2>The hero numeral</h2>
+  <div class="hero">
+    <span class="hero-num num">82.5</span><span class="hero-unit">kg</span>
+    <span class="hero-x">×</span>
+    <span class="hero-num num">8</span>
+    <p class="hero-cap">wdth 112 · wght 600 · tabular</p>
+  </div>
+
+  <h2>Scale — seven steps, no more</h2>
+  <div class="scale">
+    <div class="row"><code>--step-5</code><span class="px">56</span><span class="sample" style="font-size:40px;font-weight:600">140</span></div>
+    <div class="row"><code>--step-4</code><span class="px">40</span><span class="sample" style="font-size:34px;font-weight:600">82.5 kg</span></div>
+    <div class="row"><code>--step-3</code><span class="px">28</span><span class="sample" style="font-size:28px;font-weight:600">8,420 kg</span></div>
+    <div class="row"><code>--step-2</code><span class="px">21</span><span class="sample" style="font-size:21px;font-weight:600">Bench Press</span></div>
+    <div class="row"><code>--step-1</code><span class="px">17</span><span class="sample" style="font-size:17px;font-weight:500">Incline Dumbbell Press</span></div>
+    <div class="row"><code>--step-0</code><span class="px">15</span><span class="sample" style="font-size:15px">Body weight · 78.4 kg today</span></div>
+    <div class="row"><code>--step--1</code><span class="px">13</span><span class="sample" style="font-size:13px;color:var(--text-muted)">last time · 77.5 kg × 8, 8, 7</span></div>
+  </div>
+
+  <p class="note"><b>Fewer sizes means more hierarchy, not less.</b> Seven steps
+    cover the whole app; anything needing an eighth is a layout problem.</p>
+</section>
+
+<section class="t" data-theme="dark">
+  <p class="theme-tag">Dark</p>
+
+  <h2>Why tabular figures are non-negotiable</h2>
+  <div class="tab">
+    <div class="tab-col">
+      <p class="tab-h">✗ Proportional</p>
+      <p class="tab-n prop num">111.0</p>
+      <p class="tab-n prop num">87.5</p>
+      <p class="tab-n prop num">140.0</p>
+    </div>
+    <div class="tab-col">
+      <p class="tab-h">✓ Tabular</p>
+      <p class="tab-n tnum num">111.0</p>
+      <p class="tab-n tnum num">87.5</p>
+      <p class="tab-n tnum num">140.0</p>
+    </div>
+  </div>
+  <p class="note" style="margin-top:12px;padding-top:0;border:0">
+    On the left the <b>1</b>s are narrow, so columns drift and a live-counting
+    rest timer visibly twitches. Every number in Gymmy carries <code>.num</code>.
+  </p>
+
+  <h2>The hero numeral on dark</h2>
+  <div class="hero">
+    <span class="hero-num num">140</span><span class="hero-unit">kg</span>
+    <span class="hero-x">×</span>
+    <span class="hero-num num">3</span>
+    <p class="hero-cap">a warm glow sits behind it, not a gradient</p>
+  </div>
+
+  <h2>Small-caps labels</h2>
+  <div class="scale">
+    <div class="row"><code>label</code><span class="px">13</span>
+      <span class="sample" style="font-size:11px;letter-spacing:.11em;text-transform:uppercase;font-weight:700;color:var(--text-faint)">Working sets · Rest 90s</span></div>
+    <div class="row"><code>pr</code><span class="px">13</span>
+      <span class="sample" style="font-size:11px;letter-spacing:.11em;text-transform:uppercase;font-weight:700;color:var(--pr)">Personal record</span></div>
+    <div class="row"><code>est</code><span class="px">13</span>
+      <span class="sample" style="font-size:13px;color:var(--text-muted)"><i style="font-style:normal;opacity:.7">est.</i> 1RM 154 kg</span></div>
+  </div>
+
+  <p class="note"><b>"est." always precedes an estimate.</b> It is the typographic
+    half of the rule that estimates never read as achievements.</p>
+</section>
+
+</body>
+</html>

@@ -56,3 +56,4 @@ pnpm-debug.log*
 
 # Claude Code local state
 .claude/settings.local.json
+.playwright-mcp/

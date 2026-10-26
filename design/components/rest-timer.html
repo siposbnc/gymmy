@@ -1,0 +1,230 @@
+<!-- @dsCard group="Components" name="Rest timer" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gymmy · Rest timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+.t{
+  --bg:#F6F3EE;--surface:#FFFDFA;--surface-raised:#FFFFFF;--surface-sunken:#EDE8E1;
+  --border:#E3DCD2;--border-strong:#C9BFB2;
+  --text:#1A1614;--text-muted:#6B625A;--text-faint:#9A9087;
+  --accent:#C7430F;--accent-bright:#E2521A;--accent-wash:#FBEAE1;--on-accent:#FFF8F4;
+  --success:#0C7A52;--success-wash:#DFF3EA;--on-success:#F2FFFA;
+  --shadow-md:0 2px 4px rgba(42,32,24,.06),0 10px 26px rgba(42,32,24,.08);
+  --grain-opacity:.035;--glow:rgba(199,67,15,.10);color-scheme:light;
+}
+.t[data-theme="dark"]{
+  --bg:#14110F;--surface:#1D1917;--surface-raised:#262120;--surface-sunken:#0E0C0B;
+  --border:#332C29;--border-strong:#4A4138;
+  --text:#F5F0E9;--text-muted:#A79C91;--text-faint:#7C7268;
+  --accent:#FF6A33;--accent-bright:#FF8354;--accent-wash:#2E1810;--on-accent:#1A0E07;
+  --success:#2DD48F;--success-wash:#0D2E22;--on-success:#05281C;
+  --shadow-md:0 4px 20px rgba(0,0,0,.45);
+  --grain-opacity:.05;--glow:rgba(255,106,51,.13);color-scheme:dark;
+}
+:root{--ease-out:cubic-bezier(.2,.8,.25,1);--ease-spring:cubic-bezier(.34,1.56,.64,1)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;background:#2A2422;padding:28px;
+  display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));align-items:start;
+}
+.t{
+  background:var(--bg);color:var(--text);border-radius:20px;padding:26px;
+  position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.t::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  opacity:var(--grain-opacity);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.t>*{position:relative;z-index:1}
+
+.theme-tag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--text-faint);margin-bottom:6px}
+h1{font-family:"Instrument Serif",Georgia,serif;font-size:26px;font-weight:400;margin-bottom:18px;line-height:1.1}
+h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--accent);margin:22px 0 10px}
+h2:first-of-type{margin-top:0}
+.desc{font-size:11.5px;line-height:1.5;color:var(--text-muted);margin-top:9px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+
+/* ===== the sticky bar ===================================================== */
+.bar{
+  background:var(--surface-raised);border:1px solid var(--border);border-radius:16px;
+  padding:13px 16px;box-shadow:var(--shadow-md);position:relative;overflow:hidden;
+}
+.bar-top{display:flex;align-items:center;gap:13px;margin-bottom:11px}
+.bar-k{
+  font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:800;
+  color:var(--text-faint);flex:none;
+}
+.bar-time{font-size:30px;font-weight:600;line-height:1;flex:1;font-variation-settings:"wdth" 108}
+.bar-btn{
+  font-family:inherit;height:40px;padding:0 15px;border-radius:999px;cursor:pointer;
+  font-size:12.5px;font-weight:700;border:1px solid var(--border-strong);
+  background:var(--surface);color:var(--text);flex:none;
+}
+.bar-btn--ghost{background:transparent;border-color:transparent;color:var(--accent)}
+
+/* the precision rail — a thin instrument gauge, not a chunky progress bar */
+.rail{height:5px;border-radius:999px;background:var(--surface-sunken);overflow:hidden;position:relative}
+.rail i{display:block;height:100%;border-radius:999px;background:var(--accent)}
+.rail--ticks::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:repeating-linear-gradient(90deg,transparent 0 24px,var(--border-strong) 24px 25px);
+  opacity:.55;
+}
+
+/* --- nearly done: the only moment it raises its voice -------------------- */
+.bar--soon{border-color:var(--accent)}
+.bar--soon .bar-time{color:var(--accent)}
+.bar--soon .bar-k{color:var(--accent)}
+
+/* --- complete ------------------------------------------------------------ */
+.bar--done{background:var(--success-wash);border-color:var(--success)}
+.bar--done .bar-time{color:var(--success)}
+.bar--done .bar-k{color:var(--success)}
+.bar--done .rail i{background:var(--success)}
+.pulse{animation:pulse 1.6s var(--ease-out) infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+/* --- live countdown demo ------------------------------------------------- */
+.bar--live .rail i{animation:drain 9s linear infinite}
+@keyframes drain{from{width:88%}to{width:0%}}
+
+/* ===== per-exercise defaults ============================================= */
+.defaults{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.def{background:var(--surface);display:flex;align-items:center;gap:10px;padding:10px 13px}
+.def-name{flex:1;font-size:13.5px;font-weight:500}
+.def-val{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-muted)}
+.def-type{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;color:var(--text-faint)}
+
+/* ===== the backgrounding explainer ====================================== */
+.mech{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:15px 16px;
+}
+.mech h3{font-size:12.5px;font-weight:700;margin-bottom:9px;letter-spacing:-.01em}
+.mech ul{list-style:none;display:grid;gap:8px}
+.mech li{font-size:11.5px;line-height:1.5;color:var(--text-muted);padding-left:19px;position:relative}
+.mech li::before{
+  content:"";position:absolute;left:0;top:6px;width:7px;height:7px;border-radius:50%;
+  background:var(--accent);
+}
+.mech li b{color:var(--text);font-weight:600}
+.bad::before{background:var(--text-faint)!important}
+
+.note{margin-top:22px;padding-top:15px;border-top:1px solid var(--border);font-size:12px;line-height:1.6;color:var(--text-muted)}
+.note b{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+
+<section class="t" data-theme="light">
+  <p class="theme-tag">Light</p>
+  <h1>Rest timer</h1>
+
+  <h2>Running</h2>
+  <div class="bar bar--live">
+    <div class="bar-top">
+      <span class="bar-k">Rest</span>
+      <span class="bar-time num">1:28</span>
+      <button class="bar-btn">+30s</button>
+      <button class="bar-btn bar-btn--ghost">Skip</button>
+    </div>
+    <div class="rail rail--ticks"><i style="width:88%"></i></div>
+  </div>
+  <p class="desc">A 5px precision rail rather than a chunky progress bar — this
+    sits on screen for most of the workout and must not shout.</p>
+
+  <h2>Final 10 seconds</h2>
+  <div class="bar bar--soon">
+    <div class="bar-top">
+      <span class="bar-k">Rest · get ready</span>
+      <span class="bar-time num">0:08</span>
+      <button class="bar-btn">+30s</button>
+      <button class="bar-btn bar-btn--ghost">Skip</button>
+    </div>
+    <div class="rail rail--ticks"><i style="width:9%"></i></div>
+  </div>
+
+  <h2>Complete</h2>
+  <div class="bar bar--done">
+    <div class="bar-top">
+      <span class="bar-k pulse">Rest done</span>
+      <span class="bar-time num">0:00</span>
+      <button class="bar-btn bar-btn--ghost">Dismiss</button>
+    </div>
+    <div class="rail"><i style="width:100%"></i></div>
+  </div>
+  <p class="desc">Notification, vibration <i>and</i> an on-screen state change.
+    Each one is a fallback for the others.</p>
+
+  <h2>Per-exercise defaults</h2>
+  <div class="defaults">
+    <div class="def"><span class="def-name">Squat</span><span class="def-type">compound</span><span class="def-val">3:00</span></div>
+    <div class="def"><span class="def-name">Bench Press</span><span class="def-type">compound</span><span class="def-val">2:30</span></div>
+    <div class="def"><span class="def-name">Cable Fly</span><span class="def-type">isolation</span><span class="def-val">1:00</span></div>
+    <div class="def"><span class="def-name">Lateral Raise</span><span class="def-type">isolation</span><span class="def-val">0:45</span></div>
+  </div>
+  <p class="desc">Seeded from the movement type, then remembered per exercise
+    once you change it.</p>
+
+  <p class="note"><b>Auto-starts on log</b> — one less tap in the loop that
+    repeats thirty times a session.</p>
+</section>
+
+<section class="t" data-theme="dark">
+  <p class="theme-tag">Dark</p>
+  <h1>Why it survives<br>a sleeping phone</h1>
+
+  <div class="bar bar--live">
+    <div class="bar-top">
+      <span class="bar-k">Rest</span>
+      <span class="bar-time num">2:04</span>
+      <button class="bar-btn">+30s</button>
+      <button class="bar-btn bar-btn--ghost">Skip</button>
+    </div>
+    <div class="rail rail--ticks"><i style="width:72%"></i></div>
+  </div>
+
+  <h2>The mechanism</h2>
+  <div class="mech">
+    <h3>Timestamp-driven, not interval-driven</h3>
+    <ul>
+      <li class="bad"><b>Not this:</b> a <code>setInterval</code> counting down.
+        It dies the moment the phone sleeps or the browser freezes the tab, and
+        you come back to a timer that stopped two minutes ago.</li>
+      <li>Gymmy stores the timer's <b>absolute end timestamp</b>.</li>
+      <li>Remaining time is <b>derived</b> on every render and on
+        <code>visibilitychange</code> — so returning to the app shows the truth,
+        however long you were away.</li>
+      <li>A <code>setInterval</code> only drives the <b>visual tick</b>. If it
+        stalls, nothing is lost.</li>
+      <li>Completion fires from a <b>notification scheduled against the
+        timestamp</b>, not from JavaScript staying alive.</li>
+    </ul>
+  </div>
+
+  <h2>Platform fallbacks</h2>
+  <div class="mech">
+    <h3>Three independent signals</h3>
+    <ul>
+      <li><b>Notification</b> — needs an installed PWA on iOS 16.4+. Reliable
+        once Gymmy ships as a native build via Capacitor.</li>
+      <li><b>Vibration</b> — Android only. Safari has no Vibration API at all.</li>
+      <li><b>In-app</b> — sound plus the state change above. Always works, and
+        it's why the timer never <i>depends</i> on the other two.</li>
+    </ul>
+  </div>
+
+  <p class="note"><b>The rail doubles as the recovery indicator.</b> Reopen the
+    app after ninety seconds away and the rail is already in the right place —
+    no spinner, no resync.</p>
+</section>
+
+</body>
+</html>

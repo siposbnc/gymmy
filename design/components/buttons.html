@@ -1,0 +1,245 @@
+<!-- @dsCard group="Components" name="Buttons & controls" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gymmy · Buttons &amp; controls</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+.t{
+  --bg:#F6F3EE;--surface:#FFFDFA;--surface-raised:#FFFFFF;--surface-sunken:#EDE8E1;
+  --border:#E3DCD2;--border-strong:#C9BFB2;
+  --text:#1A1614;--text-muted:#6B625A;--text-faint:#9A9087;
+  --accent:#C7430F;--accent-bright:#E2521A;--accent-wash:#FBEAE1;--on-accent:#FFF8F4;
+  --success:#0C7A52;--success-wash:#DFF3EA;--on-success:#F2FFFA;
+  --pr:#8A6410;--pr-fill:#F7E3AE;--on-pr:#2E2206;
+  --danger:#B03A2E;--danger-wash:#F8E6E3;
+  --shadow-sm:0 1px 2px rgba(42,32,24,.06),0 2px 8px rgba(42,32,24,.05);
+  --shadow-md:0 2px 4px rgba(42,32,24,.06),0 10px 26px rgba(42,32,24,.08);
+  --grain-opacity:.035;color-scheme:light;
+}
+.t[data-theme="dark"]{
+  --bg:#14110F;--surface:#1D1917;--surface-raised:#262120;--surface-sunken:#0E0C0B;
+  --border:#332C29;--border-strong:#4A4138;
+  --text:#F5F0E9;--text-muted:#A79C91;--text-faint:#7C7268;
+  --accent:#FF6A33;--accent-bright:#FF8354;--accent-wash:#2E1810;--on-accent:#1A0E07;
+  --success:#2DD48F;--success-wash:#0D2E22;--on-success:#05281C;
+  --pr:#FFD98A;--pr-fill:#4A3A16;--on-pr:#FFE9B8;
+  --danger:#F2685A;--danger-wash:#341613;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.40);
+  --shadow-md:0 4px 20px rgba(0,0,0,.45);
+  --grain-opacity:.05;color-scheme:dark;
+}
+:root{--ease-out:cubic-bezier(.2,.8,.25,1);--ease-spring:cubic-bezier(.34,1.56,.64,1)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;background:#2A2422;padding:28px;
+  display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));align-items:start;
+}
+.t{
+  background:var(--bg);color:var(--text);border-radius:20px;padding:26px;
+  position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.t::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  opacity:var(--grain-opacity);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.t>*{position:relative;z-index:1}
+
+.theme-tag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--text-faint);margin-bottom:6px}
+h1{font-family:"Instrument Serif",Georgia,serif;font-size:26px;font-weight:400;margin-bottom:18px;line-height:1.1}
+h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--accent);margin:20px 0 9px}
+h2:first-of-type{margin-top:0}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.desc{font-size:11.5px;line-height:1.5;color:var(--text-muted);margin-top:8px}
+
+/* ===== base =============================================================== */
+.btn{
+  font-family:inherit;font-weight:700;letter-spacing:-.01em;cursor:pointer;
+  border:1.5px solid transparent;border-radius:999px;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  transition:transform 140ms var(--ease-out),background 140ms var(--ease-out);
+}
+.btn:active{transform:scale(.96)}
+
+/* sizes — every one clears 44px */
+.btn--lg{height:56px;padding:0 28px;font-size:16px}
+.btn--md{height:48px;padding:0 22px;font-size:14.5px}
+.btn--sm{height:44px;padding:0 18px;font-size:13.5px}
+.btn--xs{height:38px;padding:0 15px;font-size:12.5px}   /* inside rows only */
+
+/* variants */
+.btn--primary{background:var(--accent);color:var(--on-accent)}
+.btn--primary:hover{background:var(--accent-bright)}
+.btn--secondary{background:var(--surface);color:var(--text);border-color:var(--border-strong);box-shadow:var(--shadow-sm)}
+.btn--ghost{background:transparent;color:var(--accent)}
+.btn--ghost:hover{background:var(--accent-wash)}
+.btn--success{background:var(--success);color:var(--on-success)}
+.btn--danger{background:transparent;color:var(--danger);border-color:var(--danger)}
+.btn[disabled]{opacity:.38;cursor:not-allowed;transform:none}
+
+/* focus — visible, and it matches the accent */
+.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn--focus{outline:3px solid var(--accent);outline-offset:2px}
+
+/* icon-only */
+.btn--icon{width:48px;height:48px;padding:0;font-size:18px;border-radius:50%}
+.btn--icon-sm{width:38px;height:38px;padding:0;font-size:15px;border-radius:50%}
+
+/* loading */
+.spin{
+  width:15px;height:15px;border-radius:50%;flex:none;
+  border:2px solid currentColor;border-top-color:transparent;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== segmented control ================================================== */
+.seg{
+  display:inline-flex;background:var(--surface-sunken);border-radius:999px;padding:3px;
+  border:1px solid var(--border);
+}
+.seg button{
+  font-family:inherit;font-size:13px;font-weight:700;border:0;cursor:pointer;
+  height:40px;padding:0 18px;border-radius:999px;background:transparent;color:var(--text-muted);
+}
+.seg button[aria-selected="true"]{background:var(--surface-raised);color:var(--text);box-shadow:var(--shadow-sm)}
+
+/* ===== the start-workout hero button ====================================== */
+.hero-btn{
+  width:100%;height:64px;border-radius:18px;border:0;cursor:pointer;font-family:inherit;
+  background:var(--accent);color:var(--on-accent);
+  display:flex;align-items:center;justify-content:space-between;padding:0 22px;
+  box-shadow:var(--shadow-md);transition:transform 140ms var(--ease-out);
+}
+.hero-btn:active{transform:scale(.98)}
+.hero-btn .lead{text-align:left}
+.hero-btn .k{font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:800;opacity:.72}
+.hero-btn .n{font-size:18px;font-weight:700;letter-spacing:-.02em}
+.hero-btn .arrow{font-size:22px;opacity:.85}
+
+/* ===== toggle ============================================================= */
+.tog{display:flex;align-items:center;gap:11px;font-size:13.5px}
+.sw{
+  width:50px;height:30px;border-radius:999px;background:var(--border-strong);
+  position:relative;cursor:pointer;flex:none;transition:background 180ms var(--ease-out);
+}
+.sw::after{
+  content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left 180ms var(--ease-spring);
+}
+.sw--on{background:var(--success)}
+.sw--on::after{left:23px}
+
+.note{margin-top:22px;padding-top:15px;border-top:1px solid var(--border);font-size:12px;line-height:1.6;color:var(--text-muted)}
+.note b{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+
+<section class="t" data-theme="light">
+  <p class="theme-tag">Light</p>
+  <h1>Buttons &amp; controls</h1>
+
+  <h2>Variants</h2>
+  <div class="row">
+    <button class="btn btn--md btn--primary">Log set</button>
+    <button class="btn btn--md btn--secondary">Add exercise</button>
+    <button class="btn btn--md btn--ghost">Skip rest</button>
+    <button class="btn btn--md btn--danger">Discard</button>
+  </div>
+
+  <h2>Sizes — all clear 44px</h2>
+  <div class="row">
+    <button class="btn btn--lg btn--primary">56 · Start</button>
+    <button class="btn btn--md btn--primary">48 · Finish</button>
+    <button class="btn btn--sm btn--primary">44 · Save</button>
+    <button class="btn btn--xs btn--primary">38 · Log</button>
+  </div>
+  <p class="desc"><b>38px is the one exception</b>, allowed only inside a 52px set
+    row where the row itself is the touch target.</p>
+
+  <h2>States</h2>
+  <div class="row">
+    <button class="btn btn--md btn--primary">Default</button>
+    <button class="btn btn--md btn--primary btn--focus">Focus</button>
+    <button class="btn btn--md btn--primary" style="transform:scale(.96);background:var(--accent-bright)">Pressed</button>
+    <button class="btn btn--md btn--primary" disabled>Disabled</button>
+    <button class="btn btn--md btn--primary"><i class="spin"></i>Saving</button>
+  </div>
+
+  <h2>Icon-only — always labelled for screen readers</h2>
+  <div class="row">
+    <button class="btn btn--icon btn--secondary" aria-label="Add set">+</button>
+    <button class="btn btn--icon btn--secondary" aria-label="Exercise options">⋮</button>
+    <button class="btn btn--icon-sm btn--ghost" aria-label="How this is calculated">i</button>
+    <button class="btn btn--icon btn--success" aria-label="Complete set">✓</button>
+  </div>
+
+  <h2>Start a workout</h2>
+  <button class="hero-btn">
+    <span class="lead"><span class="k">Today · Monday</span><span class="n">Push A</span></span>
+    <span class="arrow">→</span>
+  </button>
+
+  <p class="note"><b>Pills everywhere except the hero.</b> The one square-ish
+    button on a screen is the one you're meant to press.</p>
+</section>
+
+<section class="t" data-theme="dark">
+  <p class="theme-tag">Dark</p>
+  <h1>The same, warmer</h1>
+
+  <h2>Variants</h2>
+  <div class="row">
+    <button class="btn btn--md btn--primary">Log set</button>
+    <button class="btn btn--md btn--secondary">Add exercise</button>
+    <button class="btn btn--md btn--ghost">Skip rest</button>
+    <button class="btn btn--md btn--danger">Discard</button>
+  </div>
+
+  <h2>Segmented — units, chart ranges</h2>
+  <div class="row">
+    <div class="seg" role="tablist">
+      <button role="tab" aria-selected="true">kg</button>
+      <button role="tab" aria-selected="false">lb</button>
+    </div>
+    <div class="seg" role="tablist">
+      <button role="tab" aria-selected="false">Top set</button>
+      <button role="tab" aria-selected="true">est. 1RM</button>
+      <button role="tab" aria-selected="false">Volume</button>
+    </div>
+  </div>
+
+  <h2>Toggles</h2>
+  <div class="row" style="flex-direction:column;align-items:stretch;gap:13px">
+    <label class="tog"><i class="sw sw--on"></i>Auto-start rest timer</label>
+    <label class="tog"><i class="sw"></i>Show RPE field on every set</label>
+    <label class="tog"><i class="sw sw--on"></i>Vibrate when rest ends</label>
+  </div>
+
+  <h2>Finish &amp; destructive pairing</h2>
+  <div class="row">
+    <button class="btn btn--md btn--success" style="flex:1">Finish workout</button>
+    <button class="btn btn--icon btn--danger" aria-label="Discard workout">✕</button>
+  </div>
+  <p class="desc">The destructive option is present but <b>never adjacent in
+    weight</b> — icon-only, outlined, and it still asks before acting.</p>
+
+  <h2>Start a workout</h2>
+  <button class="hero-btn">
+    <span class="lead"><span class="k">No plan today</span><span class="n">Empty workout</span></span>
+    <span class="arrow">→</span>
+  </button>
+
+  <p class="note"><b>Press feedback is scale, not colour.</b> At arm's length in
+    bad lighting, a 4% shrink registers where a hover tint doesn't.</p>
+</section>
+
+</body>
+</html>

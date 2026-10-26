@@ -1,0 +1,471 @@
+<!-- @dsCard group="Screens" name="Active Session" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gymmy · Active Session</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+/* ---- tokens (mirror of design/tokens.css) ------------------------------- */
+.ph{
+  --bg:#F6F3EE;--surface:#FFFDFA;--surface-raised:#FFFFFF;--surface-sunken:#EDE8E1;
+  --border:#E3DCD2;--border-strong:#C9BFB2;
+  --text:#1A1614;--text-muted:#6B625A;--text-faint:#9A9087;
+  --accent:#C7430F;--accent-bright:#E2521A;--accent-wash:#FBEAE1;--on-accent:#FFF8F4;
+  --success:#0C7A52;--success-wash:#DFF3EA;--on-success:#F2FFFA;
+  --pr:#8A6410;--pr-fill:#F7E3AE;--on-pr:#2E2206;
+  --danger:#B03A2E;--danger-wash:#F8E6E3;
+  --rail-empty:#DED7CD;
+  --shadow-sm:0 1px 2px rgba(42,32,24,.06),0 2px 8px rgba(42,32,24,.05);
+  --shadow-md:0 2px 4px rgba(42,32,24,.06),0 10px 26px rgba(42,32,24,.08);
+  --grain-opacity:.035;--glow:rgba(199,67,15,.10);color-scheme:light;
+}
+.ph[data-theme="dark"]{
+  --bg:#14110F;--surface:#1D1917;--surface-raised:#262120;--surface-sunken:#0E0C0B;
+  --border:#332C29;--border-strong:#4A4138;
+  --text:#F5F0E9;--text-muted:#A79C91;--text-faint:#7C7268;
+  --accent:#FF6A33;--accent-bright:#FF8354;--accent-wash:#2E1810;--on-accent:#1A0E07;
+  --success:#2DD48F;--success-wash:#0D2E22;--on-success:#05281C;
+  --pr:#FFD98A;--pr-fill:#4A3A16;--on-pr:#FFE9B8;
+  --danger:#F2685A;--danger-wash:#341613;
+  --rail-empty:#3A322E;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.40);
+  --shadow-md:0 4px 20px rgba(0,0,0,.45);
+  --grain-opacity:.05;--glow:rgba(255,106,51,.13);color-scheme:dark;
+}
+:root{--ease-out:cubic-bezier(.2,.8,.25,1);--ease-spring:cubic-bezier(.34,1.56,.64,1)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+  background:
+    radial-gradient(900px 500px at 15% 0%,rgba(199,67,15,.14),transparent 60%),
+    radial-gradient(700px 500px at 85% 100%,rgba(255,106,51,.10),transparent 60%),
+    #241F1D;
+  padding:36px 28px;display:flex;gap:40px;justify-content:center;
+  align-items:flex-start;flex-wrap:wrap;
+}
+.stage{display:flex;flex-direction:column;align-items:center;gap:14px}
+.stage-label{
+  font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;
+  color:rgba(255,255,255,.5);
+}
+
+/* ===== phone frame ======================================================== */
+.ph{
+  width:390px;border-radius:42px;background:var(--bg);color:var(--text);
+  border:9px solid #0A0807;box-shadow:0 30px 80px rgba(0,0,0,.55);
+  position:relative;overflow:hidden;display:flex;flex-direction:column;
+}
+.ph::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:40;
+  opacity:var(--grain-opacity);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.status{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:11px 24px 3px;font-size:12px;font-weight:700;
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;
+}
+.status .right{display:flex;gap:5px;align-items:center;font-size:10.5px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+
+/* ===== header ============================================================= */
+.head{
+  padding:7px 18px 13px;display:flex;align-items:center;gap:11px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg);position:relative;z-index:20;
+}
+.head-back{
+  width:38px;height:38px;border-radius:50%;flex:none;border:1px solid var(--border);
+  background:var(--surface);display:grid;place-items:center;font-size:16px;cursor:pointer;
+  color:var(--text);
+}
+.head-mid{flex:1;min-width:0}
+.head-name{
+  font-family:"Instrument Serif",Georgia,serif;font-size:22px;font-weight:400;
+  line-height:1.1;letter-spacing:-.005em;
+}
+.head-meta{
+  font-size:11px;color:var(--text-muted);font-variant-numeric:tabular-nums;
+  display:flex;align-items:center;gap:6px;margin-top:1px;
+}
+.live{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;
+  animation:blip 2s var(--ease-out) infinite}
+@keyframes blip{0%,100%{opacity:1}50%{opacity:.3}}
+.head-fin{
+  height:38px;padding:0 15px;border-radius:999px;border:0;flex:none;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:700;
+  background:var(--success);color:var(--on-success);
+}
+
+/* ===== progress ribbon — the rail idea, at session scale ================== */
+.ribbon{
+  display:flex;gap:3px;padding:10px 18px 0;align-items:flex-end;
+}
+.ribbon i{flex:1;height:5px;border-radius:999px;background:var(--rail-empty)}
+.ribbon i.done{background:var(--success)}
+.ribbon i.pr{background:var(--pr)}
+.ribbon i.now{background:var(--accent);height:8px}
+
+/* ===== scroll body ======================================================== */
+.body{padding:14px 18px 0;display:grid;gap:11px}
+
+/* --- active exercise card ------------------------------------------------ */
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:17px;
+  padding:14px;box-shadow:var(--shadow-sm);
+}
+.card--active{border-color:var(--border-strong);box-shadow:var(--shadow-md)}
+.ex-head{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.ex-name{font-size:17px;font-weight:600;letter-spacing:-.025em;flex:1}
+.ex-count{font-size:11px;font-weight:800;color:var(--text-faint);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.ex-more{
+  width:28px;height:28px;border-radius:50%;border:0;background:transparent;cursor:pointer;
+  color:var(--text-faint);font-size:15px;flex:none;
+}
+.ghost{font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums;margin-bottom:11px}
+.ghost .lbl{font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;color:var(--text-faint);margin-right:5px}
+.ghost b{color:var(--text);font-weight:600}
+
+.rows{display:grid;gap:5px}
+.row{
+  display:flex;align-items:center;gap:10px;min-height:52px;padding:7px 11px;
+  border-radius:12px;background:var(--surface-sunken);position:relative;
+}
+.rail{width:4px;height:36px;border-radius:999px;background:var(--rail-empty);flex:none}
+.idx{font-size:11px;font-weight:800;color:var(--text-faint);width:14px;flex:none;
+  font-variant-numeric:tabular-nums;text-align:center}
+.vals{flex:1;display:flex;align-items:baseline;gap:2px;font-variant-numeric:tabular-nums}
+.v{font-size:21px;font-weight:600;letter-spacing:-.025em}
+.u{font-size:12px;font-weight:600;color:var(--text-muted)}
+.x{font-size:14px;color:var(--text-faint);margin:0 6px}
+.check{
+  width:31px;height:31px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--success);color:var(--on-success);font-size:15px;font-weight:700;
+}
+.rpe{
+  font-size:10px;font-weight:800;color:var(--text-muted);background:var(--surface);
+  border:1px solid var(--border);border-radius:7px;padding:3px 6px;flex:none;
+  font-variant-numeric:tabular-nums;
+}
+.row--done{background:var(--success-wash)}
+.row--done .rail{background:var(--success)}
+.row--warm{background:transparent;border:1px dashed var(--border-strong);min-height:42px}
+.row--warm .rail{background:transparent;border-left:4px dotted var(--rail-empty);border-radius:0}
+.row--warm .v{font-size:16px;color:var(--text-muted);font-weight:500}
+.row--warm .u,.row--warm .x{color:var(--text-faint)}
+.row--warm .idx{font-size:9px}
+.row--warm .check{width:25px;height:25px;background:transparent;border:1.5px solid var(--border-strong);color:var(--text-faint);font-size:11px}
+.row--pr{background:var(--pr-fill);outline:1.5px solid var(--pr);outline-offset:-1.5px}
+.row--pr .rail{background:var(--pr)}
+.row--pr .v,.row--pr .u,.row--pr .idx{color:var(--on-pr)}
+.prb{
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;
+  background:var(--pr);color:#2E2206;border-radius:999px;padding:4px 7px;flex:none;
+}
+/* pending — prefilled and obviously tappable */
+.row--next{background:var(--surface-raised);border:1.5px solid var(--border-strong)}
+.row--next .field{
+  background:var(--surface-sunken);border-radius:9px;padding:3px 9px;
+  border-bottom:2px solid var(--accent);
+}
+.log{
+  min-width:54px;height:38px;border-radius:999px;border:0;flex:none;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:800;letter-spacing:-.01em;
+  background:var(--accent);color:var(--on-accent);
+}
+.plates{
+  display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:9px;
+  border-top:1px dashed var(--border);font-size:11.5px;color:var(--text-muted);
+  font-variant-numeric:tabular-nums;
+}
+.plates .lbl{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;color:var(--text-faint)}
+.plates b{color:var(--text);font-weight:600}
+.info{
+  width:16px;height:16px;border-radius:50%;border:1.2px solid var(--text-faint);
+  color:var(--text-faint);font-size:9.5px;font-weight:800;display:grid;place-items:center;
+  flex:none;cursor:pointer;font-style:normal;
+}
+
+/* --- collapsed upcoming exercises --------------------------------------- */
+.up{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;
+}
+.up-chev{color:var(--text-faint);font-size:12px;flex:none}
+.up-name{flex:1;font-size:15px;font-weight:500;letter-spacing:-.015em}
+.up-meta{font-size:11px;color:var(--text-faint);font-variant-numeric:tabular-nums;font-weight:600}
+.up-dots{display:flex;gap:3px;flex:none}
+.up-dots i{width:5px;height:5px;border-radius:50%;background:var(--rail-empty)}
+
+.add{
+  background:transparent;border:1.5px dashed var(--border-strong);border-radius:14px;
+  padding:14px;color:var(--text-muted);font-family:inherit;font-size:13.5px;font-weight:700;
+  cursor:pointer;width:100%;
+}
+
+/* ===== sticky rest bar =================================================== */
+.rest{
+  margin:14px 12px 0;background:var(--surface-raised);border:1px solid var(--border);
+  border-radius:16px;padding:11px 14px;box-shadow:var(--shadow-md);
+  position:relative;z-index:30;
+}
+.rest-top{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.rest-k{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:800;color:var(--text-faint);flex:none}
+.rest-t{font-size:27px;font-weight:600;line-height:1;flex:1;font-variation-settings:"wdth" 108}
+.rest-b{
+  height:36px;padding:0 13px;border-radius:999px;cursor:pointer;font-family:inherit;
+  font-size:12px;font-weight:700;border:1px solid var(--border-strong);
+  background:var(--surface);color:var(--text);flex:none;
+}
+.rest-b--ghost{background:transparent;border-color:transparent;color:var(--accent)}
+.rail-bar{height:5px;border-radius:999px;background:var(--surface-sunken);overflow:hidden;position:relative}
+.rail-bar i{display:block;height:100%;border-radius:999px;background:var(--accent)}
+.rail-bar::after{
+  content:"";position:absolute;inset:0;
+  background-image:repeating-linear-gradient(90deg,transparent 0 22px,var(--border-strong) 22px 23px);
+  opacity:.5;
+}
+
+/* ===== tab bar =========================================================== */
+.tabs{
+  display:flex;padding:9px 6px 16px;margin-top:12px;
+  border-top:1px solid var(--border);background:var(--bg);
+}
+.tab{flex:1;display:grid;place-items:center;gap:3px;cursor:pointer}
+.tab-i{font-size:17px;color:var(--text-faint)}
+.tab-l{font-size:9.5px;font-weight:700;color:var(--text-faint);letter-spacing:.02em}
+.tab--on .tab-i,.tab--on .tab-l{color:var(--accent)}
+.home-ind{width:120px;height:4px;border-radius:999px;background:var(--text);opacity:.22;margin:0 auto}
+
+/* annotations beside the phones */
+.anno{
+  max-width:390px;display:grid;gap:9px;margin-top:2px;
+}
+.anno p{
+  font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.62);
+  padding-left:16px;position:relative;
+}
+.anno p::before{
+  content:"";position:absolute;left:0;top:6px;width:7px;height:7px;border-radius:2px;
+  background:#FF6A33;transform:rotate(45deg);
+}
+.anno b{color:#fff;font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- ==================== LIGHT ==================== -->
+<div class="stage">
+  <p class="stage-label">Active session · light</p>
+  <div class="ph" data-theme="light">
+    <div class="status"><span class="num">9:41</span>
+      <span class="right"><span>▮▮▮</span><span class="num">82%</span></span></div>
+
+    <div class="head">
+      <button class="head-back" aria-label="Back">‹</button>
+      <div class="head-mid">
+        <p class="head-name">Push A</p>
+        <p class="head-meta"><i class="live"></i><span class="num">42:10</span> · 12 of 24 sets</p>
+      </div>
+      <button class="head-fin">Finish</button>
+    </div>
+
+    <div class="ribbon">
+      <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i>
+      <i class="done"></i><i class="pr"></i><i class="done"></i><i class="done"></i>
+      <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i>
+      <i class="now"></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+
+    <div class="body">
+      <div class="card card--active">
+        <div class="ex-head">
+          <span class="ex-name">Bench Press</span>
+          <span class="ex-count">3 of 4</span>
+          <button class="ex-more" aria-label="Exercise options">⋮</button>
+        </div>
+        <p class="ghost"><span class="lbl">last time</span><b>77.5 kg</b> × 8, 8, 7</p>
+
+        <div class="rows">
+          <div class="row row--warm">
+            <i class="rail"></i><span class="idx">W</span>
+            <span class="vals"><span class="v">20</span><span class="u">kg</span><span class="x">×</span><span class="v">12</span></span>
+            <span class="check">✓</span>
+          </div>
+          <div class="row row--done">
+            <i class="rail"></i><span class="idx">1</span>
+            <span class="vals"><span class="v">80</span><span class="u">kg</span><span class="x">×</span><span class="v">8</span></span>
+            <span class="rpe">RPE 7</span><span class="check">✓</span>
+          </div>
+          <div class="row row--done">
+            <i class="rail"></i><span class="idx">2</span>
+            <span class="vals"><span class="v">80</span><span class="u">kg</span><span class="x">×</span><span class="v">8</span></span>
+            <span class="rpe">RPE 8</span><span class="check">✓</span>
+          </div>
+          <div class="row row--next">
+            <i class="rail"></i><span class="idx">3</span>
+            <span class="vals">
+              <span class="field"><span class="v">80</span><span class="u">kg</span></span>
+              <span class="x">×</span>
+              <span class="field"><span class="v">8</span></span>
+            </span>
+            <button class="log">Log</button>
+          </div>
+        </div>
+
+        <p class="plates"><span class="lbl">plates / side</span><b>20 + 10</b><i class="info">i</i></p>
+      </div>
+
+      <div class="up">
+        <span class="up-chev">▸</span><span class="up-name">Incline Dumbbell Press</span>
+        <span class="up-dots"><i></i><i></i><i></i></span>
+        <span class="up-meta">0 / 3</span>
+      </div>
+      <div class="up">
+        <span class="up-chev">▸</span><span class="up-name">Cable Fly</span>
+        <span class="up-dots"><i></i><i></i><i></i></span>
+        <span class="up-meta">0 / 3</span>
+      </div>
+      <button class="add">+ Add exercise</button>
+    </div>
+
+    <div class="rest">
+      <div class="rest-top">
+        <span class="rest-k">Rest</span>
+        <span class="rest-t num">1:28</span>
+        <button class="rest-b">+30s</button>
+        <button class="rest-b rest-b--ghost">Skip</button>
+      </div>
+      <div class="rail-bar"><i style="width:59%"></i></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab tab--on"><span class="tab-i">◉</span><span class="tab-l">Today</span></div>
+      <div class="tab"><span class="tab-i">☰</span><span class="tab-l">Routines</span></div>
+      <div class="tab"><span class="tab-i">▦</span><span class="tab-l">History</span></div>
+      <div class="tab"><span class="tab-i">◢</span><span class="tab-l">Progress</span></div>
+      <div class="tab"><span class="tab-i">⋯</span><span class="tab-l">More</span></div>
+    </div>
+    <div class="home-ind"></div>
+  </div>
+
+  <div class="anno">
+    <p><b>One tap to log.</b> The next set arrives prefilled from last session;
+      the underlined fields are editable but rarely need to be.</p>
+    <p><b>"Last time" is never behind a tap.</b> It's the most-read text in the
+      app, so it sits under the exercise name permanently.</p>
+    <p><b>The ribbon is the rail at session scale</b> — one tick per set, gold
+      where a record landed. Progress readable in half a second.</p>
+  </div>
+</div>
+
+<!-- ==================== DARK ==================== -->
+<div class="stage">
+  <p class="stage-label">Active session · dark · a record just landed</p>
+  <div class="ph" data-theme="dark">
+    <div class="status"><span class="num">19:12</span>
+      <span class="right"><span>▮▮▮</span><span class="num">64%</span></span></div>
+
+    <div class="head">
+      <button class="head-back" aria-label="Back">‹</button>
+      <div class="head-mid">
+        <p class="head-name">Legs — heavy</p>
+        <p class="head-meta"><i class="live"></i><span class="num">31:44</span> · 9 of 18 sets</p>
+      </div>
+      <button class="head-fin">Finish</button>
+    </div>
+
+    <div class="ribbon">
+      <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i>
+      <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i>
+      <i class="pr"></i><i class="now"></i><i></i><i></i><i></i><i></i>
+      <i></i><i></i><i></i><i></i>
+    </div>
+
+    <div class="body">
+      <div class="card card--active">
+        <div class="ex-head">
+          <span class="ex-name">Squat</span>
+          <span class="ex-count">3 of 3</span>
+          <button class="ex-more" aria-label="Exercise options">⋮</button>
+        </div>
+        <p class="ghost"><span class="lbl">last time</span><b>135 kg</b> × 3, 3, 2</p>
+
+        <div class="rows">
+          <div class="row row--warm">
+            <i class="rail"></i><span class="idx">W</span>
+            <span class="vals"><span class="v">60</span><span class="u">kg</span><span class="x">×</span><span class="v">5</span></span>
+            <span class="check">✓</span>
+          </div>
+          <div class="row row--done">
+            <i class="rail"></i><span class="idx">1</span>
+            <span class="vals"><span class="v">140</span><span class="u">kg</span><span class="x">×</span><span class="v">3</span></span>
+            <span class="check">✓</span>
+          </div>
+          <div class="row row--done">
+            <i class="rail"></i><span class="idx">2</span>
+            <span class="vals"><span class="v">140</span><span class="u">kg</span><span class="x">×</span><span class="v">3</span></span>
+            <span class="rpe">RPE 9</span><span class="check">✓</span>
+          </div>
+          <div class="row row--pr">
+            <i class="rail"></i><span class="idx">3</span>
+            <span class="vals"><span class="v">142.5</span><span class="u">kg</span><span class="x">×</span><span class="v">3</span></span>
+            <span class="prb">★ Record</span><span class="check">✓</span>
+          </div>
+        </div>
+
+        <p class="plates"><span class="lbl">plates / side</span><b>25 + 25 + 10 + 1.25</b><i class="info">i</i></p>
+      </div>
+
+      <div class="up">
+        <span class="up-chev">▸</span><span class="up-name">Romanian Deadlift</span>
+        <span class="up-dots"><i></i><i></i><i></i></span>
+        <span class="up-meta">0 / 3</span>
+      </div>
+      <div class="up">
+        <span class="up-chev">▸</span><span class="up-name">Leg Press</span>
+        <span class="up-dots"><i></i><i></i><i></i></span>
+        <span class="up-meta">0 / 3</span>
+      </div>
+      <button class="add">+ Add exercise</button>
+    </div>
+
+    <div class="rest">
+      <div class="rest-top">
+        <span class="rest-k">Rest</span>
+        <span class="rest-t num">2:47</span>
+        <button class="rest-b">+30s</button>
+        <button class="rest-b rest-b--ghost">Skip</button>
+      </div>
+      <div class="rail-bar"><i style="width:91%"></i></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab tab--on"><span class="tab-i">◉</span><span class="tab-l">Today</span></div>
+      <div class="tab"><span class="tab-i">☰</span><span class="tab-l">Routines</span></div>
+      <div class="tab"><span class="tab-i">▦</span><span class="tab-l">History</span></div>
+      <div class="tab"><span class="tab-i">◢</span><span class="tab-l">Progress</span></div>
+      <div class="tab"><span class="tab-i">⋯</span><span class="tab-l">More</span></div>
+    </div>
+    <div class="home-ind"></div>
+  </div>
+
+  <div class="anno">
+    <p><b>The record is a state, not a popup.</b> Gold rail, gold row, one badge —
+      nothing to dismiss while you're catching your breath.</p>
+    <p><b>Awarded for heaviest weight logged</b>, 142.5 kg. An estimated 1RM
+      could never produce this; records are things you did.</p>
+    <p><b>Plate maths from your own inventory</b> — the 1.25 kg pair is there
+      because you told Gymmy you own one.</p>
+    <p><b>Rest bar sits above the tabs</b>, inside thumb reach, and survives the
+      phone sleeping because it counts from a timestamp, not an interval.</p>
+  </div>
+</div>
+
+</body>
+</html>
