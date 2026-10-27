@@ -8,6 +8,7 @@ import { InfoAffordance } from '~/ui/InfoAffordance'
 import { ScreenHeader } from '~/ui/ScreenHeader'
 import { cn } from '~/ui/cn'
 
+import { AboutSection } from './AboutSection'
 import { BackupSection } from './BackupSection'
 import { BarsSection } from './BarsSection'
 import { RestSection } from './RestSection'
@@ -195,6 +196,7 @@ export function SettingsScreen() {
         </div>
 
         <BackupSection settings={settings} />
+        <AboutSection />
       </div>
     </>
   )

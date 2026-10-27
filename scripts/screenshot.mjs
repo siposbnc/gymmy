@@ -321,6 +321,17 @@ for (const theme of ['light', 'dark']) {
   )
 
   allErrors.push(
+    ...(await shoot('settings-about', {
+      theme,
+      steps: async (page) => {
+        await page.goto(`${BASE}/more/settings`, { waitUntil: 'networkidle' })
+        await page.getByText('About', { exact: true }).scrollIntoViewIfNeeded()
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
+  allErrors.push(
     ...(await shoot('explainer', {
       theme,
       steps: async (page) => {
