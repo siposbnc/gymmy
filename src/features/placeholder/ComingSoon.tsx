@@ -21,7 +21,7 @@ export function ComingSoon({ title, milestone, description }: ComingSoonProps) {
       <ScreenHeader title={title} />
       <div className="px-4">
         <div className="rounded-lg border border-dashed border-line-strong p-6 text-center">
-          <p className="label-caps text-accent">{milestone}</p>
+          <p className="label-caps text-accent-ink">{milestone}</p>
           <p className="mt-2 text-[0.9rem] leading-relaxed text-ink-muted">{description}</p>
         </div>
       </div>

@@ -70,10 +70,34 @@ export interface StorageAdapter {
   estimate(): Promise<{ usageBytes: number; quotaBytes: number } | null>
 }
 
+export type InstallState =
+  /** Already running as an installed app. */
+  | 'installed'
+  /** The browser has offered an install prompt we can trigger. */
+  | 'promptable'
+  /** Installable, but only by hand — iOS Safari never fires the event. */
+  | 'manual'
+  /** This browser cannot install it at all. */
+  | 'unsupported'
+
+export interface InstallAdapter {
+  getState(): InstallState
+  /** Subscribe to state changes. Returns an unsubscribe function. */
+  subscribe(listener: (state: InstallState) => void): () => void
+  /**
+   * Show the browser's install prompt. Only meaningful when `promptable`.
+   * Resolves true if the user accepted.
+   */
+  prompt(): Promise<boolean>
+  /** True on iOS/iPadOS, where installing is a manual Share-sheet action. */
+  isIos(): boolean
+}
+
 export interface Platform {
   readonly notifications: NotificationAdapter
   readonly vibration: VibrationAdapter
   readonly audio: AudioAdapter
   readonly files: FilesAdapter
   readonly storage: StorageAdapter
+  readonly install: InstallAdapter
 }

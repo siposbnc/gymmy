@@ -1,6 +1,8 @@
 import type {
   AudioAdapter,
   FilesAdapter,
+  InstallAdapter,
+  InstallState,
   NotificationAdapter,
   Platform,
   StorageAdapter,
@@ -174,4 +176,91 @@ const storage: StorageAdapter = {
   },
 }
 
-export const webPlatform: Platform = { notifications, vibration, audio, files, storage }
+// ---------------------------------------------------------------------------
+// Install
+// ---------------------------------------------------------------------------
+
+/**
+ * Installing matters more here than for most web apps.
+ *
+ * On iOS an uninstalled site can have its IndexedDB evicted under storage
+ * pressure — which for Gymmy means losing training history that exists nowhere
+ * else. Installing also unlocks notifications (16.4+), without which the rest
+ * timer cannot reach you once you switch apps.
+ */
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>
+  readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
+let deferredPrompt: BeforeInstallPromptEvent | null = null
+const installListeners = new Set<(state: InstallState) => void>()
+
+function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false
+  // `standalone` is the iOS-only signal; the media query covers everyone else.
+  const iosStandalone = (window.navigator as { standalone?: boolean }).standalone === true
+  return iosStandalone || window.matchMedia('(display-mode: standalone)').matches
+}
+
+function detectIos(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  // iPadOS 13+ reports as Macintosh, so touch support disambiguates it.
+  return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+}
+
+function currentInstallState(): InstallState {
+  if (isStandalone()) return 'installed'
+  if (deferredPrompt) return 'promptable'
+  // Safari never fires beforeinstallprompt but can still install by hand.
+  if (detectIos()) return 'manual'
+  return 'unsupported'
+}
+
+function announceInstallState(): void {
+  const state = currentInstallState()
+  for (const listener of installListeners) listener(state)
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault()
+    deferredPrompt = event as BeforeInstallPromptEvent
+    announceInstallState()
+  })
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null
+    announceInstallState()
+  })
+}
+
+const install: InstallAdapter = {
+  getState: currentInstallState,
+
+  subscribe(listener) {
+    installListeners.add(listener)
+    return () => installListeners.delete(listener)
+  },
+
+  async prompt() {
+    if (!deferredPrompt) return false
+    await deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    // The event is single-use; the browser re-fires it if still installable.
+    deferredPrompt = null
+    announceInstallState()
+    return outcome === 'accepted'
+  },
+
+  isIos: detectIos,
+}
+
+export const webPlatform: Platform = {
+  notifications,
+  vibration,
+  audio,
+  files,
+  storage,
+  install,
+}

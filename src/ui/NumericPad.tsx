@@ -99,12 +99,12 @@ export function NumericPad({
 
   const keyClass =
     'h-[3.375rem] cursor-pointer rounded-[0.8125rem] text-[1.375rem] font-semibold num ' +
-    'bg-sunken transition-colors duration-(--dur-fast) hover:bg-accent-wash hover:text-accent ' +
+    'bg-sunken transition-colors duration-(--dur-fast) hover:bg-accent-wash hover:text-accent-ink ' +
     'active:scale-95'
   const utilClass =
     'h-[3.375rem] cursor-pointer rounded-[0.8125rem] text-[0.9rem] font-bold border border-line ' +
     'bg-transparent text-ink-muted transition-colors duration-(--dur-fast) hover:bg-accent-wash ' +
-    'hover:text-accent active:scale-95 grid place-items-center'
+    'hover:text-accent-ink active:scale-95 grid place-items-center'
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={eyebrow ?? 'Enter a value'} hideTitle>

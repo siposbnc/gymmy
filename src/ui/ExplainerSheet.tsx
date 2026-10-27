@@ -50,7 +50,7 @@ export function ExplainerSheet({
       eyebrow={eyebrow}
       footer={
         <div className="flex items-center gap-2">
-          <span className="flex-1 text-[0.8rem] font-bold text-accent">
+          <span className="flex-1 text-[0.8rem] font-bold text-accent-ink">
             All of Gymmy&rsquo;s maths →
           </span>
           <Button size="sm" onClick={() => onOpenChange(false)}>
@@ -60,7 +60,7 @@ export function ExplainerSheet({
       }
     >
       <section className="border-b border-line px-5 py-4">
-        <p className="label-caps mb-2 text-accent">What it is</p>
+        <p className="label-caps mb-2 text-accent-ink">What it is</p>
         <p className="text-[0.85rem] leading-relaxed" data-selectable>
           {entry.explainer.whatItIs}
         </p>
@@ -68,7 +68,7 @@ export function ExplainerSheet({
 
       {entry.formula ? (
         <section className="border-b border-line px-5 py-4">
-          <p className="label-caps mb-2 text-accent">How it&rsquo;s worked out</p>
+          <p className="label-caps mb-2 text-accent-ink">How it&rsquo;s worked out</p>
           <p className="num inline-block rounded-sm bg-sunken px-3 py-2 text-[0.875rem] font-semibold">
             {entry.formula}
           </p>
@@ -76,7 +76,7 @@ export function ExplainerSheet({
           {worked ? (
             <div className="mt-3 rounded-md border-l-[3px] border-accent bg-sunken px-4 py-3">
               <p className="label-caps mb-1.5 text-ink-faint">Your set</p>
-              <p className="num text-[0.9rem] leading-relaxed font-bold text-accent">
+              <p className="num text-[0.9rem] leading-relaxed font-bold text-accent-ink">
                 {worked.given}
               </p>
               <p className="num text-[0.9rem] leading-relaxed">
@@ -89,14 +89,14 @@ export function ExplainerSheet({
       ) : null}
 
       <section className="border-b border-line px-5 py-4">
-        <p className="label-caps mb-2 text-accent">Why it&rsquo;s useful</p>
+        <p className="label-caps mb-2 text-accent-ink">Why it&rsquo;s useful</p>
         <p className="text-[0.85rem] leading-relaxed" data-selectable>
           {entry.explainer.whyUseful}
         </p>
       </section>
 
       <section className="px-5 py-4">
-        <p className="label-caps mb-2 text-accent">Where it breaks down</p>
+        <p className="label-caps mb-2 text-accent-ink">Where it breaks down</p>
         <ul className="grid gap-2.5">
           {entry.explainer.caveats.map((caveat) => (
             <li

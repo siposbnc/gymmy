@@ -31,7 +31,7 @@ function Action({
       onClick={onClick}
       className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
     >
-      <span className={destructive ? 'text-danger' : 'text-accent'}>{icon}</span>
+      <span className={destructive ? 'text-danger' : 'text-accent-ink'}>{icon}</span>
       <span className="min-w-0 flex-1">
         <span className={`block text-[0.95rem] font-medium ${destructive ? 'text-danger' : ''}`}>
           {label}

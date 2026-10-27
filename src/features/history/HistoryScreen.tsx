@@ -81,17 +81,23 @@ export function HistoryScreen() {
 
             {grid.map((day) => {
               const inMonth = new Date(day).getMonth() === cursor.month
+
+              // Days from the neighbouring months are only here to square off
+              // the week grid. Rendering their numbers at 25% opacity put
+              // unreadable text on screen for no informational gain — the
+              // month heading already says where you are.
+              if (!inMonth) return <span key={day} aria-hidden className="aspect-square" />
+
               const didTrain = trained.has(day)
               return (
                 <span
                   key={day}
                   className={cn(
                     'num grid aspect-square place-items-center rounded-md text-[0.72rem] font-bold',
-                    !inMonth && 'opacity-25',
                     didTrain
                       ? 'bg-accent text-on-accent'
                       : day === today
-                        ? 'border border-accent text-accent'
+                        ? 'border border-accent text-accent-ink'
                         : 'text-ink-muted',
                   )}
                 >

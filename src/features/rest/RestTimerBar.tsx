@@ -39,7 +39,7 @@ export function RestTimerBar() {
         <span
           className={cn(
             'label-caps shrink-0',
-            isComplete ? 'animate-[pulse_1.6s_ease-in-out_infinite] text-success' : soon ? 'text-accent' : 'text-ink-faint',
+            isComplete ? 'animate-[pulse_1.6s_ease-in-out_infinite] text-success' : soon ? 'text-accent-ink' : 'text-ink-faint',
           )}
         >
           {isComplete ? 'Rest done' : soon ? 'Rest · get ready' : 'Rest'}
@@ -48,7 +48,7 @@ export function RestTimerBar() {
         <span
           className={cn(
             'num-hero flex-1 text-[1.7rem] leading-none',
-            isComplete ? 'text-success' : soon ? 'text-accent' : '',
+            isComplete ? 'text-success' : soon ? 'text-accent-ink' : '',
           )}
         >
           {formatDuration(Math.max(0, remaining))}
@@ -67,7 +67,7 @@ export function RestTimerBar() {
         <button
           type="button"
           onClick={skip}
-          className="h-9 shrink-0 cursor-pointer rounded-full px-3.5 text-[0.75rem] font-bold text-accent active:scale-95"
+          className="h-9 shrink-0 cursor-pointer rounded-full px-3.5 text-[0.75rem] font-bold text-accent-ink active:scale-95"
         >
           {isComplete ? 'Dismiss' : 'Skip'}
         </button>

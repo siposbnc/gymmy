@@ -1,3 +1,4 @@
+import type { CsvSetRow } from '~/domain/csv'
 import { computeRecords, recordId, type RecordSet } from '~/domain/records'
 import type { PersonalRecord, Session, SetEntry } from '~/domain/types'
 
@@ -153,6 +154,51 @@ export async function listHeadlineRecords(limit = 30): Promise<PersonalRecord[]>
     .filter((record) => record.kind === 'max_weight')
     .sort((a, b) => b.achievedAt - a.achievedAt)
     .slice(0, limit)
+}
+
+/**
+ * Every logged set, flattened for CSV.
+ *
+ * Completed sessions only — an in-progress workout is not history yet, and
+ * exporting it would produce a row that changes next time you look.
+ */
+export async function allSetsForExport(): Promise<CsvSetRow[]> {
+  const [sessions, links, sets, exercises] = await Promise.all([
+    db.sessions.toArray(),
+    db.sessionExercises.toArray(),
+    db.sets.toArray(),
+    db.exercises.toArray(),
+  ])
+
+  const sessionById = new Map(sessions.map((session) => [session.id, session]))
+  const linkById = new Map(links.map((link) => [link.id, link]))
+  const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]))
+
+  const rows = sets.flatMap((set): CsvSetRow[] => {
+    const link = linkById.get(set.sessionExerciseId)
+    if (!link) return []
+    const session = sessionById.get(link.sessionId)
+    if (!session || session.status !== 'completed') return []
+
+    return [
+      {
+        sessionId: session.id,
+        sessionName: session.name,
+        startedAt: session.startedAt,
+        exerciseName: exerciseById.get(link.exerciseId)?.name ?? 'Unknown exercise',
+        setIndex: set.setIndex,
+        setType: set.type,
+        weightKg: set.weightKg,
+        reps: set.reps,
+        rpe: set.rpe,
+      },
+    ]
+  })
+
+  // Chronological, so the file reads like a training log.
+  return rows.sort(
+    (a, b) => a.startedAt - b.startedAt || a.exerciseName.localeCompare(b.exerciseName) || a.setIndex - b.setIndex,
+  )
 }
 
 /**

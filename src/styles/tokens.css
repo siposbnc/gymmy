@@ -24,10 +24,16 @@
   /* --- Text ------------------------------------------------------------- */
   --text: #1a1614; /* 16.2:1 on --bg */
   --text-muted: #6b625a; /*  5.4:1 on --bg */
-  --text-faint: #9a9087;
+  /* Darkened from #9A9087 (2.8:1), which failed AA everywhere it was used.
+     It reads as a tertiary tone through weight, size and letter-spacing on
+     the small-caps labels — not through being too pale to read. */
+  --text-faint: #746b62; /*  4.7:1 on --bg */
 
   /* --- Accent: molten orange. Effort, heat, iron under sodium light ----- */
   --accent: #c7430f; /*  4.7:1 with --on-accent */
+  /* The accent as TEXT on a page background. The fill colour lands at 4.47:1
+     there — a hair under AA — so coloured labels use this instead. */
+  --accent-ink: #b83c0c; /*  5.1:1 on --bg */
   --accent-bright: #e2521a;
   --accent-wash: #fbeae1;
   --on-accent: #fff8f4;
@@ -70,9 +76,12 @@
 
   --text: #f5f0e9; /* 16.6:1 on --bg */
   --text-muted: #a79c91; /*  7.0:1 on --bg */
-  --text-faint: #7c7268;
+  /* Lightened from #7C7268 (4.0:1) for the same reason. */
+  --text-faint: #8a8075; /*  4.9:1 on --bg, 4.5:1 on --surface */
 
   --accent: #ff6a33; /*  6.6:1 with --on-accent */
+  /* Already clears AA as text on dark, so no separate step is needed. */
+  --accent-ink: #ff6a33;
   --accent-bright: #ff8354;
   --accent-wash: #2e1810;
   --on-accent: #1a0e07;

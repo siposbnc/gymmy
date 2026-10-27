@@ -52,7 +52,7 @@ function SessionBarContent({
         className="size-2 shrink-0 animate-[blink_2s_var(--ease-out-soft)_infinite] rounded-full bg-on-accent"
       />
       <span className="min-w-0 flex-1">
-        <span className="label-caps block opacity-70">Workout in progress</span>
+        <span className="label-caps block">Workout in progress</span>
         <span className="block truncate text-[0.95rem] font-bold">{name}</span>
       </span>
       <span className="num shrink-0 text-[0.85rem] font-bold opacity-90">
