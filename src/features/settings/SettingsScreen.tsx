@@ -9,6 +9,8 @@ import { ScreenHeader } from '~/ui/ScreenHeader'
 import { Stepper } from '~/ui/Stepper'
 import { cn } from '~/ui/cn'
 
+import { BackupSection } from './BackupSection'
+
 function Segmented<T extends string>({
   value,
   options,
@@ -214,6 +216,8 @@ export function SettingsScreen() {
             </div>
           </Card>
         </div>
+
+        <BackupSection settings={settings} />
       </div>
     </>
   )

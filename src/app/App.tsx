@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 
 import { ExercisesScreen } from '~/features/exercises/ExercisesScreen'
+import { ActiveSessionScreen } from '~/features/session/ActiveSessionScreen'
 import { MathsScreen } from '~/features/more/MathsScreen'
 import { MoreScreen } from '~/features/more/MoreScreen'
 import { ComingSoon } from '~/features/placeholder/ComingSoon'
@@ -19,6 +20,10 @@ export function App() {
           <Routes>
             <Route element={<TabShell />}>
               <Route index element={<TodayScreen />} />
+
+              {/* Inside the shell so the tab bar stays reachable mid-workout,
+                  but the session bar hides itself here. */}
+              <Route path="session" element={<ActiveSessionScreen />} />
 
               <Route
                 path="routines"

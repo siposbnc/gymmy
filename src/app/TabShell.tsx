@@ -3,6 +3,8 @@ import { NavLink, Outlet } from 'react-router'
 
 import { cn } from '~/ui/cn'
 
+import { ActiveSessionBar } from './ActiveSessionBar'
+
 const TABS = [
   { to: '/', label: 'Today', Icon: Dumbbell, end: true },
   { to: '/routines', label: 'Routines', Icon: ListChecks, end: false },
@@ -24,6 +26,10 @@ export function TabShell() {
       <main className="min-h-0 flex-1 overflow-y-auto pb-2">
         <Outlet />
       </main>
+
+      <div className="shrink-0">
+        <ActiveSessionBar />
+      </div>
 
       <nav
         aria-label="Main"

@@ -1,83 +1,176 @@
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Play } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router'
 
-import { useSettings } from '~/db/hooks'
-import { calculatePlates, formatPlates } from '~/domain/metrics'
-import { formatWeight } from '~/domain/units'
+import { useActiveSession, useSettings } from '~/db/hooks'
+import { discardSession, isStale, startEmptySession } from '~/db/repositories/sessions'
+import { totalVolume } from '~/domain/metrics'
+import { formatVolume } from '~/domain/units'
+import { Button } from '~/ui/Button'
 import { Card } from '~/ui/Card'
-import { InfoAffordance } from '~/ui/InfoAffordance'
 import { ScreenHeader } from '~/ui/ScreenHeader'
-import { Stat } from '~/ui/Stat'
+import { Sheet } from '~/ui/Sheet'
+import { formatDuration, useElapsed } from '~/features/session/useElapsed'
 
-/**
- * The Today tab.
- *
- * In M1 this becomes the real entry point — active session card, or the
- * start-workout buttons. For M0 it proves the foundations are wired: live
- * settings off IndexedDB, a pure domain calculation, and the explainer sheet.
- */
 export function TodayScreen() {
+  const navigate = useNavigate()
+  const active = useActiveSession()
   const settings = useSettings()
+  const [confirmStale, setConfirmStale] = useState(false)
 
-  // A real calculation against the user's real plate inventory, so M0 is
-  // demonstrably working rather than merely compiling.
-  const demoTarget = 100
-  const plates = calculatePlates({
-    targetKg: demoTarget,
-    barWeightKg: settings.barWeightKg,
-    inventory: settings.plateInventory,
-  })
+  const session = active?.session ?? null
+  const stale = session ? isStale(session) : false
+
+  async function start() {
+    await startEmptySession('Workout')
+    await navigate('/session')
+  }
 
   return (
     <>
-      <ScreenHeader eyebrow="Gymmy" title="Foundations are in." />
+      <ScreenHeader
+        eyebrow={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+        title={session ? 'Pick up where you left off.' : 'Ready when you are.'}
+      />
 
-      <div className="grid gap-3 px-4">
+      <div className="grid gap-3 px-4 pb-6">
+        {session ? (
+          <ResumeCard
+            name={session.name}
+            startedAt={session.startedAt}
+            setCount={
+              active?.views.flatMap((v) => v.sets).filter((s) => s.type !== 'warmup').length ?? 0
+            }
+            volume={formatVolume(
+              totalVolume({ sets: active?.views.flatMap((v) => v.sets) ?? [] }),
+              settings.units,
+            )}
+            stale={stale}
+            onResume={() => void navigate('/session')}
+            onDiscard={() => setConfirmStale(true)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => void start()}
+            className="flex h-16 cursor-pointer items-center gap-3 rounded-xl bg-accent px-5 text-on-accent shadow-(--shadow-md) transition-transform duration-(--dur-fast) active:scale-[0.98]"
+          >
+            <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
+            <span className="flex-1 text-left">
+              <span className="label-caps block opacity-70">No plan needed</span>
+              <span className="block text-[1.1rem] font-bold tracking-tight">Start a workout</span>
+            </span>
+            <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
+          </button>
+        )}
+
         <Card>
-          <p className="text-[0.9rem] leading-relaxed text-ink-muted">
-            M0 is complete: the token layer, database, platform adapters and UI kit are wired up.
-            Set logging arrives in <strong className="font-semibold text-ink">M1</strong>.
+          <p className="text-[0.85rem] leading-relaxed text-ink-muted">
+            <strong className="font-semibold text-ink">M1 is in:</strong> empty workouts, pre-filled
+            set rows, warm-ups, RPE, editable history and backups. Training plans arrive in M3 —
+            until then every workout starts empty and you add exercises as you go.
           </p>
         </Card>
 
-        <div className="grid grid-cols-3 gap-2.5">
-          <Stat label="Unit" value={settings.units} />
-          <Stat label="Bar" value={formatWeight(settings.barWeightKg, settings.units, { withUnit: false })} unit={settings.units} />
-          <Stat label="Rest" value={`${Math.round(settings.defaultRestSeconds / 60)}:00`} />
-        </div>
-
-        <Card>
-          <p className="label-caps flex items-center gap-1.5 text-ink-faint">
-            Plates per side for {formatWeight(demoTarget, settings.units)}
-            <InfoAffordance
-              explainerId="plates"
-              exampleInput={{
-                targetKg: demoTarget,
-                barWeightKg: settings.barWeightKg,
-                inventory: settings.plateInventory,
-              }}
-            />
-          </p>
-          <p className="num mt-1.5 text-title font-semibold">{formatPlates(plates)}</p>
-          {!plates.exact ? (
-            <p className="mt-1 text-[0.75rem] text-ink-muted">
-              Not loadable exactly — closest is {formatWeight(plates.achievedKg, settings.units)}.
-            </p>
-          ) : null}
-        </Card>
-
-        <a
-          href="/more/maths"
-          className="flex touch-comfortable items-center gap-3 rounded-lg bg-accent px-5 text-on-accent"
+        <button
+          type="button"
+          onClick={() => void navigate('/more/maths')}
+          className="flex cursor-pointer items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-left"
         >
-          <span className="flex-1">
-            <span className="label-caps block opacity-70">Every number, explained</span>
-            <span className="text-[1.05rem] font-bold tracking-tight">
+          <span className="min-w-0 flex-1">
+            <span className="label-caps block text-ink-faint">Every number, explained</span>
+            <span className="block text-[0.95rem] font-semibold">
               How Gymmy works out your numbers
             </span>
           </span>
-          <ArrowRight size={20} aria-hidden />
-        </a>
+          <ArrowRight size={17} aria-hidden className="shrink-0 text-ink-faint" />
+        </button>
       </div>
+
+      <Sheet
+        open={confirmStale}
+        onOpenChange={setConfirmStale}
+        title="Discard this workout?"
+        footer={
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setConfirmStale(false)}>
+              Keep it
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                if (session) void discardSession(session.id)
+                setConfirmStale(false)
+              }}
+            >
+              Discard
+            </Button>
+          </div>
+        }
+      >
+        <p className="px-5 py-4 text-[0.9rem] leading-relaxed text-ink-muted">
+          This removes the session and every set logged in it. There is no undo — but you can finish
+          it instead and edit or delete it later from History.
+        </p>
+      </Sheet>
     </>
+  )
+}
+
+function ResumeCard({
+  name,
+  startedAt,
+  setCount,
+  volume,
+  stale,
+  onResume,
+  onDiscard,
+}: {
+  name: string
+  startedAt: number
+  setCount: number
+  volume: string
+  stale: boolean
+  onResume: () => void
+  onDiscard: () => void
+}) {
+  const elapsed = useElapsed(startedAt)
+
+  return (
+    <Card active className="p-0">
+      <button
+        type="button"
+        onClick={onResume}
+        className="w-full cursor-pointer px-4 pt-4 pb-3 text-left"
+      >
+        <p className="label-caps text-accent">In progress</p>
+        <p className="mt-1 font-display text-[1.6rem] leading-tight">{name}</p>
+        <p className="num mt-1.5 text-[0.8rem] text-ink-muted">
+          {formatDuration(elapsed)} · {setCount} set{setCount === 1 ? '' : 's'} · {volume}
+        </p>
+      </button>
+
+      <div className="flex items-center gap-2 border-t border-line px-4 py-3">
+        <Button size="sm" className="flex-1" onClick={onResume}>
+          Continue
+        </Button>
+        {stale ? (
+          <Button variant="danger" size="sm" onClick={onDiscard}>
+            Discard
+          </Button>
+        ) : null}
+      </div>
+
+      {stale ? (
+        // Someone who started a session yesterday and forgot it should not have
+        // today's workout silently appended to it.
+        <p className="border-t border-line px-4 py-2.5 text-[0.75rem] leading-relaxed text-ink-muted">
+          This workout has been open for a while. Continue it if you are still training, or discard
+          it and start fresh.
+        </p>
+      ) : null}
+    </Card>
   )
 }

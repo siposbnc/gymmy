@@ -3,9 +3,10 @@
 A gym buddy app. Log your sets and reps fast, build your own training plans, and watch the
 numbers go up.
 
-> **Status: M0 complete — foundations.** The app runs; set logging arrives in M1.
-> The full design lives in **[docs/PLAN.md](docs/PLAN.md)**, the visual system in
-> **[design/](design/)**.
+> **Status: M1 complete — you can log a real workout.** Empty workouts, pre-filled
+> set rows, warm-ups, RPE, editable sets, session recovery and backups all work.
+> Training plans arrive in M3. The full design lives in
+> **[docs/PLAN.md](docs/PLAN.md)**, the visual system in **[design/](design/)**.
 
 ## Getting started
 
