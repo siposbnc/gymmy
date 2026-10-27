@@ -60,6 +60,16 @@ export async function updateExercise(
   await db.exercises.update(id, patch)
 }
 
+/** Detach an exercise from a specific bar, so it follows the default again. */
+export async function clearExerciseBar(id: string): Promise<void> {
+  await db.exercises
+    .where('id')
+    .equals(id)
+    .modify((exercise) => {
+      delete exercise.barId
+    })
+}
+
 /**
  * Whether an exercise can be deleted outright.
  *

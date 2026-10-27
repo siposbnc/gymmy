@@ -29,6 +29,8 @@ describe('bootstrapDatabase', () => {
           weekStartsOn: 1,
           defaultRestSeconds: 120,
           barWeightKg: 20,
+          bars: [{ id: 'bar_olympic', name: 'Olympic bar', weightKg: 20 }],
+          defaultBarId: 'bar_olympic',
           plateInventory: [],
           weeklySessionGoal: 3,
           showStreak: true,

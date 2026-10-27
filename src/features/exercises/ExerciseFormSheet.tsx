@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 
-import { createCustomExercise, updateExercise } from '~/db/repositories/exercises'
+import { useSettings } from '~/db/hooks'
+import {
+  clearExerciseBar,
+  createCustomExercise,
+  updateExercise,
+} from '~/db/repositories/exercises'
+import { usesBar } from '~/domain/bars'
 import type {
   Equipment,
   Exercise,
@@ -63,6 +69,10 @@ export function ExerciseFormSheet({
   const [trackingType, setTrackingType] = useState<TrackingType>('weight_reps')
   const [restSeconds, setRestSeconds] = useState(120)
   const [description, setDescription] = useState('')
+  /** Empty string means "follow the default bar". */
+  const [barId, setBarId] = useState('')
+
+  const settings = useSettings()
 
   // Re-seed from the exercise being edited each time the sheet opens.
   useEffect(() => {
@@ -74,9 +84,12 @@ export function ExerciseFormSheet({
     setTrackingType(existing?.trackingType ?? 'weight_reps')
     setRestSeconds(existing?.defaultRestSeconds ?? 120)
     setDescription(existing?.description ?? '')
+    setBarId(existing?.barId ?? '')
   }, [open, existing])
 
   const trimmed = name.trim()
+  const defaultBarName =
+    settings.bars.find((bar) => bar.id === settings.defaultBarId)?.name ?? 'none set'
 
   async function save() {
     if (!trimmed) return
@@ -89,9 +102,13 @@ export function ExerciseFormSheet({
       trackingType,
       defaultRestSeconds: restSeconds,
       ...(description.trim() ? { description: description.trim() } : {}),
+      ...(barId && usesBar({ equipment }) ? { barId } : {}),
     }
 
     if (existing) {
+      // Clearing the bar has to remove the field, not set it to empty, or the
+      // exercise would stay pinned to a bar that no longer applies.
+      if (!barId || !usesBar({ equipment })) await clearExerciseBar(existing.id)
       await updateExercise(existing.id, shared)
       onSaved?.(existing.id)
     } else {
@@ -166,6 +183,26 @@ export function ExerciseFormSheet({
             ariaLabel="Movement type"
           />
         </Field>
+
+        {usesBar({ equipment }) ? (
+          <Field
+            label="Bar"
+            hint="Which bar this is loaded on, so the plate calculator subtracts the right weight"
+          >
+            <Chips
+              options={[
+                { value: '', label: `Default (${defaultBarName})` },
+                ...settings.bars.map((bar) => ({
+                  value: bar.id,
+                  label: `${bar.name} · ${bar.weightKg} kg`,
+                })),
+              ]}
+              value={barId}
+              onChange={setBarId}
+              ariaLabel="Bar used"
+            />
+          </Field>
+        ) : null}
 
         <Field label="What you track" hint="Reps only suits bodyweight work like pull-ups">
           <Chips

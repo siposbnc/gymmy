@@ -28,7 +28,7 @@ describe('schema migrations', () => {
     return legacy
   }
 
-  it('v1 → v2 backfills the rest settings without touching anything else', async () => {
+  it('v1 → current backfills the rest settings without touching anything else', async () => {
     const name = `gymmy-migration-${Math.random().toString(36).slice(2)}`
 
     const legacy = await createV1Database(name)
@@ -66,7 +66,12 @@ describe('schema migrations', () => {
     expect(settings?.autoStartRest).toBe(true)
     expect(settings?.restSound).toBe(true)
     expect(settings?.restVibrate).toBe(true)
-    expect(settings?.schemaVersion).toBe(2)
+
+    // A v1 database opened today runs every upgrade in sequence, so it lands
+    // at the current version with v3's bars in place too.
+    expect(settings?.schemaVersion).toBe(SCHEMA_VERSION)
+    expect(settings?.bars.length).toBeGreaterThan(0)
+    expect(settings?.defaultBarId).toBeTruthy()
 
     // ...and the user's existing choices are untouched.
     expect(settings?.units).toBe('lb')
@@ -80,6 +85,49 @@ describe('schema migrations', () => {
     // And their training history survived, which is the whole point.
     const session = await upgraded.sessions.get('ses_old')
     expect(session?.name).toBe('An old workout')
+
+    upgraded.close()
+  })
+
+  it('v2 → v3 turns the single bar weight into the default bar', async () => {
+    const name = `gymmy-migration-${Math.random().toString(36).slice(2)}`
+
+    const legacy = await createV1Database(name)
+    await legacy.table('settings').add({
+      id: 'singleton',
+      units: 'kg',
+      theme: 'system',
+      weekStartsOn: 1,
+      defaultRestSeconds: 120,
+      // A user who measured their bar at 15 kg.
+      barWeightKg: 15,
+      plateInventory: [{ weightKg: 20, pairs: 2 }],
+      weeklySessionGoal: 3,
+      showStreak: true,
+      showRpe: false,
+      autoStartRest: true,
+      restSound: true,
+      restVibrate: true,
+      schemaVersion: 2,
+    })
+    legacy.close()
+
+    const upgraded = new GymmyDB(name)
+    await upgraded.open()
+    const settings = await upgraded.settings.get('singleton')
+
+    // Their measured weight becomes the default bar. Silently switching every
+    // plate calculation to a seeded 20 kg would be the worst possible upgrade.
+    const defaultBar = settings?.bars.find((bar) => bar.id === settings.defaultBarId)
+    expect(defaultBar?.weightKg).toBe(15)
+
+    // The standard rack comes along, minus anything duplicating their weight.
+    expect(settings?.bars.length).toBeGreaterThan(1)
+    expect(settings?.bars.filter((bar) => bar.weightKg === 15)).toHaveLength(1)
+
+    // And the legacy field stays, so a v2 export still imports.
+    expect(settings?.barWeightKg).toBe(15)
+    expect(settings?.schemaVersion).toBe(3)
 
     upgraded.close()
   })

@@ -3,7 +3,12 @@ import type { Settings } from '~/domain/types'
 import { recomputeRecordsFor } from '../repositories/history'
 import { db, SCHEMA_VERSION } from '../schema'
 import { SEED_EXERCISES } from './exercises'
-import { DEFAULT_BAR_WEIGHT_KG, DEFAULT_PLATE_INVENTORY } from './plates'
+import {
+  DEFAULT_BAR_ID,
+  DEFAULT_BAR_WEIGHT_KG,
+  DEFAULT_BARS,
+  DEFAULT_PLATE_INVENTORY,
+} from './plates'
 
 export const DEFAULT_SETTINGS: Settings = {
   id: 'singleton',
@@ -12,6 +17,8 @@ export const DEFAULT_SETTINGS: Settings = {
   weekStartsOn: 1,
   defaultRestSeconds: 120,
   barWeightKg: DEFAULT_BAR_WEIGHT_KG,
+  bars: DEFAULT_BARS,
+  defaultBarId: DEFAULT_BAR_ID,
   plateInventory: DEFAULT_PLATE_INVENTORY,
   weeklySessionGoal: 3,
   showStreak: true,
@@ -110,4 +117,10 @@ async function seedStaticData(): Promise<void> {
   })
 }
 
-export { SEED_EXERCISES, DEFAULT_PLATE_INVENTORY, DEFAULT_BAR_WEIGHT_KG }
+export {
+  SEED_EXERCISES,
+  DEFAULT_PLATE_INVENTORY,
+  DEFAULT_BAR_WEIGHT_KG,
+  DEFAULT_BARS,
+  DEFAULT_BAR_ID,
+}

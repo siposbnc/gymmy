@@ -300,6 +300,17 @@ for (const theme of ['light', 'dark']) {
   )
 
   allErrors.push(
+    ...(await shoot('settings-bars', {
+      theme,
+      steps: async (page) => {
+        await page.goto(`${BASE}/more/settings`, { waitUntil: 'networkidle' })
+        await page.getByText('Bars', { exact: true }).scrollIntoViewIfNeeded()
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
+  allErrors.push(
     ...(await shoot('explainer', {
       theme,
       steps: async (page) => {
