@@ -11,12 +11,25 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'prompt',
+      // autoUpdate, not prompt: an installed PWA is rarely fully closed, so a
+      // waiting service worker can sit there for weeks and you stay stuck on
+      // the version you first installed. Auto-updating is safe here because
+      // every set is written to IndexedDB the moment it is logged and an
+      // interrupted session is recovered on launch — the worst case is a
+      // reload that puts you back exactly where you were.
+      //
+      // M5 can replace this with a polite "update ready" prompt that waits for
+      // a moment you are not mid-set.
+      registerType: 'autoUpdate',
       // Fonts are bundled, not fetched — a PWA used in a gym basement cannot
       // depend on a CDN. Precaching them is the whole point.
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        // Client-side routes must fall back to the shell, so a refresh on
+        // /history/<id> works offline as well as online.
+        navigateFallback: 'index.html',
+        cleanupOutdatedCaches: true,
       },
       manifest: {
         name: 'Gymmy',

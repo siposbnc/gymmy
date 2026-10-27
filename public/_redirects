@@ -1,0 +1,9 @@
+# SPA fallback.
+#
+# Gymmy routes on the client, so a hard refresh or a shared link to
+# /history/<id> must still be served index.html rather than a 404. The host
+# checks for a real file first, so assets, the manifest and sw.js are
+# unaffected.
+#
+# Understood by both Cloudflare Pages and Netlify.
+/*  /index.html  200
