@@ -1,4 +1,4 @@
-import { recordsGuide, rpeGuide, unitsGuide, warmupGuide } from './guides'
+import { recordsGuide, restTimerGuide, rpeGuide, unitsGuide, warmupGuide } from './guides'
 import { oneRepMaxMetric } from './one-rep-max'
 import { platesMetric } from './plates'
 import { prefillMetric } from './prefill'
@@ -30,6 +30,7 @@ export const EXPLAINABLES: readonly Explainable[] = [
   recordsGuide,
   rpeGuide,
   warmupGuide,
+  restTimerGuide,
   unitsGuide,
 ]
 

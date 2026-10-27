@@ -7,6 +7,7 @@ import { ThemeProvider } from '~/app/ThemeProvider'
 import { addExerciseToSession, listSets, startEmptySession } from '~/db/repositories/sessions'
 import { db } from '~/db/schema'
 import { bootstrapDatabase } from '~/db/seed'
+import { useRestTimer } from '~/features/rest/restTimer'
 
 import { ActiveSessionScreen } from './ActiveSessionScreen'
 
@@ -33,6 +34,7 @@ describe('logging a set', () => {
     await db.delete()
     await db.open()
     await bootstrapDatabase()
+    useRestTimer.setState({ endsAt: null, totalSeconds: 0, label: null, signalled: false })
   })
 
   it('logs in one tap and carries the numbers forward', async () => {
@@ -163,5 +165,37 @@ describe('logging a set', () => {
     await startEmptySession('Interrupted workout')
     renderSession()
     expect(await screen.findByText('Interrupted workout')).toBeInTheDocument()
+  })
+
+  it('auto-starts rest using the exercise own default', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Legs')
+    await addExerciseToSession(sessionId, 'ex_squat')
+
+    renderSession()
+    await screen.findByText('Squat')
+
+    await user.click(screen.getByRole('button', { name: /weight: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '6' }))
+    await user.click(screen.getByRole('button', { name: '0' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await user.click(await screen.findByRole('button', { name: /reps: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '5' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    expect(useRestTimer.getState().endsAt).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Log' }))
+
+    await waitFor(() => {
+      const { endsAt, totalSeconds, label } = useRestTimer.getState()
+      // Squat is seeded at 240s, well above the 120s global default — the
+      // per-exercise value is what must win.
+      expect(totalSeconds).toBe(240)
+      expect(label).toBe('Squat')
+      expect(endsAt).toBeGreaterThan(Date.now())
+    })
   })
 })

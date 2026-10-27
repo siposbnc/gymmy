@@ -82,6 +82,25 @@ export async function removeSessionExercise(sessionExerciseId: string): Promise<
   })
 }
 
+/**
+ * Change how long you rest after this exercise.
+ *
+ * Writes to both the session row (this workout) and the exercise row (every
+ * future workout). Changing a rest length mid-session is almost always a
+ * correction to a bad default rather than a one-off, so remembering it is the
+ * behaviour that matches intent.
+ */
+export async function setExerciseRest(
+  sessionExerciseId: string,
+  exerciseId: string,
+  seconds: number,
+): Promise<void> {
+  await db.transaction('rw', db.sessionExercises, db.exercises, async () => {
+    await db.sessionExercises.update(sessionExerciseId, { restSeconds: seconds })
+    await db.exercises.update(exerciseId, { defaultRestSeconds: seconds })
+  })
+}
+
 export async function reorderSessionExercises(
   sessionId: string,
   orderedIds: readonly string[],

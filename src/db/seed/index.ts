@@ -15,6 +15,9 @@ export const DEFAULT_SETTINGS: Settings = {
   weeklySessionGoal: 3,
   showStreak: true,
   showRpe: false,
+  autoStartRest: true,
+  restSound: true,
+  restVibrate: true,
   schemaVersion: SCHEMA_VERSION,
 }
 

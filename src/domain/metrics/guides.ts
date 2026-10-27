@@ -61,6 +61,22 @@ export const recordsGuide: Explainable = {
   },
 }
 
+export const restTimerGuide: Explainable = {
+  id: 'rest_timer',
+  label: 'The rest timer',
+  shortLabel: 'rest',
+  explainer: {
+    whatItIs:
+      'A countdown between sets. It starts on its own when you log a set, using the rest length saved for that exercise, and you can add 30 seconds or skip it at any point.',
+    whyUseful:
+      'Rest length changes what a session trains. Keeping it consistent is what makes this week comparable to last week — and it saves watching a clock while you are catching your breath.',
+    caveats: [
+      'Gymmy records when your rest ends rather than counting down second by second, so locking your phone or switching apps cannot make it drift. Come back after two minutes away and it already shows the right time.',
+      'A notification needs permission, and on iPhone it needs Gymmy installed to the home screen. Vibration does not exist in Safari at all. The in-app sound and the on-screen countdown always work, which is why the timer never relies on the other two.',
+    ],
+  },
+}
+
 export const unitsGuide: Explainable = {
   id: 'units',
   label: 'Kilograms and pounds',

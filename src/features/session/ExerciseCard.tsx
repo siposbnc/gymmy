@@ -6,9 +6,14 @@ import {
   deleteSet,
   logSet,
   removeSessionExercise,
+  setExerciseRest,
   toggleWarmup,
   updateSet,
 } from '~/db/repositories/sessions'
+import { useRestTimer } from '~/features/rest/restTimer'
+import { platform } from '~/lib/platform'
+import { formatRestLength } from '~/lib/time'
+import { Stepper } from '~/ui/Stepper'
 import { calculatePlates, formatPlates, lastTimeSummary, resolvePrefill } from '~/domain/metrics'
 import type { Settings, SetEntry } from '~/domain/types'
 import { fromDisplayUnit, INCREMENT, toDisplayUnit } from '~/domain/units'
@@ -81,12 +86,28 @@ export function ExerciseCard({ view, settings, active = false }: ExerciseCardPro
 
   const activeSet: SetEntry | null = sets.find((set) => set.id === actionsFor) ?? null
 
+  const startRest = useRestTimer((state) => state.start)
+
+  const restSeconds =
+    sessionExercise.restSeconds ?? exercise?.defaultRestSeconds ?? settings.defaultRestSeconds
+
   async function handleLog() {
+    // iOS will not let audio play unless it has been unlocked from a user
+    // gesture. The Log tap is the only gesture guaranteed to precede a rest
+    // timer, so this is the right place to do it.
+    void platform.audio.unlock()
+
     await logSet(sessionExercise.id, {
       weightKg,
       reps,
       type: draftWarmup ? 'warmup' : 'normal',
     })
+
+    // Auto-start removes a tap from a loop that repeats thirty times a session.
+    if (settings.autoStartRest && restSeconds > 0) {
+      startRest(restSeconds, exercise?.name ?? 'Rest')
+    }
+
     // Clear the overrides so the next row follows the chain again — which now
     // carries forward what was just logged.
     setDraftWeight(null)
@@ -159,7 +180,8 @@ export function ExerciseCard({ view, settings, active = false }: ExerciseCardPro
           {exercise?.name ?? 'Unknown exercise'}
         </h2>
         <span className="num shrink-0 text-[0.7rem] font-extrabold tracking-wide text-ink-faint">
-          {workingSets.length} set{workingSets.length === 1 ? '' : 's'}
+          {workingSets.length} set{workingSets.length === 1 ? '' : 's'} · rest{' '}
+          {formatRestLength(restSeconds)}
         </span>
         <button
           type="button"
@@ -258,6 +280,23 @@ export function ExerciseCard({ view, settings, active = false }: ExerciseCardPro
         eyebrow={exercise?.name}
         title="Exercise options"
       >
+        <div className="border-b border-line px-5 py-4">
+          <p className="label-caps mb-2 text-ink-faint">Rest after each set</p>
+          <Stepper
+            value={restSeconds}
+            onChange={(seconds) => {
+              if (exercise) void setExerciseRest(sessionExercise.id, exercise.id, seconds)
+            }}
+            step={15}
+            min={0}
+            max={600}
+            unit={formatRestLength(restSeconds)}
+            hint="Remembered for this exercise next time"
+            decreaseLabel="Decrease rest by 15 seconds"
+            increaseLabel="Increase rest by 15 seconds"
+          />
+        </div>
+
         <div className="pb-2">
           <button
             type="button"

@@ -29,7 +29,12 @@ export interface NotificationAdapter {
    * surviving — the web adapter degrades honestly when the page is frozen,
    * which is exactly why the rest timer never depends on this alone.
    */
-  scheduleAt(options: { id: string; title: string; body?: string; at: number }): () => void
+  scheduleAt(options: {
+    id: string
+    title: string
+    body?: string | undefined
+    at: number
+  }): () => void
   cancel(id: string): void
 }
 

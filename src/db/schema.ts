@@ -23,7 +23,7 @@ import type {
  * SCHEMA_VERSION is also written into exports so an import can tell what it is
  * looking at.
  */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 /** Indexes only. Dexie stores the whole object regardless of what is listed. */
 export class GymmyDB extends Dexie {
@@ -51,6 +51,26 @@ export class GymmyDB extends Dexie {
       records: 'id, exerciseId, [exerciseId+kind], achievedAt, sessionId',
       settings: 'id',
     })
+
+    // v2 — rest timer preferences (M2).
+    //
+    // No index changes, so the store definitions are unchanged; the upgrade
+    // exists purely to backfill the new Settings fields. Doing this through a
+    // real migration rather than defaulting on read means the stored row is
+    // always complete, so an export taken after an upgrade is too.
+    this.version(2)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table<Settings, string>('settings')
+          .toCollection()
+          .modify((settings) => {
+            settings.autoStartRest ??= true
+            settings.restSound ??= true
+            settings.restVibrate ??= true
+            settings.schemaVersion = 2
+          })
+      })
   }
 }
 

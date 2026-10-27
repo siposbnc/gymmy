@@ -10,6 +10,7 @@ import { Stepper } from '~/ui/Stepper'
 import { cn } from '~/ui/cn'
 
 import { BackupSection } from './BackupSection'
+import { RestSection } from './RestSection'
 
 function Segmented<T extends string>({
   value,
@@ -133,22 +134,7 @@ export function SettingsScreen() {
           </Row>
         </Card>
 
-        <div>
-          <p className="label-caps mb-2 px-1 text-ink-faint">Rest</p>
-          <Card>
-            <Stepper
-              value={settings.defaultRestSeconds}
-              onChange={(defaultRestSeconds) => void updateSettings({ defaultRestSeconds })}
-              step={15}
-              min={15}
-              max={600}
-              unit="seconds"
-              hint="Default — individual exercises override this"
-              decreaseLabel="Decrease default rest by 15 seconds"
-              increaseLabel="Increase default rest by 15 seconds"
-            />
-          </Card>
-        </div>
+        <RestSection settings={settings} />
 
         <div>
           <p className="label-caps mb-2 px-1 text-ink-faint">Bar &amp; plates</p>

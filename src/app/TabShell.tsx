@@ -3,6 +3,8 @@ import { NavLink, Outlet } from 'react-router'
 
 import { cn } from '~/ui/cn'
 
+import { RestTimerBar } from '~/features/rest/RestTimerBar'
+
 import { ActiveSessionBar } from './ActiveSessionBar'
 
 const TABS = [
@@ -27,7 +29,10 @@ export function TabShell() {
         <Outlet />
       </main>
 
+      {/* Rest above the session bar: it is the more urgent of the two, and it
+          is temporary, so it gets the position nearer the thumb. */}
       <div className="shrink-0">
+        <RestTimerBar />
         <ActiveSessionBar />
       </div>
 

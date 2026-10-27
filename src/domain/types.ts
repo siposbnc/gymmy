@@ -211,6 +211,12 @@ export interface Settings {
   weeklySessionGoal: number
   showStreak: boolean
   showRpe: boolean
+
+  /** Rest timer behaviour. Added in schema v2. */
+  autoStartRest: boolean
+  restSound: boolean
+  restVibrate: boolean
+
   schemaVersion: number
   lastExportAt?: number
 }

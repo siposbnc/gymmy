@@ -33,6 +33,9 @@ describe('bootstrapDatabase', () => {
           weeklySessionGoal: 3,
           showStreak: true,
           showRpe: false,
+          autoStartRest: true,
+          restSound: true,
+          restVibrate: true,
           schemaVersion: SCHEMA_VERSION,
         })
       }
