@@ -11,6 +11,7 @@ import './styles/app.css'
 
 import { App } from './app/App'
 import { bootstrapDatabase } from './db/seed'
+import { trackKeyboardInset } from './lib/keyboard'
 import { platform } from './lib/platform'
 
 const container = document.querySelector('#root')
@@ -31,6 +32,10 @@ async function start(root: Element) {
   // A request, not a guarantee — iOS evicts storage for uninstalled sites under
   // pressure. This is why export/import ships in M1 rather than at the end.
   void platform.storage.requestPersistence()
+
+  // Publishes --keyboard-inset so bottom sheets can lift clear of the on-screen
+  // keyboard. Lives for the life of the app, so the cleanup is discarded.
+  trackKeyboardInset()
 
   createRoot(root).render(
     <StrictMode>

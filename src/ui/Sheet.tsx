@@ -43,10 +43,20 @@ export function Sheet({
           )}
         />
         <Dialog.Content
+          // Lift clear of the on-screen keyboard. A sheet sits against the
+          // bottom of the LAYOUT viewport, but the keyboard covers the bottom
+          // of the VISUAL one — and iOS does not shrink dvh for it — so
+          // without this the list is hidden behind the keys the moment you tap
+          // a search field. The height shrinks by the same amount so the top
+          // of the sheet does not run off-screen instead.
+          style={{
+            bottom: 'var(--keyboard-inset, 0px)',
+            maxHeight: 'calc(88dvh - var(--keyboard-inset, 0px))',
+          }}
           className={cn(
-            'fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88dvh] w-full max-w-[32rem]',
+            'fixed inset-x-0 z-50 mx-auto flex w-full max-w-[32rem]',
             'flex-col overflow-hidden rounded-t-[1.375rem] border border-line bg-raised',
-            'shadow-(--shadow-lg) focus:outline-none',
+            'shadow-(--shadow-lg) transition-[bottom,max-height] duration-200 focus:outline-none',
             'data-[state=open]:animate-[sheet-up_var(--dur-slow)_var(--ease-out-soft)]',
             className,
           )}

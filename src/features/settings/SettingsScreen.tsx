@@ -6,10 +6,10 @@ import { useTheme } from '~/app/theme-context'
 import { Card } from '~/ui/Card'
 import { InfoAffordance } from '~/ui/InfoAffordance'
 import { ScreenHeader } from '~/ui/ScreenHeader'
-import { Stepper } from '~/ui/Stepper'
 import { cn } from '~/ui/cn'
 
 import { BackupSection } from './BackupSection'
+import { BarsSection } from './BarsSection'
 import { RestSection } from './RestSection'
 
 function Segmented<T extends string>({
@@ -136,20 +136,11 @@ export function SettingsScreen() {
 
         <RestSection settings={settings} />
 
-        <div>
-          <p className="label-caps mb-2 px-1 text-ink-faint">Bar &amp; plates</p>
-          <Card className="grid gap-3">
-            <Stepper
-              value={settings.barWeightKg}
-              onChange={(barWeightKg) => void updateSettings({ barWeightKg })}
-              step={2.5}
-              min={0}
-              max={40}
-              unit="kg bar"
-              decreaseLabel="Decrease bar weight"
-              increaseLabel="Increase bar weight"
-            />
+        <BarsSection settings={settings} />
 
+        <div>
+          <p className="label-caps mb-2 px-1 text-ink-faint">Plates</p>
+          <Card className="grid gap-3">
             <div>
               <p className="label-caps mb-2 text-ink-faint">Pairs owned</p>
               <ul className="grid gap-1.5">

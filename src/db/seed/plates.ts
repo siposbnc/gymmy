@@ -1,4 +1,4 @@
-import type { PlatePair } from '~/domain/types'
+import type { Bar, PlatePair } from '~/domain/types'
 
 /**
  * A standard metric commercial gym, seeded so the plate calculator works the
@@ -9,6 +9,21 @@ import type { PlatePair } from '~/domain/types'
  * Counts are PAIRS, which is also how many fit on one side of the bar.
  */
 export const DEFAULT_BAR_WEIGHT_KG = 20
+
+export const DEFAULT_BAR_ID = 'bar_olympic'
+
+/**
+ * A standard rack of bars, seeded like the plate inventory — a sensible
+ * starting point to edit rather than a claim about what you own.
+ *
+ * Ids are stable slugs so an exercise pointing at one survives app updates.
+ */
+export const DEFAULT_BARS: Bar[] = [
+  { id: DEFAULT_BAR_ID, name: 'Olympic bar', weightKg: 20 },
+  { id: 'bar_womens', name: "Women's bar", weightKg: 15 },
+  { id: 'bar_technique', name: 'Technique bar', weightKg: 10 },
+  { id: 'bar_ez', name: 'EZ bar', weightKg: 7.5 },
+]
 
 export const DEFAULT_PLATE_INVENTORY: PlatePair[] = [
   { weightKg: 25, pairs: 4 },

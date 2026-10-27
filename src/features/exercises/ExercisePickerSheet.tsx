@@ -44,7 +44,9 @@ export function ExercisePickerSheet({
   })
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="Add exercise" className="max-h-[90dvh]">
+    // No max-height override: Sheet sizes itself against the visible viewport
+    // so it stays clear of the keyboard.
+    <Sheet open={open} onOpenChange={onOpenChange} title="Add exercise">
       <div className="sticky top-0 z-10 bg-raised px-5 pt-3 pb-2">
         <label className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-3.5 py-2.5">
           <Search size={17} className="shrink-0 text-ink-faint" aria-hidden />
@@ -97,8 +99,16 @@ export function ExercisePickerSheet({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.95rem] font-medium">{exercise.name}</span>
                   <span className="block text-[0.72rem] text-ink-muted">
-                    {exercise.muscleGroups[0]} · {exercise.equipment}
+                    {exercise.movementType} · {exercise.muscleGroups[0]} · {exercise.equipment}
                   </span>
+                  {/* The description earns its place here most of all: this is
+                      the moment you are choosing between an incline press and
+                      a decline one. */}
+                  {exercise.description ? (
+                    <span className="mt-0.5 line-clamp-2 block text-[0.72rem] leading-relaxed text-ink-faint">
+                      {exercise.description}
+                    </span>
+                  ) : null}
                 </span>
                 {added ? (
                   <span className="label-caps shrink-0 rounded-full bg-sunken px-2 py-1 text-ink-faint">

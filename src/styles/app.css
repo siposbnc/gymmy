@@ -243,13 +243,28 @@
     line-height: 1.55;
   }
 
-  /* The app is exactly one viewport tall; only panes inside it scroll. */
+  /*
+   * The app is exactly one viewport tall; only panes inside it scroll.
+   *
+   * Minus the keyboard, because iOS does not shrink dvh when it opens — the
+   * app would otherwise keep laying out behind the keys, hiding whatever is at
+   * the bottom of the screen. See src/lib/keyboard.ts.
+   */
   #root {
     height: 100%;
-    height: 100dvh;
+    height: calc(100dvh - var(--keyboard-inset, 0px));
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  /*
+   * While typing, the tab bar is in the way rather than useful: it eats a
+   * chunk of the little space the keyboard leaves, and you are not navigating
+   * mid-search. Native apps hide it for the same reason.
+   */
+  :root[data-keyboard='open'] nav[aria-label='Main'] {
+    display: none;
   }
 
   h1,

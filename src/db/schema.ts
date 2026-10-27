@@ -1,6 +1,8 @@
 import Dexie, { type EntityTable } from 'dexie'
 
+import { DEFAULT_BAR_WEIGHT_KG, DEFAULT_BARS } from './seed/plates'
 import type {
+  Bar,
   Exercise,
   PersonalRecord,
   Routine,
@@ -23,7 +25,7 @@ import type {
  * SCHEMA_VERSION is also written into exports so an import can tell what it is
  * looking at.
  */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 /** Indexes only. Dexie stores the whole object regardless of what is listed. */
 export class GymmyDB extends Dexie {
@@ -69,6 +71,41 @@ export class GymmyDB extends Dexie {
             settings.restSound ??= true
             settings.restVibrate ??= true
             settings.schemaVersion = 2
+          })
+      })
+
+    // v3 — multiple bars.
+    //
+    // Pre-v3 there was a single `barWeightKg`. That value is the user's real
+    // measured bar, so it becomes their default rather than being replaced by
+    // a seeded 20 kg: silently changing the weight every plate calculation is
+    // based on would be the worst possible outcome of an upgrade.
+    //
+    // The standard rack is added alongside it, minus anything that would
+    // duplicate the weight they already had. `barWeightKg` is left in place so
+    // a v2 export still imports cleanly.
+    this.version(3)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table<Settings, string>('settings')
+          .toCollection()
+          .modify((settings) => {
+            if (settings.bars?.length) return
+
+            const existingWeight = settings.barWeightKg ?? DEFAULT_BAR_WEIGHT_KG
+            const theirBar: Bar = {
+              id: 'bar_default',
+              name: 'Your bar',
+              weightKg: existingWeight,
+            }
+
+            settings.bars = [
+              theirBar,
+              ...DEFAULT_BARS.filter((bar) => bar.weightKg !== existingWeight),
+            ]
+            settings.defaultBarId = theirBar.id
+            settings.schemaVersion = 3
           })
       })
   }

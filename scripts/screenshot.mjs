@@ -176,6 +176,16 @@ async function seedHistory(page) {
 
 const allErrors = []
 
+/** Assertion helper for the structural checks that follow the screenshots. */
+const check = (label, condition) => {
+  if (condition) {
+    console.log(`  ✓ ${label}`)
+  } else {
+    allErrors.push(label)
+    console.error(`  ✗ ${label}`)
+  }
+}
+
 for (const theme of ['light', 'dark']) {
   allErrors.push(...(await shoot('today', { theme })))
 
@@ -278,6 +288,39 @@ for (const theme of ['light', 'dark']) {
   )
 
   allErrors.push(
+    ...(await shoot('exercise-detail', {
+      theme,
+      steps: async (page) => {
+        await page.goto(`${BASE}/more/exercises`, { waitUntil: 'networkidle' })
+        await page.getByRole('button', { name: /^Romanian Deadlift/ }).click()
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('exercise-new', {
+      theme,
+      steps: async (page) => {
+        await page.goto(`${BASE}/more/exercises`, { waitUntil: 'networkidle' })
+        await tap(page, 'New', true)
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('settings-bars', {
+      theme,
+      steps: async (page) => {
+        await page.goto(`${BASE}/more/settings`, { waitUntil: 'networkidle' })
+        await page.getByText('Bars', { exact: true }).scrollIntoViewIfNeeded()
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
+  allErrors.push(
     ...(await shoot('explainer', {
       theme,
       steps: async (page) => {
@@ -353,6 +396,59 @@ for (const theme of ['light', 'dark']) {
       `✓ shell ${name}: document fixed, tab bar pinned at ${shell.navBottom}/${shell.viewportHeight}`,
     )
   }
+
+  await context.close()
+}
+
+/**
+ * Keyboard-inset wiring.
+ *
+ * Playwright cannot raise a real on-screen keyboard, but the part that breaks
+ * is the CSS: does the sheet actually lift, and does the tab bar get out of
+ * the way. Driving --keyboard-inset directly tests exactly that.
+ */
+{
+  const context = await browser.newContext({
+    viewport: { width: 393, height: 852 },
+    hasTouch: true,
+    isMobile: true,
+  })
+  const page = await context.newPage()
+  await page.goto(`${BASE}/more/exercises`, { waitUntil: 'networkidle' })
+
+  // Open a sheet with a search field in it.
+  await tap(page, 'New', true)
+  await page.waitForTimeout(400)
+
+  const before = await page.evaluate(() => {
+    const sheet = document.querySelector('[role="dialog"]')
+    return sheet ? Math.round(sheet.getBoundingClientRect().bottom) : -1
+  })
+  check('sheet sits at the bottom of the screen with no keyboard', before === 852)
+
+  const KEYBOARD = 336
+  await page.evaluate((inset) => {
+    document.documentElement.style.setProperty('--keyboard-inset', `${inset}px`)
+    document.documentElement.dataset.keyboard = 'open'
+  }, KEYBOARD)
+  await page.waitForTimeout(350)
+
+  const after = await page.evaluate(() => {
+    const sheet = document.querySelector('[role="dialog"]')
+    const nav = document.querySelector('nav[aria-label="Main"]')
+    return {
+      bottom: sheet ? Math.round(sheet.getBoundingClientRect().bottom) : -1,
+      height: sheet ? Math.round(sheet.getBoundingClientRect().height) : -1,
+      navVisible: nav ? getComputedStyle(nav).display !== 'none' : false,
+    }
+  })
+
+  check(
+    `sheet lifts clear of the keyboard (${after.bottom} vs ${852 - KEYBOARD})`,
+    Math.abs(after.bottom - (852 - KEYBOARD)) <= 2,
+  )
+  check('sheet still fits on screen rather than running off the top', after.height <= 852 - KEYBOARD)
+  check('tab bar gets out of the way while typing', !after.navVisible)
 
   await context.close()
 }

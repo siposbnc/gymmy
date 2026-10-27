@@ -14,6 +14,7 @@ import { useRestTimer } from '~/features/rest/restTimer'
 import { platform } from '~/lib/platform'
 import { formatRestLength } from '~/lib/time'
 import { Stepper } from '~/ui/Stepper'
+import { barContext, describeBar, resolveBar, resolveBarWeight, usesBar } from '~/domain/bars'
 import { calculatePlates, formatPlates, lastTimeSummary, resolvePrefill } from '~/domain/metrics'
 import type { Settings, SetEntry } from '~/domain/types'
 import { fromDisplayUnit, INCREMENT, toDisplayUnit } from '~/domain/units'
@@ -85,16 +86,18 @@ export function ExerciseCard({
 
   const ghost = useMemo(() => lastTimeSummary(previousSets, unit), [previousSets, unit])
 
+  const bar = useMemo(() => resolveBar(exercise, barContext(settings)), [exercise, settings])
+
   const plates = useMemo(
     () =>
-      weightKg == null || exercise?.equipment !== 'barbell'
+      weightKg == null || !usesBar(exercise)
         ? null
         : calculatePlates({
             targetKg: weightKg,
-            barWeightKg: settings.barWeightKg,
+            barWeightKg: resolveBarWeight(exercise, barContext(settings)),
             inventory: settings.plateInventory,
           }),
-    [weightKg, exercise?.equipment, settings.barWeightKg, settings.plateInventory],
+    [weightKg, exercise, settings],
   )
 
   const activeSet: SetEntry | null = sets.find((set) => set.id === actionsFor) ?? null
@@ -258,15 +261,18 @@ export function ExerciseCard({
         </div>
 
         {plates ? (
-          <p className="num mt-2.5 flex items-center gap-1.5 border-t border-dashed border-line pt-2.5 text-[0.72rem] text-ink-muted">
+          <p className="num mt-2.5 flex flex-wrap items-center gap-x-1.5 border-t border-dashed border-line pt-2.5 text-[0.72rem] text-ink-muted">
             <span className="label-caps text-ink-faint">plates / side</span>
             <strong className="font-semibold text-ink">{formatPlates(plates)}</strong>
             {!plates.exact ? <span className="text-ink-faint">· not exact</span> : null}
+            {/* Naming the bar matters once there is more than one: the same
+                plates on a 10 kg bar are a different total. */}
+            <span className="text-ink-faint">· {describeBar(bar, unit)}</span>
             <InfoAffordance
               explainerId="plates"
               exampleInput={{
                 targetKg: weightKg,
-                barWeightKg: settings.barWeightKg,
+                barWeightKg: resolveBarWeight(exercise, barContext(settings)),
                 inventory: settings.plateInventory,
               }}
             />

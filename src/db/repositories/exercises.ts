@@ -47,6 +47,50 @@ export async function createCustomExercise(
 }
 
 /**
+ * Edit an exercise.
+ *
+ * Built-ins are editable too — renaming "Pendlay Row" to match what your gym
+ * calls it, or fixing a rest default, is legitimate. Seeding never overwrites
+ * an existing row, so those edits survive app updates.
+ */
+export async function updateExercise(
+  id: string,
+  patch: Partial<Omit<Exercise, 'id' | 'isCustom'>>,
+): Promise<void> {
+  await db.exercises.update(id, patch)
+}
+
+/** Detach an exercise from a specific bar, so it follows the default again. */
+export async function clearExerciseBar(id: string): Promise<void> {
+  await db.exercises
+    .where('id')
+    .equals(id)
+    .modify((exercise) => {
+      delete exercise.barId
+    })
+}
+
+/**
+ * Whether an exercise can be deleted outright.
+ *
+ * Only if nothing references it. Anything with history gets archived instead,
+ * so past sessions keep making sense.
+ */
+export async function canDeleteExercise(id: string): Promise<boolean> {
+  const [inSessions, inRoutines] = await Promise.all([
+    db.sessionExercises.where('exerciseId').equals(id).count(),
+    db.routineExercises.where('exerciseId').equals(id).count(),
+  ])
+  return inSessions === 0 && inRoutines === 0
+}
+
+export async function deleteExercise(id: string): Promise<boolean> {
+  if (!(await canDeleteExercise(id))) return false
+  await db.exercises.delete(id)
+  return true
+}
+
+/**
  * Archived rather than deleted: an exercise may be referenced by years of
  * sessions, and deleting it would orphan that history.
  */

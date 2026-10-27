@@ -60,6 +60,22 @@ export interface Exercise {
   movementType: MovementType
   trackingType: TrackingType
   defaultRestSeconds: number
+  /**
+   * Which bar this exercise uses, when it is not the default one.
+   *
+   * Absent means "use the default", which is also what happens if the bar is
+   * later deleted — the calculation degrades to something sensible rather
+   * than breaking.
+   */
+  barId?: Id
+  /**
+   * What the exercise is and how it differs from its neighbours.
+   *
+   * Seeded for built-ins and backfilled on launch for installs that predate
+   * it. Optional because a custom exercise does not need one.
+   */
+  description?: string
+  /** The user's own notes — never overwritten by a seed update. */
   notes?: string
   isCustom: boolean
   archivedAt?: number
@@ -215,6 +231,20 @@ export interface PlatePair {
   pairs: number
 }
 
+/**
+ * A bar the user owns.
+ *
+ * Most gyms have more than one — a 20 kg Olympic bar, a lighter technique bar,
+ * a curl bar — and loading the same plates on a different bar gives a
+ * different total. Exercises can point at a specific bar; anything that does
+ * not falls back to the default.
+ */
+export interface Bar {
+  id: Id
+  name: string
+  weightKg: number
+}
+
 export interface Settings {
   id: 'singleton'
   units: WeightUnit
@@ -222,7 +252,16 @@ export interface Settings {
   /** 0 = Sunday, 1 = Monday. */
   weekStartsOn: 0 | 1
   defaultRestSeconds: number
+  /**
+   * Legacy single-bar weight, kept so a pre-v3 export still imports.
+   * `bars` and `defaultBarId` are the live values — read them through
+   * `resolveBarWeight` rather than touching this.
+   */
   barWeightKg: number
+  /** Every bar the user owns. Added in schema v3. */
+  bars: Bar[]
+  /** Which bar to assume when an exercise does not name one. */
+  defaultBarId: Id
   plateInventory: PlatePair[]
   weeklySessionGoal: number
   showStreak: boolean
