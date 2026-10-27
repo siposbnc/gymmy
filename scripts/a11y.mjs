@@ -103,7 +103,6 @@ for (const theme of ['light', 'dark']) {
 
     await page.evaluate(axeSource)
     const result = await page.evaluate(async () =>
-      // eslint-disable-next-line no-undef
       window.axe.run(document, {
         runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
       }),

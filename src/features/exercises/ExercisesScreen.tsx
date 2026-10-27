@@ -1,10 +1,14 @@
-import { Search } from 'lucide-react'
+import { ChevronRight, Plus, Search } from 'lucide-react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 
 import { useExercises } from '~/db/hooks'
 import type { MuscleGroup } from '~/domain/types'
+import { Button } from '~/ui/Button'
 import { ScreenHeader } from '~/ui/ScreenHeader'
 import { cn } from '~/ui/cn'
+
+import { ExerciseFormSheet } from './ExerciseFormSheet'
 
 const GROUPS: readonly { value: MuscleGroup | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -22,8 +26,10 @@ const GROUPS: readonly { value: MuscleGroup | 'all'; label: string }[] = [
 ]
 
 export function ExercisesScreen() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [group, setGroup] = useState<MuscleGroup | 'all'>('all')
+  const [creating, setCreating] = useState(false)
 
   const exercises = useExercises({
     search,
@@ -32,7 +38,16 @@ export function ExercisesScreen() {
 
   return (
     <>
-      <ScreenHeader eyebrow="More" title="Exercises" />
+      <ScreenHeader
+        eyebrow="More"
+        title="Exercises"
+        action={
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus size={16} aria-hidden />
+            New
+          </Button>
+        }
+      />
 
       <div className="px-4">
         <label className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-3.5 py-2.5">
@@ -71,9 +86,13 @@ export function ExercisesScreen() {
         {exercises === undefined ? (
           <p className="py-8 text-center text-[0.85rem] text-ink-faint">Loading…</p>
         ) : exercises.length === 0 ? (
-          <p className="py-10 text-center font-display text-[1.4rem] text-ink-muted">
-            Nothing matches that.
-          </p>
+          <div className="py-10 text-center">
+            <p className="font-display text-[1.4rem] text-ink-muted">Nothing matches that.</p>
+            <Button variant="secondary" className="mt-4" onClick={() => setCreating(true)}>
+              <Plus size={17} aria-hidden />
+              Add it yourself
+            </Button>
+          </div>
         ) : (
           <>
             <p className="label-caps mb-2 text-ink-faint">
@@ -81,34 +100,51 @@ export function ExercisesScreen() {
             </p>
             <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
               {exercises.map((exercise) => (
-                <li key={exercise.id} className="flex items-center gap-3 px-3.5 py-3">
-                  {/* The status rail, reused as a movement-type marker. */}
-                  <span
-                    className={cn(
-                      'h-7 w-1 shrink-0 rounded-full',
-                      exercise.movementType === 'compound' ? 'bg-accent' : 'bg-rail',
-                    )}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[0.95rem] font-medium">
-                      {exercise.name}
+                <li key={exercise.id}>
+                  <button
+                    type="button"
+                    onClick={() => void navigate(`/more/exercises/${exercise.id}`)}
+                    className="flex w-full cursor-pointer items-center gap-3 px-3.5 py-3 text-left"
+                  >
+                    {/* The rail is a fast visual grouping cue, but the word
+                        below carries the meaning — colour is never the only
+                        encoding. */}
+                    <span
+                      className={cn(
+                        'h-7 w-1 shrink-0 rounded-full',
+                        exercise.movementType === 'compound' ? 'bg-accent' : 'bg-rail',
+                      )}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[0.95rem] font-medium">
+                        {exercise.name}
+                        {exercise.isCustom ? (
+                          <span className="label-caps ml-1.5 rounded-full bg-sunken px-1.5 py-0.5 align-[1px] text-ink-muted">
+                            yours
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="block truncate text-[0.72rem] text-ink-muted">
+                        {exercise.movementType} · {exercise.muscleGroups[0]} ·{' '}
+                        {exercise.equipment}
+                        {exercise.trackingType === 'reps_only' ? ' · reps only' : ''}
+                      </span>
                     </span>
-                    <span className="block text-[0.72rem] text-ink-muted">
-                      {exercise.muscleGroups[0]} · {exercise.equipment}
-                      {exercise.trackingType === 'reps_only' ? ' · reps only' : ''}
-                    </span>
-                  </span>
-                  <span className="num shrink-0 text-[0.75rem] font-bold text-ink-faint">
-                    {Math.floor(exercise.defaultRestSeconds / 60)}:
-                    {String(exercise.defaultRestSeconds % 60).padStart(2, '0')}
-                  </span>
+                    <ChevronRight size={15} className="shrink-0 text-ink-faint" aria-hidden />
+                  </button>
                 </li>
               ))}
             </ul>
           </>
         )}
       </div>
+
+      <ExerciseFormSheet
+        open={creating}
+        onOpenChange={setCreating}
+        onSaved={(id) => void navigate(`/more/exercises/${id}`)}
+      />
     </>
   )
 }

@@ -97,8 +97,16 @@ export function ExercisePickerSheet({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.95rem] font-medium">{exercise.name}</span>
                   <span className="block text-[0.72rem] text-ink-muted">
-                    {exercise.muscleGroups[0]} · {exercise.equipment}
+                    {exercise.movementType} · {exercise.muscleGroups[0]} · {exercise.equipment}
                   </span>
+                  {/* The description earns its place here most of all: this is
+                      the moment you are choosing between an incline press and
+                      a decline one. */}
+                  {exercise.description ? (
+                    <span className="mt-0.5 line-clamp-2 block text-[0.72rem] leading-relaxed text-ink-faint">
+                      {exercise.description}
+                    </span>
+                  ) : null}
                 </span>
                 {added ? (
                   <span className="label-caps shrink-0 rounded-full bg-sunken px-2 py-1 text-ink-faint">

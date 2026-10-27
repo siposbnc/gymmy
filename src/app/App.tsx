@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 
+import { ExerciseDetailScreen } from '~/features/exercises/ExerciseDetailScreen'
 import { ExercisesScreen } from '~/features/exercises/ExercisesScreen'
 import { ActiveSessionScreen } from '~/features/session/ActiveSessionScreen'
 import { MathsScreen } from '~/features/more/MathsScreen'
@@ -47,7 +48,10 @@ export function App() {
 
               <Route path="more">
                 <Route index element={<MoreScreen />} />
-                <Route path="exercises" element={<ExercisesScreen />} />
+                <Route path="exercises">
+                  <Route index element={<ExercisesScreen />} />
+                  <Route path=":exerciseId" element={<ExerciseDetailScreen />} />
+                </Route>
                 <Route path="maths" element={<MathsScreen />} />
                 <Route path="settings" element={<SettingsScreen />} />
               </Route>

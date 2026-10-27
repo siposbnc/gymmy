@@ -278,6 +278,28 @@ for (const theme of ['light', 'dark']) {
   )
 
   allErrors.push(
+    ...(await shoot('exercise-detail', {
+      theme,
+      steps: async (page) => {
+        await page.goto(`${BASE}/more/exercises`, { waitUntil: 'networkidle' })
+        await page.getByRole('button', { name: /^Romanian Deadlift/ }).click()
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('exercise-new', {
+      theme,
+      steps: async (page) => {
+        await page.goto(`${BASE}/more/exercises`, { waitUntil: 'networkidle' })
+        await tap(page, 'New', true)
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
+  allErrors.push(
     ...(await shoot('explainer', {
       theme,
       steps: async (page) => {

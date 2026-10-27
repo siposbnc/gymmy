@@ -31,7 +31,42 @@ export const DEFAULT_SETTINGS: Settings = {
  */
 export async function bootstrapDatabase(): Promise<void> {
   await seedStaticData()
+  await backfillBuiltInMetadata()
   await rebuildRecordsIfMissing()
+}
+
+/**
+ * Fill in metadata that built-in exercises gained after they were seeded.
+ *
+ * Seeding only ADDS missing exercises, which is what stops an app update
+ * stomping a renamed built-in — but it also means a field added later never
+ * reaches anyone who installed before it existed. Descriptions were added
+ * after v1 shipped, so without this they would only ever appear on fresh
+ * installs.
+ *
+ * Strictly additive: it writes a description only where there is none, and
+ * never touches a custom exercise or anything the user has edited.
+ */
+export async function backfillBuiltInMetadata(): Promise<void> {
+  const stored = await db.exercises.toArray()
+  const seedById = new Map(SEED_EXERCISES.map((exercise) => [exercise.id, exercise]))
+
+  const missing = stored.filter(
+    (exercise) =>
+      !exercise.isCustom && exercise.description == null && seedById.has(exercise.id),
+  )
+  if (missing.length === 0) return
+
+  await db.transaction('rw', db.exercises, async () => {
+    await Promise.all(
+      missing.map((exercise) => {
+        const description = seedById.get(exercise.id)?.description
+        return description == null
+          ? Promise.resolve(0)
+          : db.exercises.update(exercise.id, { description })
+      }),
+    )
+  })
 }
 
 /**

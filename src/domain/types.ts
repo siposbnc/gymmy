@@ -60,6 +60,14 @@ export interface Exercise {
   movementType: MovementType
   trackingType: TrackingType
   defaultRestSeconds: number
+  /**
+   * What the exercise is and how it differs from its neighbours.
+   *
+   * Seeded for built-ins and backfilled on launch for installs that predate
+   * it. Optional because a custom exercise does not need one.
+   */
+  description?: string
+  /** The user's own notes — never overwritten by a seed update. */
   notes?: string
   isCustom: boolean
   archivedAt?: number

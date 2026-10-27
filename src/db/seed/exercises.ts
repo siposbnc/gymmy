@@ -1,5 +1,7 @@
 import type { Equipment, Exercise, MovementType, MuscleGroup, TrackingType } from '~/domain/types'
 
+import { EXERCISE_DESCRIPTIONS } from './descriptions'
+
 /**
  * The built-in exercise library.
  *
@@ -131,6 +133,7 @@ function toExercise([
   restOverride,
   tracking,
 ]: Seed): Exercise {
+  const description = EXERCISE_DESCRIPTIONS[slug]
   return {
     id: `ex_${slug}`,
     name,
@@ -139,6 +142,7 @@ function toExercise([
     movementType,
     trackingType: tracking ?? 'weight_reps',
     defaultRestSeconds: restOverride ?? REST_BY_MOVEMENT[movementType],
+    ...(description == null ? {} : { description }),
     isCustom: false,
   }
 }
