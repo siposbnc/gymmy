@@ -1,4 +1,12 @@
-import { recordsGuide, restTimerGuide, rpeGuide, unitsGuide, warmupGuide } from './guides'
+import {
+  muscleVolumeGuide,
+  recordsGuide,
+  restTimerGuide,
+  rpeGuide,
+  streakGuide,
+  unitsGuide,
+  warmupGuide,
+} from './guides'
 import { oneRepMaxMetric } from './one-rep-max'
 import { platesMetric } from './plates'
 import { prefillMetric } from './prefill'
@@ -27,10 +35,12 @@ export const EXPLAINABLES: readonly Explainable[] = [
   oneRepMaxMetric,
   volumeMetric,
   platesMetric,
+  muscleVolumeGuide,
   recordsGuide,
   rpeGuide,
   warmupGuide,
   restTimerGuide,
+  streakGuide,
   unitsGuide,
 ]
 

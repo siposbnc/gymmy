@@ -3,12 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { buildBackup, EXPORT_FORMAT, importFromJson, backupFilename } from './backup'
 import { db, SCHEMA_VERSION } from './schema'
 import { bootstrapDatabase } from './seed'
-import {
-  addExerciseToSession,
-  finishSession,
-  logSet,
-  startEmptySession,
-} from './repositories/sessions'
+import { completeSession } from './repositories/history'
+import { addExerciseToSession, logSet, startEmptySession } from './repositories/sessions'
 
 /**
  * Export/import is the only device-migration path for an app with no account,
@@ -28,7 +24,9 @@ describe('backup', () => {
     await logSet(sessionExerciseId, { weightKg: 20, reps: 12, type: 'warmup' })
     await logSet(sessionExerciseId, { weightKg: 80, reps: 8 })
     await logSet(sessionExerciseId, { weightKg: 80, reps: 8, rpe: 8 })
-    await finishSession(sessionId)
+    // completeSession, not finishSession: this is what the app does, and it
+    // settles records — so the backup under test contains them.
+    await completeSession(sessionId)
     return sessionId
   }
 
@@ -74,7 +72,7 @@ describe('backup', () => {
     await db.open()
     await bootstrapDatabase()
     const otherSession = await startEmptySession('Legs')
-    await finishSession(otherSession)
+    await completeSession(otherSession)
 
     await importFromJson(json, 'replace')
 
@@ -91,7 +89,7 @@ describe('backup', () => {
     await db.open()
     await bootstrapDatabase()
     const localSession = await startEmptySession('Legs')
-    await finishSession(localSession)
+    await completeSession(localSession)
 
     await importFromJson(json, 'merge')
 
@@ -125,5 +123,22 @@ describe('backup', () => {
 
   it('names the file by date so backups sort', () => {
     expect(backupFilename(new Date('2026-10-26T12:00:00Z'))).toBe('gymmy-backup-2026-10-26.json')
+  })
+
+  it('rebuilds records after a restore, so the PR board is not empty', async () => {
+    await seedAWorkout()
+    const json = JSON.stringify(await buildBackup())
+
+    // A backup written by a build that had no records table content at all.
+    const stripped = JSON.parse(json) as { data: { records: unknown[] } }
+    stripped.data.records = []
+
+    await db.delete()
+    await db.open()
+    await importFromJson(JSON.stringify(stripped), 'replace')
+
+    const records = await db.records.toArray()
+    expect(records.length).toBeGreaterThan(0)
+    expect(records.find((record) => record.kind === 'max_weight')?.value).toBe(80)
   })
 })

@@ -4,7 +4,11 @@ import { ExercisesScreen } from '~/features/exercises/ExercisesScreen'
 import { ActiveSessionScreen } from '~/features/session/ActiveSessionScreen'
 import { MathsScreen } from '~/features/more/MathsScreen'
 import { MoreScreen } from '~/features/more/MoreScreen'
+import { HistoryScreen } from '~/features/history/HistoryScreen'
+import { SessionDetailScreen } from '~/features/history/SessionDetailScreen'
 import { ComingSoon } from '~/features/placeholder/ComingSoon'
+import { ExerciseProgressScreen } from '~/features/progress/ExerciseProgressScreen'
+import { ProgressScreen } from '~/features/progress/ProgressScreen'
 import { RoutineEditorScreen } from '~/features/routines/RoutineEditorScreen'
 import { RoutinesScreen } from '~/features/routines/RoutinesScreen'
 import { SettingsScreen } from '~/features/settings/SettingsScreen'
@@ -31,26 +35,15 @@ export function App() {
                 <Route index element={<RoutinesScreen />} />
                 <Route path=":routineId" element={<RoutineEditorScreen />} />
               </Route>
-              <Route
-                path="history"
-                element={
-                  <ComingSoon
-                    title="History"
-                    milestone="M4"
-                    description="A calendar and list of every session, each one fully editable so a forgotten set can be added later."
-                  />
-                }
-              />
-              <Route
-                path="progress"
-                element={
-                  <ComingSoon
-                    title="Progress"
-                    milestone="M4"
-                    description="Per-exercise charts, your personal record board, and weekly volume by muscle group."
-                  />
-                }
-              />
+              <Route path="history">
+                <Route index element={<HistoryScreen />} />
+                <Route path=":sessionId" element={<SessionDetailScreen />} />
+              </Route>
+
+              <Route path="progress">
+                <Route index element={<ProgressScreen />} />
+                <Route path=":exerciseId" element={<ExerciseProgressScreen />} />
+              </Route>
 
               <Route path="more">
                 <Route index element={<MoreScreen />} />

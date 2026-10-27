@@ -3,11 +3,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { useActiveSession, useSettings } from '~/db/hooks'
-import {
-  addExerciseToSession,
-  discardSession,
-  finishSession,
-} from '~/db/repositories/sessions'
+import { completeSession } from '~/db/repositories/history'
+import { addExerciseToSession, discardSession } from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
 import { formatVolume } from '~/domain/units'
 import { Button } from '~/ui/Button'
@@ -119,11 +116,14 @@ export function ActiveSessionScreen() {
               size="sm"
               className="flex-1"
               onClick={() => {
-                void (workingSets.length === 0
-                  ? discardSession(session.id)
-                  : finishSession(session.id))
                 setFinishing(false)
-                void navigate('/')
+                if (workingSets.length === 0) {
+                  void discardSession(session.id).then(() => navigate('/'))
+                  return
+                }
+                // completeSession settles records, then the detail screen shows
+                // the summary and anything newly earned.
+                void completeSession(session.id).then(() => navigate(`/history/${session.id}`))
               }}
             >
               {workingSets.length === 0 ? 'Discard workout' : 'Finish workout'}

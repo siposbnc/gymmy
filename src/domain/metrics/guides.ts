@@ -56,6 +56,7 @@ export const recordsGuide: Explainable = {
     caveats: [
       'Records come only from work you logged. Gymmy will not award you a record based on an estimate of what you could lift, so your estimated 1RM going up is not a record.',
       `Warm-up sets do not count, and a tie is not a record — you have to beat it.`,
+      'A reps record only appears for a weight you have trained more than once. The first time you try a weight is the first time you tried it, not an achievement — otherwise adding 2.5 kg every week would mint a new record every week and bury the ones that mean something.',
       'If you forgot to log something, add it from History and records recalculate.',
     ],
   },
@@ -73,6 +74,40 @@ export const restTimerGuide: Explainable = {
     caveats: [
       'Gymmy records when your rest ends rather than counting down second by second, so locking your phone or switching apps cannot make it drift. Come back after two minutes away and it already shows the right time.',
       'A notification needs permission, and on iPhone it needs Gymmy installed to the home screen. Vibration does not exist in Safari at all. The in-app sound and the on-screen countdown always work, which is why the timer never relies on the other two.',
+    ],
+  },
+}
+
+export const streakGuide: Explainable = {
+  id: 'streak',
+  label: 'Streak',
+  shortLabel: 'streak',
+  formula: 'consecutive weeks that met your session goal',
+  explainer: {
+    whatItIs:
+      'How many weeks in a row you have hit the number of sessions you set as your goal.',
+    whyUseful:
+      'Consistency over months beats any single session, and weeks are the honest unit — rest days are part of training, not a failure.',
+    caveats: [
+      'The current week never breaks it. A Tuesday cannot fail a three-session week, so the count only moves once a week is over.',
+      'It is motivation, not data. Losing a streak to illness, travel or a deload means nothing about your training, and you can switch it off in Settings.',
+    ],
+  },
+}
+
+export const muscleVolumeGuide: Explainable = {
+  id: 'muscle_volume',
+  label: 'Volume by muscle',
+  shortLabel: 'by muscle',
+  formula: "each set's volume counts toward its exercise's main muscle",
+  explainer: {
+    whatItIs:
+      'Your weekly training volume split by the muscle each exercise mainly works.',
+    whyUseful:
+      'It shows where your effort is actually going, which is often not where you think — most people train what they enjoy and under-train the rest.',
+    caveats: [
+      'A set counts in full toward one muscle, not divided across every muscle involved. Splitting a bench press between chest, triceps and shoulders would look precise while being guesswork, so Gymmy credits the main mover and says so.',
+      'Volume compares a muscle against itself over time. Comparing chest to quads is not meaningful — legs move more weight by nature.',
     ],
   },
 }

@@ -11,8 +11,16 @@ export function countsTowardVolume(set: Pick<SetEntry, 'type'>): boolean {
   return set.type !== 'warmup'
 }
 
+/** The shape volume needs. Explicit `| undefined` so callers holding values
+ *  that may be undefined can pass them under `exactOptionalPropertyTypes`. */
+export interface VolumeSet {
+  readonly type: SetEntry['type']
+  readonly weightKg?: number | undefined
+  readonly reps?: number | undefined
+}
+
 /** One set's contribution: `reps × weight`. */
-export function setVolume(set: Pick<SetEntry, 'type' | 'weightKg' | 'reps'>): number {
+export function setVolume(set: VolumeSet): number {
   if (!countsTowardVolume(set)) return 0
   const { weightKg, reps } = set
   if (weightKg == null || reps == null) return 0
@@ -21,7 +29,7 @@ export function setVolume(set: Pick<SetEntry, 'type' | 'weightKg' | 'reps'>): nu
 }
 
 export interface VolumeInput {
-  readonly sets: readonly Pick<SetEntry, 'type' | 'weightKg' | 'reps'>[]
+  readonly sets: readonly VolumeSet[]
 }
 
 export function totalVolume({ sets }: VolumeInput): number {

@@ -1,7 +1,17 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 
+import {
+  computeStreak,
+  exerciseSeries,
+  weeklyVolume,
+  type ExercisePoint,
+  type HistorySet,
+  type Streak,
+  type WeeklyVolume,
+} from '~/domain/history'
 import type {
   Exercise,
+  PersonalRecord,
   Routine,
   RoutineExercise,
   Session,
@@ -11,6 +21,13 @@ import type {
 } from '~/domain/types'
 
 import { listExercises, type ExerciseFilter } from './repositories/exercises'
+import {
+  getSessionDetail,
+  listCompletedSessions,
+  listHeadlineRecords,
+  listRecordsForExercise,
+  listRecordsFromSession,
+} from './repositories/history'
 import { listRoutineExercises, listRoutines } from './repositories/routines'
 import { db } from './schema'
 import { getSettings } from './repositories/settings'
@@ -40,6 +57,118 @@ export function useExercises(filter: ExerciseFilter = {}): Exercise[] | undefine
     () => listExercises({ search, muscleGroup, includeArchived }),
     [search, muscleGroup, includeArchived],
   )
+}
+
+// ---------------------------------------------------------------------------
+// History & progress
+// ---------------------------------------------------------------------------
+
+/** Every working set ever logged, shaped for the domain aggregations. */
+async function allHistorySets(): Promise<HistorySet[]> {
+  const [links, sets] = await Promise.all([db.sessionExercises.toArray(), db.sets.toArray()])
+  const exerciseByLink = new Map(links.map((link) => [link.id, link]))
+
+  return sets.flatMap((set) => {
+    const link = exerciseByLink.get(set.sessionExerciseId)
+    if (!link) return []
+    return [
+      {
+        sessionId: link.sessionId,
+        exerciseId: link.exerciseId,
+        completedAt: set.completedAt,
+        type: set.type,
+        weightKg: set.weightKg,
+        reps: set.reps,
+      },
+    ]
+  })
+}
+
+export interface ProgressOverview {
+  streak: Streak
+  weeks: WeeklyVolume[]
+  /** The most recent week's split by primary muscle. */
+  thisWeekByMuscle: { key: string; label: string; value: number }[]
+  records: PersonalRecord[]
+  exerciseNames: Map<string, string>
+  sessionCount: number
+}
+
+export function useProgressOverview(): ProgressOverview | undefined {
+  const settings = useSettings()
+  const { weekStartsOn, weeklySessionGoal } = settings
+
+  return useLiveQuery(async () => {
+    const [sessions, exercises, records, sets] = await Promise.all([
+      db.sessions.toArray(),
+      db.exercises.toArray(),
+      listHeadlineRecords(),
+      allHistorySets(),
+    ])
+
+    const completed = sessions.filter((session) => session.status === 'completed')
+    const primaryMuscle = new Map(
+      exercises.flatMap((exercise) =>
+        exercise.muscleGroups[0] ? [[exercise.id, exercise.muscleGroups[0]] as const] : [],
+      ),
+    )
+
+    const weeks = weeklyVolume(sets, primaryMuscle, weekStartsOn)
+    const latest = weeks.at(-1)
+
+    return {
+      streak: computeStreak(completed, weeklySessionGoal, weekStartsOn),
+      weeks,
+      thisWeekByMuscle: Object.entries(latest?.byMuscle ?? {}).map(([muscle, value]) => ({
+        key: muscle,
+        label: muscle,
+        value: value ?? 0,
+      })),
+      records,
+      exerciseNames: new Map(exercises.map((exercise) => [exercise.id, exercise.name])),
+      sessionCount: completed.length,
+    }
+  }, [weekStartsOn, weeklySessionGoal])
+}
+
+export interface ExerciseProgress {
+  exercise: Exercise | undefined
+  points: ExercisePoint[]
+  records: PersonalRecord[]
+}
+
+export function useExerciseProgress(exerciseId: string | undefined): ExerciseProgress | undefined {
+  return useLiveQuery(async () => {
+    if (!exerciseId) return undefined
+    const [exercise, sessions, sets, records] = await Promise.all([
+      db.exercises.get(exerciseId),
+      db.sessions.toArray(),
+      allHistorySets(),
+      listRecordsForExercise(exerciseId),
+    ])
+
+    const completed = sessions.filter((session) => session.status === 'completed')
+    return {
+      exercise,
+      points: exerciseSeries(exerciseId, sets, completed),
+      records,
+    }
+  }, [exerciseId])
+}
+
+export function useCompletedSessions(limit?: number): Session[] | undefined {
+  return useLiveQuery(() => listCompletedSessions(limit), [limit])
+}
+
+export function useSessionDetail(sessionId: string | undefined) {
+  return useLiveQuery(async () => {
+    if (!sessionId) return null
+    const [detail, records] = await Promise.all([
+      getSessionDetail(sessionId),
+      listRecordsFromSession(sessionId),
+    ])
+    return detail == null ? null : { ...detail, records }
+  }, [sessionId])
 }
 
 /** A routine plus the number of exercises in it, for the list screen. */

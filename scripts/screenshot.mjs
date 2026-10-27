@@ -95,6 +95,85 @@ async function buildRoutine(page) {
   await page.waitForTimeout(250)
 }
 
+/**
+ * Log several finished sessions so the progress charts have something real to
+ * draw. Done through IndexedDB directly rather than the UI — driving 40 sets
+ * through the numeric pad would take minutes and prove nothing extra.
+ */
+async function seedHistory(page) {
+  await page.evaluate(async () => {
+    const open = indexedDB.open('gymmy')
+    const db = await new Promise((resolve, reject) => {
+      open.onsuccess = () => resolve(open.result)
+      open.onerror = () => reject(open.error)
+    })
+
+    const put = (store, value) =>
+      new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readwrite')
+        tx.objectStore(store).put(value)
+        tx.oncomplete = resolve
+        tx.onerror = () => reject(tx.error)
+      })
+
+    const DAY = 86_400_000
+    const plan = [
+      { weeksAgo: 5, squat: 120, bench: 75 },
+      { weeksAgo: 4, squat: 125, bench: 77.5 },
+      { weeksAgo: 3, squat: 130, bench: 77.5 },
+      { weeksAgo: 2, squat: 132.5, bench: 80 },
+      { weeksAgo: 1, squat: 137.5, bench: 80 },
+      { weeksAgo: 0, squat: 140, bench: 82.5 },
+    ]
+
+    let n = 0
+    for (const { weeksAgo, squat, bench } of plan) {
+      const startedAt = Date.now() - weeksAgo * 7 * DAY - 2 * DAY
+      const sessionId = `seed_ses_${n}`
+      await put('sessions', {
+        id: sessionId,
+        name: weeksAgo % 2 === 0 ? 'Lower A' : 'Upper A',
+        startedAt,
+        endedAt: startedAt + 3_900_000,
+        status: 'completed',
+      })
+
+      for (const [index, [exerciseId, weight, reps]] of [
+        ['ex_squat', squat, 3],
+        ['ex_bench-press', bench, 8],
+        ['ex_romanian-deadlift', squat * 0.6, 8],
+      ].entries()) {
+        const linkId = `seed_sex_${n}_${index}`
+        await put('sessionExercises', {
+          id: linkId,
+          sessionId,
+          exerciseId,
+          order: index,
+          restSeconds: 150,
+        })
+        for (let setIndex = 1; setIndex <= 3; setIndex += 1) {
+          await put('sets', {
+            id: `seed_set_${n}_${index}_${setIndex}`,
+            sessionExerciseId: linkId,
+            setIndex,
+            weightKg: weight,
+            reps,
+            type: 'normal',
+            completedAt: startedAt + setIndex * 300_000,
+          })
+        }
+      }
+      n += 1
+    }
+    db.close()
+  })
+
+  // Records are derived. Reloading lets bootstrapDatabase notice the sessions
+  // have no records yet and rebuild them — the same path an import takes.
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+}
+
 const allErrors = []
 
 for (const theme of ['light', 'dark']) {
@@ -146,6 +225,53 @@ for (const theme of ['light', 'dark']) {
         await page.getByRole('button', { name: /back to routines/i }).click()
         await page.waitForTimeout(250)
         await tap(page, 'Start', true)
+        await page.waitForTimeout(400)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('progress', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await page.getByRole('link', { name: 'Progress' }).click()
+        await page.waitForTimeout(400)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('exercise-progress', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await page.getByRole('link', { name: 'Progress' }).click()
+        await page.getByRole('button', { name: /^Squat/ }).click()
+        await page.waitForTimeout(400)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('history', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await page.getByRole('link', { name: 'History' }).click()
+        await page.waitForTimeout(400)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('session-detail', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await page.getByRole('link', { name: 'History' }).click()
+        await page.waitForTimeout(300)
+        await page.getByRole('button', { name: /Lower A/ }).first().click()
         await page.waitForTimeout(400)
       },
     })),

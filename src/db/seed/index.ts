@@ -1,5 +1,6 @@
 import type { Settings } from '~/domain/types'
 
+import { recomputeRecordsFor } from '../repositories/history'
 import { db, SCHEMA_VERSION } from '../schema'
 import { SEED_EXERCISES } from './exercises'
 import { DEFAULT_BAR_WEIGHT_KG, DEFAULT_PLATE_INVENTORY } from './plates'
@@ -29,6 +30,35 @@ export const DEFAULT_SETTINGS: Settings = {
  * built-in or changed its rest default, and an app update must not stomp that.
  */
 export async function bootstrapDatabase(): Promise<void> {
+  await seedStaticData()
+  await rebuildRecordsIfMissing()
+}
+
+/**
+ * Records are derived, so they can legitimately be absent when the sessions
+ * that produce them are not.
+ *
+ * The case that matters is import: restoring a backup writes sessions and sets
+ * straight into the tables without going through `completeSession`, so without
+ * this the PR board would stay empty on a freshly restored device until the
+ * user happened to edit something. Same story for a backup taken by a build
+ * that predates records entirely.
+ *
+ * Deliberately conditional: recomputing every exercise on every launch would
+ * be wasted work once records exist.
+ */
+export async function rebuildRecordsIfMissing(): Promise<void> {
+  const [recordCount, completed] = await Promise.all([
+    db.records.count(),
+    db.sessions.where('status').equals('completed').count(),
+  ])
+  if (recordCount > 0 || completed === 0) return
+
+  const links = await db.sessionExercises.toArray()
+  await recomputeRecordsFor([...new Set(links.map((link) => link.exerciseId))])
+}
+
+async function seedStaticData(): Promise<void> {
   await db.transaction('rw', db.settings, db.exercises, async () => {
     const existingSettings = await db.settings.get('singleton')
     if (!existingSettings) {

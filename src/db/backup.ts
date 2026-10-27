@@ -12,6 +12,7 @@ import type {
   Settings,
 } from '~/domain/types'
 
+import { recomputeRecordsFor } from './repositories/history'
 import { db, SCHEMA_VERSION } from './schema'
 
 /**
@@ -207,5 +208,17 @@ export async function importFromJson(json: string, mode: ImportMode): Promise<Im
     },
   )
 
+  // A merge can bring in sessions whose records were never computed on this
+  // device, and a backup from a build that predates records has none at all.
+  // Rebuilding here means the PR board is right the moment the import lands.
+  await recomputeAllRecords()
+
   return { mode, counts }
+}
+
+/** Rebuild records for every exercise that has been trained. */
+export async function recomputeAllRecords(): Promise<void> {
+  const links = await db.sessionExercises.toArray()
+  const exerciseIds = [...new Set(links.map((link) => link.exerciseId))]
+  if (exerciseIds.length > 0) await recomputeRecordsFor(exerciseIds)
 }
