@@ -209,6 +209,9 @@ export async function allSetsForExport(): Promise<CsvSetRow[]> {
  * import and keeps `sessions.ts` focused on the set-logging write path.
  */
 export async function completeSession(sessionId: string): Promise<PersonalRecord[]> {
+  // Stamps endedAt, so this is ONLY for actually finishing a workout. Editing
+  // a past session must call `recomputeRecordsForSession` instead — calling
+  // this would rewrite its end time to now and inflate its duration.
   await db.sessions.update(sessionId, { status: 'completed', endedAt: Date.now() })
   await recomputeRecordsForSession(sessionId)
   return listRecordsFromSession(sessionId)

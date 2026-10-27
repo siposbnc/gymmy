@@ -1,10 +1,18 @@
-import { ChevronLeft, Trash2 } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 
 import { useSessionDetail, useSettings } from '~/db/hooks'
-import { completeSession, deleteSession } from '~/db/repositories/history'
-import { deleteSet, toggleWarmup, updateSet } from '~/db/repositories/sessions'
+import { deleteSession, recomputeRecordsForSession } from '~/db/repositories/history'
+import {
+  addExerciseToSession,
+  deleteSet,
+  logSet,
+  moveSetToExercise,
+  toggleWarmup,
+  updateSet,
+} from '~/db/repositories/sessions'
+import { ExercisePickerSheet } from '~/features/exercises/ExercisePickerSheet'
 import { totalVolume } from '~/domain/metrics'
 import { describeRecordKind } from '~/domain/records'
 import type { SetEntry } from '~/domain/types'
@@ -40,6 +48,23 @@ export function SessionDetailScreen() {
   const [pad, setPad] = useState<PadTarget | null>(null)
   const [actionsFor, setActionsFor] = useState<SetEntry | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [movingSet, setMovingSet] = useState<SetEntry | null>(null)
+
+  /**
+   * Append a set, seeded from the last one logged for that exercise.
+   *
+   * A forgotten set is nearly always more of what you were already doing, so
+   * copying the previous values means the usual case needs no editing at all.
+   */
+  async function addForgottenSet(sessionExerciseId: string, existing: SetEntry[]) {
+    const last = [...existing].filter((set) => set.type !== 'warmup').at(-1)
+    await logSet(sessionExerciseId, {
+      weightKg: last?.weightKg,
+      reps: last?.reps ?? 1,
+    })
+    resettle()
+  }
 
   if (detail === undefined) {
     return <p className="p-8 text-center text-[0.85rem] text-ink-faint">Loading…</p>
@@ -61,9 +86,16 @@ export function SessionDetailScreen() {
   const volume = totalVolume({ sets: allSets })
   const duration = session.endedAt ? (session.endedAt - session.startedAt) / 1000 : null
 
-  /** Any edit can change what the records are, so re-settle them. */
+  /**
+   * Any edit can change what the records are, so re-settle them.
+   *
+   * NOT `completeSession` — that also stamps `endedAt` with the current time,
+   * which is correct when you finish a workout and badly wrong when you fix a
+   * typo in it hours later. Doing so stretched a two-hour session into a
+   * six-hour one. This only recomputes records.
+   */
   const resettle = () => {
-    if (sessionId) void completeSession(sessionId)
+    if (sessionId) void recomputeRecordsForSession(sessionId)
   }
 
   const padSet = pad ? allSets.find((set) => set.id === pad.setId) : undefined
@@ -158,15 +190,75 @@ export function SessionDetailScreen() {
                 ))}
               </div>
             )}
+
+            {/* Forgetting a set is normal; so is remembering it later. */}
+            <button
+              type="button"
+              onClick={() => void addForgottenSet(entry.sessionExerciseId, entry.sets)}
+              className="mt-2 w-full cursor-pointer rounded-md border border-dashed border-line-strong py-2 text-[0.78rem] font-bold text-ink-muted"
+            >
+              <Plus size={14} className="mr-1 inline align-[-2px]" aria-hidden />
+              Add a set
+            </button>
           </Card>
         ))}
 
+        <button
+          type="button"
+          onClick={() => setPicking(true)}
+          className="w-full cursor-pointer rounded-lg border-[1.5px] border-dashed border-line-strong p-3.5 text-[0.85rem] font-bold text-ink-muted"
+        >
+          <Plus size={15} className="mr-1 inline align-[-2px]" aria-hidden />
+          Add an exercise
+        </button>
+
         {exercises.length === 0 ? (
-          <p className="px-6 py-6 text-center text-[0.85rem] text-ink-muted">
-            This session has no exercises in it.
+          <p className="px-6 pt-2 text-center text-[0.85rem] leading-relaxed text-ink-muted">
+            This session has no exercises in it. Add one if you logged this workout somewhere else
+            and want it here.
           </p>
         ) : null}
       </div>
+
+      <ExercisePickerSheet
+        open={picking}
+        onOpenChange={setPicking}
+        alreadyAdded={exercises.map((entry) => entry.exerciseId)}
+        onPick={(exerciseId) => {
+          if (sessionId) {
+            void addExerciseToSession(sessionId, exerciseId).then(resettle)
+          }
+          setPicking(false)
+        }}
+      />
+
+      <Sheet
+        open={movingSet !== null}
+        onOpenChange={(open) => !open && setMovingSet(null)}
+        eyebrow="Move set"
+        title="Which exercise was it?"
+      >
+        <ul className="divide-y divide-line pb-2">
+          {exercises
+            .filter((entry) => entry.sessionExerciseId !== movingSet?.sessionExerciseId)
+            .map((entry) => (
+              <li key={entry.sessionExerciseId}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (movingSet) {
+                      void moveSetToExercise(movingSet.id, entry.sessionExerciseId).then(resettle)
+                    }
+                    setMovingSet(null)
+                  }}
+                  className="w-full cursor-pointer px-5 py-3.5 text-left text-[0.95rem] font-medium"
+                >
+                  {entry.name}
+                </button>
+              </li>
+            ))}
+        </ul>
+      </Sheet>
 
       {pad && padSet ? (
         <NumericPad
@@ -216,6 +308,15 @@ export function SessionDetailScreen() {
           }
           setActionsFor(null)
         }}
+        // Only offered when there is somewhere else in this session to put it.
+        onMove={
+          exercises.length > 1
+            ? () => {
+                setMovingSet(actionsFor)
+                setActionsFor(null)
+              }
+            : undefined
+        }
       />
 
       <Sheet

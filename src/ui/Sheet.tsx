@@ -14,6 +14,13 @@ interface SheetProps {
   children: ReactNode
   footer?: ReactNode | undefined
   className?: string | undefined
+  /**
+   * Fill the screen rather than sizing to content.
+   *
+   * For sheets whose job is browsing a long list — once you are searching, every
+   * row you can see is worth more than the backdrop behind the sheet.
+   */
+  fullHeight?: boolean | undefined
 }
 
 /**
@@ -32,6 +39,7 @@ export function Sheet({
   children,
   footer,
   className,
+  fullHeight = false,
 }: SheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -49,10 +57,18 @@ export function Sheet({
           // without this the list is hidden behind the keys the moment you tap
           // a search field. The height shrinks by the same amount so the top
           // of the sheet does not run off-screen instead.
-          style={{
-            bottom: 'var(--keyboard-inset, 0px)',
-            maxHeight: 'calc(88dvh - var(--keyboard-inset, 0px))',
-          }}
+          style={
+            fullHeight
+              ? {
+                  bottom: 'var(--keyboard-inset, 0px)',
+                  height: 'calc(94dvh - var(--keyboard-inset, 0px))',
+                  maxHeight: 'calc(94dvh - var(--keyboard-inset, 0px))',
+                }
+              : {
+                  bottom: 'var(--keyboard-inset, 0px)',
+                  maxHeight: 'calc(88dvh - var(--keyboard-inset, 0px))',
+                }
+          }
           className={cn(
             'fixed inset-x-0 z-50 mx-auto flex w-full max-w-[32rem]',
             'flex-col overflow-hidden rounded-t-[1.375rem] border border-line bg-raised',

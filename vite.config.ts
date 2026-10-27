@@ -28,8 +28,33 @@ function git(command: string, fallback: string): string {
   }
 }
 
-/** Commit count: a genuine monotonic build number, tied to history. */
-const buildNumber = Number(git('rev-list --count HEAD', '0')) || 0
+/**
+ * Build number, derived from the COMMIT's own timestamp.
+ *
+ * It was the commit count, which was wrong: CI clones shallow, so
+ * `rev-list --count` succeeds and confidently returns 1. A wrong answer is
+ * worse than no answer here, because the whole point is telling two builds
+ * apart.
+ *
+ * The commit date is present even in a depth-1 clone, is monotonic, and reads
+ * as a date — so "20261028.0009" is both comparable and immediately
+ * meaningful, which a sequence number never was.
+ */
+function commitBuildNumber(): string {
+  const seconds = Number(git('log -1 --format=%ct', '0'))
+  const date = seconds > 0 ? new Date(seconds * 1000) : new Date()
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    '.',
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+  ].join('')
+}
+
+const buildNumber = commitBuildNumber()
 
 const commit =
   process.env.CF_PAGES_COMMIT_SHA?.slice(0, 7) ??

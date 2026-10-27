@@ -206,6 +206,52 @@ export async function deleteSet(setId: string): Promise<void> {
   })
 }
 
+/**
+ * Move a set to a different exercise.
+ *
+ * For the case where a set was logged against the wrong exercise — which is
+ * easy to do mid-workout and currently only fixable by deleting and retyping
+ * it. Both the old and new homes are renumbered, so neither is left with a
+ * gap or a duplicate index.
+ */
+export async function moveSetToExercise(
+  setId: string,
+  targetSessionExerciseId: string,
+): Promise<void> {
+  await db.transaction('rw', db.sets, async () => {
+    const set = await db.sets.get(setId)
+    if (!set || set.sessionExerciseId === targetSessionExerciseId) return
+
+    const from = set.sessionExerciseId
+    const target = await listSets(targetSessionExerciseId)
+    const sameKind = target.filter((candidate) =>
+      set.type === 'warmup' ? candidate.type === 'warmup' : candidate.type !== 'warmup',
+    )
+
+    await db.sets.update(setId, {
+      sessionExerciseId: targetSessionExerciseId,
+      setIndex: sameKind.length + 1,
+    })
+
+    await renumber(from)
+  })
+}
+
+/** Rewrite set indices so warm-ups and working sets each count from one. */
+async function renumber(sessionExerciseId: string): Promise<void> {
+  const remaining = await listSets(sessionExerciseId)
+  let working = 0
+  let warmup = 0
+  await Promise.all(
+    remaining.map((row) => {
+      const nextIndex = row.type === 'warmup' ? ++warmup : ++working
+      return row.setIndex === nextIndex
+        ? Promise.resolve(0)
+        : db.sets.update(row.id, { setIndex: nextIndex })
+    }),
+  )
+}
+
 /** Flip a set between warm-up and working, renumbering both runs. */
 export async function toggleWarmup(setId: string): Promise<void> {
   await db.transaction('rw', db.sets, async () => {

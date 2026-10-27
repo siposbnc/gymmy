@@ -1,4 +1,4 @@
-import { Flame, Gauge, Trash2 } from 'lucide-react'
+import { ArrowRightLeft, Flame, Gauge, Trash2 } from 'lucide-react'
 
 import type { SetEntry } from '~/domain/types'
 import { Sheet } from '~/ui/Sheet'
@@ -10,6 +10,8 @@ interface SetActionsSheetProps {
   onToggleWarmup: () => void
   onEditRpe: () => void
   onDelete: () => void
+  /** Offered only where there is somewhere to move the set to. */
+  onMove?: (() => void) | undefined
 }
 
 function Action({
@@ -56,6 +58,7 @@ export function SetActionsSheet({
   onToggleWarmup,
   onEditRpe,
   onDelete,
+  onMove,
 }: SetActionsSheetProps) {
   const isWarmup = set?.type === 'warmup'
 
@@ -83,6 +86,14 @@ export function SetActionsSheet({
           hint="Rate of Perceived Exertion — how hard the set felt, 1 to 10"
           onClick={onEditRpe}
         />
+        {onMove ? (
+          <Action
+            icon={<ArrowRightLeft size={19} />}
+            label="Move to another exercise"
+            hint="For a set logged against the wrong one"
+            onClick={onMove}
+          />
+        ) : null}
         <Action
           icon={<Trash2 size={19} />}
           label="Delete set"

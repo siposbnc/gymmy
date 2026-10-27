@@ -274,6 +274,19 @@
     line-height: 1.15;
   }
 
+  /*
+   * iOS zooms the page whenever a focused input is under 16px, which throws
+   * the whole layout off just as you start typing. Pinning text controls to
+   * 16px is the only reliable way to stop it — `maximum-scale=1` works but
+   * also disables pinch-zoom for everyone, which is an accessibility
+   * regression.
+   */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
   button {
     font-family: inherit;
     color: inherit;

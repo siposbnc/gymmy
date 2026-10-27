@@ -63,8 +63,17 @@ export function ExercisesScreen() {
         </label>
       </div>
 
-      {/* Horizontal filter rail — scrolls inside itself, never the page. */}
-      <div className="mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
+      {/* Horizontal filter rail — scrolls inside itself, never the page. The
+          edge fade signals there is more to the right. */}
+      <div
+        className="mt-3 flex gap-2 overflow-x-auto px-4 pb-2"
+        style={{
+          maskImage:
+            'linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)',
+          WebkitMaskImage:
+            'linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)',
+        }}
+      >
         {GROUPS.map((option) => (
           <button
             key={option.value}
