@@ -15,11 +15,11 @@ import type { Explainable } from './types'
 
 export const rpeGuide: Explainable = {
   id: 'rpe',
-  label: 'RPE — how hard the set was',
+  label: 'RPE — Rate of Perceived Exertion',
   shortLabel: 'RPE',
   explainer: {
     whatItIs:
-      'A 1–10 rating of effort, where 10 means you could not have done another rep. Count the reps you had left: 10 is nothing left, 9 is one more rep, 8 is two more, 7 is three more, 6 or less is easy.',
+      'RPE stands for Rate of Perceived Exertion. It is a 1–10 rating of how hard a set felt, where 10 means you could not have done another rep. Count the reps you had left: 10 is nothing left, 9 is one more rep, 8 is two more, 7 is three more, 6 or less is easy.',
     whyUseful:
       'The same weight is a different workout on a bad night of sleep. RPE records how hard it actually felt, which is what tells you whether to push or hold next session.',
     caveats: [
@@ -74,6 +74,38 @@ export const restTimerGuide: Explainable = {
     caveats: [
       'Gymmy records when your rest ends rather than counting down second by second, so locking your phone or switching apps cannot make it drift. Come back after two minutes away and it already shows the right time.',
       'A notification needs permission, and on iPhone it needs Gymmy installed to the home screen. Vibration does not exist in Safari at all. The in-app sound and the on-screen countdown always work, which is why the timer never relies on the other two.',
+    ],
+  },
+}
+
+export const amrapGuide: Explainable = {
+  id: 'amrap',
+  label: 'AMRAP — As Many Reps As Possible',
+  shortLabel: 'AMRAP',
+  explainer: {
+    whatItIs:
+      'AMRAP stands for As Many Reps As Possible. Marking the last set of an exercise as AMRAP means you stop at the point you genuinely cannot do another rep, rather than at the number the plan asked for.',
+    whyUseful:
+      'A fixed rep target tells you nothing about the days you had more in the tank. Taking the final set to failure shows what the weight is actually worth to you right now, and it is the clearest signal that a weight has become easy enough to go up.',
+    caveats: [
+      'One set, at the end. Taking every set to failure wrecks the quality of the sets that follow and the sessions after it.',
+      'Gymmy records what you did, not what the plan asked for, so an AMRAP set logs as its real rep count like any other set.',
+    ],
+  },
+}
+
+export const warmupVsWorkingGuide: Explainable = {
+  id: 'set_types',
+  label: 'Set types — working, warm-up, dropset',
+  shortLabel: 'set types',
+  explainer: {
+    whatItIs:
+      'A working set is a real set at your training weight, and it is what Gymmy counts. A warm-up is a lighter set ramping up to it. A dropset is an extra set done immediately after a working set with the weight reduced, taken without resting.',
+    whyUseful:
+      'Separating them keeps your totals honest. Warm-ups would otherwise inflate your set count and drag your average weight down, while dropsets are genuine extra work and should count.',
+    caveats: [
+      'Only warm-ups are excluded from volume, records and estimated one-rep max. Dropsets and sets taken to failure all count as real work.',
+      'Nothing is deleted either way — a warm-up stays visible in the session so you can see how you worked up to your top set.',
     ],
   },
 }

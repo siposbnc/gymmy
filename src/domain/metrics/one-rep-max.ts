@@ -38,14 +38,14 @@ export function estimateOneRepMax({ weightKg, reps }: OneRepMaxInput): number | 
 
 export const oneRepMaxMetric: Metric<OneRepMaxInput, number | null> = {
   id: 'est_1rm',
-  label: 'Estimated 1RM',
+  label: 'Estimated 1RM — one-rep max',
   shortLabel: 'est. 1RM',
   formula: 'weight × (1 + reps ÷ 30)',
   compute: estimateOneRepMax,
 
   explainer: {
     whatItIs:
-      'An estimate of the heaviest weight you could lift for a single rep, worked out from a set you actually did. You never have to test a true max to track it.',
+      '1RM stands for one-rep max: the heaviest weight you could lift for a single rep. This is an estimate of it, worked out from a set you actually did, so you never have to test a true max to track it.',
     whyUseful:
       'It is the only fair way to compare sets that look nothing alike. Was 100 kg × 5 better than 90 kg × 8? Estimated 1RM says yes — 117 against 114. That comparison is what the trend line tracks.',
     caveats: [

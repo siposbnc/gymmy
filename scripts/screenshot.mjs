@@ -302,6 +302,61 @@ for (const theme of ['light', 'dark']) {
   )
 }
 
+/**
+ * Shell integrity check.
+ *
+ * The document itself must never scroll: if it does, an installed iOS PWA
+ * drags the whole shell — safe-area padding and all — up under the Dynamic
+ * Island, and takes the bottom tab bar off-screen with it. That exact bug
+ * shipped, so it gets an assertion rather than a screenshot.
+ */
+{
+  const context = await browser.newContext({
+    viewport: { width: 393, height: 852 }, // iPhone 15 Pro
+    deviceScaleFactor: 3,
+    hasTouch: true,
+    isMobile: true,
+  })
+  const page = await context.newPage()
+  await page.goto(BASE, { waitUntil: 'networkidle' })
+  await seedHistory(page)
+
+  for (const [name, path] of [
+    ['today', '/'],
+    ['progress', '/progress'],
+    ['history', '/history'],
+  ]) {
+    await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(300)
+
+    const shell = await page.evaluate(() => {
+      const nav = document.querySelector('nav[aria-label="Main"]')
+      return {
+        documentScrolls:
+          document.documentElement.scrollHeight > document.documentElement.clientHeight,
+        bodyScrolls: document.body.scrollHeight > document.body.clientHeight,
+        navBottom: nav ? Math.round(nav.getBoundingClientRect().bottom) : -1,
+        viewportHeight: window.innerHeight,
+      }
+    })
+
+    if (shell.documentScrolls || shell.bodyScrolls) {
+      allErrors.push(`${path}: the document scrolls — the tab bar will not stay fixed`)
+    }
+    // The nav must sit at the bottom edge, not somewhere up the page.
+    if (Math.abs(shell.navBottom - shell.viewportHeight) > 2) {
+      allErrors.push(
+        `${path}: tab bar bottom at ${shell.navBottom}, viewport ${shell.viewportHeight}`,
+      )
+    }
+    console.log(
+      `✓ shell ${name}: document fixed, tab bar pinned at ${shell.navBottom}/${shell.viewportHeight}`,
+    )
+  }
+
+  await context.close()
+}
+
 await browser.close()
 
 if (allErrors.length > 0) {

@@ -125,8 +125,9 @@ export function ExerciseProgressScreen() {
             <Card>
               <div className="mb-1 flex items-center gap-1.5">
                 <h2 className="label-caps text-ink-faint">
-                  {activeMeasure.label}
-                  {measure === 'est_1rm' ? ' — analysis, not a record' : ''}
+                  {measure === 'est_1rm'
+                    ? 'Estimated one-rep max — analysis, not a record'
+                    : activeMeasure.label}
                 </h2>
                 {activeMeasure.explainerId ? (
                   <InfoAffordance explainerId={activeMeasure.explainerId} />

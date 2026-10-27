@@ -24,8 +24,10 @@ const TABS = [
  */
 export function TabShell() {
   return (
-    <div className="flex min-h-dvh flex-col">
-      <main className="min-h-0 flex-1 overflow-y-auto pb-2">
+    // h-full, not min-h-dvh: a minimum lets the shell outgrow the viewport,
+    // which hands scrolling to the document and unpins the tab bar.
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
         <Outlet />
       </main>
 

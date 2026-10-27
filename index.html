@@ -15,7 +15,13 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <!-- Still required by older iOS, which ignores the standard tag above. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!--
+      `default`, not `black-translucent`. Translucent extends the web view up
+      under the status bar AND forces white status-bar text, which is invisible
+      against this app's light theme. `default` keeps the content below the
+      status bar and lets iOS pick a legible text colour for the theme.
+    -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Gymmy" />
 
     <script>

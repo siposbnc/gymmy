@@ -18,6 +18,7 @@ import { ExercisePickerSheet } from '~/features/exercises/ExercisePickerSheet'
 import { formatRestLength } from '~/lib/time'
 import { Button } from '~/ui/Button'
 import { Card } from '~/ui/Card'
+import { InfoAffordance } from '~/ui/InfoAffordance'
 import { NumericPad } from '~/ui/NumericPad'
 import { Sheet } from '~/ui/Sheet'
 import { cn } from '~/ui/cn'
@@ -377,6 +378,7 @@ function RoutineEntryCard({
           <button
             type="button"
             aria-pressed={entry.isAmrap}
+            aria-label="Take the last set to failure, as many reps as possible"
             onClick={() => void updateRoutineExercise(entry.id, { isAmrap: !entry.isAmrap })}
             className={cn(
               'rounded-full border px-2.5 py-1.5 text-[0.7rem] font-bold',
@@ -385,8 +387,10 @@ function RoutineEntryCard({
                 : 'border-line text-ink-muted',
             )}
           >
-            Last set AMRAP
+            Last set to failure
           </button>
+
+          <InfoAffordance explainerId="amrap" className="ml-auto" />
         </div>
       </Card>
     </div>

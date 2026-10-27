@@ -80,7 +80,7 @@ export function SetActionsSheet({
         <Action
           icon={<Gauge size={19} />}
           label={set?.rpe == null ? 'Add RPE' : `Change RPE (now ${set.rpe})`}
-          hint="How hard the set was, 1–10"
+          hint="Rate of Perceived Exertion — how hard the set felt, 1 to 10"
           onClick={onEditRpe}
         />
         <Action

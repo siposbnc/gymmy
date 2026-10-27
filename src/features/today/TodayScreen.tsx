@@ -106,15 +106,6 @@ export function TodayScreen() {
           </>
         )}
 
-        <Card>
-          <p className="text-[0.85rem] leading-relaxed text-ink-muted">
-            <strong className="font-semibold text-ink">Logging and rest are in:</strong> pre-filled
-            set rows, warm-ups, RPE, editable sets, backups, and a rest timer that survives your
-            phone sleeping. Training plans arrive in M3 — until then every workout starts empty and
-            you add exercises as you go.
-          </p>
-        </Card>
-
         <button
           type="button"
           onClick={() => void navigate('/more/maths')}
