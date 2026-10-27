@@ -215,20 +215,38 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /*
+   * The document itself never scrolls.
+   *
+   * This matters more than it looks. An app shell sized with `min-height`
+   * can grow past the viewport, and then the BODY scrolls — which on an
+   * installed iOS PWA drags the whole shell, safe-area padding and all, up
+   * under the Dynamic Island, and takes the bottom nav off-screen with it.
+   * Pinning the document and letting only the content pane scroll is what
+   * makes the tab bar genuinely fixed.
+   */
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   body {
     background-color: var(--bg);
     color: var(--text);
     font-family: var(--font-ui);
     font-size: var(--text-body);
     line-height: 1.55;
-    overscroll-behavior-y: none;
   }
 
-  /* The app is a single full-height surface; only panes scroll. */
+  /* The app is exactly one viewport tall; only panes inside it scroll. */
   #root {
-    min-height: 100dvh;
+    height: 100%;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   h1,

@@ -119,7 +119,7 @@ export function SettingsScreen() {
 
           <Row
             label="Show RPE field"
-            hint="How hard each set was, 1–10"
+            hint="Rate of Perceived Exertion — how hard each set felt, 1–10"
             explainerId="rpe"
           >
             <Segmented
