@@ -44,7 +44,9 @@ export function ExercisePickerSheet({
   })
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="Add exercise" className="max-h-[90dvh]">
+    // No max-height override: Sheet sizes itself against the visible viewport
+    // so it stays clear of the keyboard.
+    <Sheet open={open} onOpenChange={onOpenChange} title="Add exercise">
       <div className="sticky top-0 z-10 bg-raised px-5 pt-3 pb-2">
         <label className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-3.5 py-2.5">
           <Search size={17} className="shrink-0 text-ink-faint" aria-hidden />
