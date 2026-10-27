@@ -93,6 +93,11 @@ export interface InstallAdapter {
   isIos(): boolean
 }
 
+export interface ClipboardAdapter {
+  /** Resolves false when the browser refuses or has no clipboard access. */
+  writeText(text: string): Promise<boolean>
+}
+
 export interface Platform {
   readonly notifications: NotificationAdapter
   readonly vibration: VibrationAdapter
@@ -100,4 +105,5 @@ export interface Platform {
   readonly files: FilesAdapter
   readonly storage: StorageAdapter
   readonly install: InstallAdapter
+  readonly clipboard: ClipboardAdapter
 }

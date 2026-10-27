@@ -1,5 +1,6 @@
 import type {
   AudioAdapter,
+  ClipboardAdapter,
   FilesAdapter,
   InstallAdapter,
   InstallState,
@@ -256,6 +257,20 @@ const install: InstallAdapter = {
   isIos: detectIos,
 }
 
+const clipboard: ClipboardAdapter = {
+  async writeText(text) {
+    try {
+      // Requires a secure context, which the app always has — service workers
+      // need one too.
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // Denied permission, or an insecure origin during local testing.
+      return false
+    }
+  },
+}
+
 export const webPlatform: Platform = {
   notifications,
   vibration,
@@ -263,4 +278,5 @@ export const webPlatform: Platform = {
   files,
   storage,
   install,
+  clipboard,
 }
