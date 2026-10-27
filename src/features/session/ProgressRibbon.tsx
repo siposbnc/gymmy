@@ -14,9 +14,14 @@ export function ProgressRibbon({ views }: { views: readonly SessionExerciseView[
     view.sets.filter((set) => set.type !== 'warmup').map(() => 'done' as const),
   )
 
-  // One pending tick so the ribbon never reads as "finished" mid-workout.
+  // One pending tick so the ribbon never reads as "finished" mid-workout, then
+  // a few empties so it has somewhere to grow into.
+  //
+  // `Array.from` rather than `[...Array(n)]`: the latter produces holes, which
+  // spread as `undefined` and silently render as zero-height cells.
+  const padding = Array.from({ length: Math.max(0, 6 - ticks.length) }, () => 'empty' as const)
   const cells: ('done' | 'now' | 'empty')[] =
-    views.length === 0 ? [] : [...ticks, 'now', ...Array<'empty'>(Math.max(0, 6 - ticks.length))]
+    views.length === 0 ? [] : [...ticks, 'now', ...padding]
 
   if (cells.length === 0) return null
 
@@ -35,7 +40,10 @@ export function ProgressRibbon({ views }: { views: readonly SessionExerciseView[
             'flex-1 rounded-full',
             cell === 'done' && 'h-[5px] bg-success',
             cell === 'now' && 'h-2 bg-accent',
-            cell === 'empty' && 'h-[5px] bg-rail',
+            // line-strong, not rail: at 5px on the page background the rail
+            // token is too faint to see, and a progress indicator whose
+            // remaining portion is invisible cannot show progress.
+            cell === 'empty' && 'h-[5px] bg-line-strong',
           )}
         />
       ))}

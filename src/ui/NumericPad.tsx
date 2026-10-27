@@ -41,10 +41,22 @@ export function NumericPad({
   allowDecimal = true,
 }: NumericPadProps) {
   const [draft, setDraft] = useState(() => String(value))
+  /**
+   * Whether the user has started entering a number.
+   *
+   * The pad opens showing the current value so you can see what you are
+   * changing, but the first digit must REPLACE it rather than append — typing
+   * "80" into a field already reading "80" has to give 80, not 8080. This is
+   * how every calculator behaves, and getting it wrong silently corrupts a set.
+   */
+  const [touched, setTouched] = useState(false)
 
   // Re-seed whenever the pad opens for a different value.
   useEffect(() => {
-    if (open) setDraft(String(value))
+    if (open) {
+      setDraft(String(value))
+      setTouched(false)
+    }
   }, [open, value])
 
   const commit = () => {
@@ -55,12 +67,25 @@ export function NumericPad({
 
   const append = (key: string) => {
     setDraft((current) => {
-      if (key === '.' && (current.includes('.') || !allowDecimal)) return current
+      // First keypress starts a new number over the seeded one.
+      const base = touched ? current : ''
+      if (key === '.') {
+        if (!allowDecimal || base.includes('.')) return base || '0'
+        return base === '' ? '0.' : `${base}.`
+      }
       // A lone leading zero should be replaced, not built on.
-      if (current === '0' && key !== '.') return key
-      if (current.replace('.', '').length >= 6) return current
-      return current + key
+      if (base === '0') return key
+      if (base.replace('.', '').length >= 6) return base
+      return base + key
     })
+    setTouched(true)
+  }
+
+  const backspace = () => {
+    // Backspace operates on what is shown, so it edits the seeded value rather
+    // than wiping it — which is what you want when fixing a typo'd digit.
+    setDraft((current) => current.slice(0, -1))
+    setTouched(true)
   }
 
   const adjust = (delta: number) => {
@@ -69,6 +94,7 @@ export function NumericPad({
       const base = Number.isFinite(parsed) ? parsed : 0
       return String(Math.max(0, Math.round((base + delta) * 1000) / 1000))
     })
+    setTouched(true)
   }
 
   const keyClass =
@@ -110,7 +136,7 @@ export function NumericPad({
             type="button"
             aria-label="Backspace"
             className={utilClass}
-            onClick={() => setDraft((current) => current.slice(0, -1))}
+            onClick={backspace}
           >
             <Delete size={18} />
           </button>
