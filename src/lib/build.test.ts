@@ -10,21 +10,24 @@ import { BUILD_COMMIT, BUILD_NUMBER, buildLabel, buildSummary, formatBuildTime }
  */
 describe('build identity', () => {
   it('is actually injected, not left as a bare identifier', () => {
-    expect(typeof BUILD_NUMBER).toBe('number')
+    expect(typeof BUILD_NUMBER).toBe('string')
     expect(typeof BUILD_COMMIT).toBe('string')
     expect(BUILD_COMMIT.length).toBeGreaterThan(0)
   })
 
-  it('increases with history, so a bigger number is newer', () => {
-    // Zero is the documented fallback for a build with no git behind it.
-    expect(BUILD_NUMBER).toBeGreaterThanOrEqual(0)
-    expect(Number.isInteger(BUILD_NUMBER)).toBe(true)
+  it('is a sortable commit date, not a commit count', () => {
+    // A count breaks on CI: a shallow clone makes `rev-list --count` return 1
+    // with no error, which is worse than no number at all. The commit date is
+    // present at depth 1 and still orders correctly as a plain string.
+    expect(BUILD_NUMBER).toMatch(/^\d{8}\.\d{4}$/)
+    expect('20261028.0009' < '20261028.1430').toBe(true)
+    expect('20261028.2359' < '20261029.0001').toBe(true)
   })
 })
 
 describe('buildLabel', () => {
   it('reads as a build number when there is one', () => {
-    expect(buildLabel()).toMatch(BUILD_NUMBER > 0 ? /^Build \d+$/ : /^Development build$/)
+    expect(buildLabel()).toMatch(/^Build \d{8}\.\d{4}$/)
   })
 })
 

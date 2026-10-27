@@ -12,6 +12,7 @@ import {
   isStale,
   listSets,
   logSet,
+  moveSetToExercise,
   removeSessionExercise,
   startEmptySession,
   STALE_SESSION_MS,
@@ -131,6 +132,59 @@ describe('sessions', () => {
       expect(sets[0]?.weightKg).toBe(102.5)
       expect(sets[0]?.rpe).toBe(9)
       expect(sets[1]?.weightKg).toBe(100)
+    })
+
+    it('moves a set logged against the wrong exercise', async () => {
+      const sessionId = await startEmptySession()
+      const squat = await addExerciseToSession(sessionId, 'ex_squat')
+      const bench = await addExerciseToSession(sessionId, 'ex_bench-press')
+
+      await logSet(squat, { weightKg: 100, reps: 5 })
+      const misplaced = await logSet(squat, { weightKg: 80, reps: 8 })
+      await logSet(squat, { weightKg: 100, reps: 5 })
+      await logSet(bench, { weightKg: 80, reps: 8 })
+
+      await moveSetToExercise(misplaced, bench)
+
+      const squatSets = await listSets(squat)
+      const benchSets = await listSets(bench)
+
+      // The source renumbers so there is no gap where the set was.
+      expect(squatSets).toHaveLength(2)
+      expect(squatSets.map((set) => set.setIndex)).toEqual([1, 2])
+      expect(squatSets.every((set) => set.weightKg === 100)).toBe(true)
+
+      // And it lands at the end of its new home.
+      expect(benchSets).toHaveLength(2)
+      expect(benchSets.map((set) => set.setIndex)).toEqual([1, 2])
+      expect(benchSets[1]?.id).toBe(misplaced)
+    })
+
+    it('keeps a moved warm-up numbered among warm-ups', async () => {
+      const sessionId = await startEmptySession()
+      const squat = await addExerciseToSession(sessionId, 'ex_squat')
+      const bench = await addExerciseToSession(sessionId, 'ex_bench-press')
+
+      await logSet(bench, { weightKg: 20, reps: 12, type: 'warmup' })
+      const warm = await logSet(squat, { weightKg: 20, reps: 10, type: 'warmup' })
+
+      await moveSetToExercise(warm, bench)
+
+      const benchSets = await listSets(bench)
+      expect(benchSets.map((set) => [set.type, set.setIndex])).toEqual([
+        ['warmup', 1],
+        ['warmup', 2],
+      ])
+    })
+
+    it('moving a set to where it already is does nothing', async () => {
+      const sessionId = await startEmptySession()
+      const squat = await addExerciseToSession(sessionId, 'ex_squat')
+      const id = await logSet(squat, { weightKg: 100, reps: 5 })
+
+      await moveSetToExercise(id, squat)
+
+      expect(await listSets(squat)).toHaveLength(1)
     })
 
     it('removing an exercise takes its sets with it', async () => {

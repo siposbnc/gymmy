@@ -11,17 +11,17 @@
  * be traced back to exact source.
  */
 
-declare const __BUILD_NUMBER__: number
+declare const __BUILD_NUMBER__: string
 declare const __BUILD_COMMIT__: string
 declare const __BUILD_TIME__: string
 
+/** `YYYYMMDD.HHMM` of the commit this was built from. */
 export const BUILD_NUMBER = __BUILD_NUMBER__
 export const BUILD_COMMIT = __BUILD_COMMIT__
 export const BUILD_TIME = __BUILD_TIME__
 
-/** "Build 47", or "Build 47 (dev)" when it was not built from a clean commit. */
 export function buildLabel(): string {
-  return BUILD_NUMBER > 0 ? `Build ${BUILD_NUMBER}` : 'Development build'
+  return BUILD_NUMBER ? `Build ${BUILD_NUMBER}` : 'Development build'
 }
 
 /** "28 Oct 2026, 14:32" in the reader's locale, or null if unparseable. */

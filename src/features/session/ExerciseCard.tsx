@@ -115,7 +115,9 @@ export function ExerciseCard({
 
     await logSet(sessionExercise.id, {
       weightKg,
-      reps,
+      // A set with a weight but no rep count is a set you did once — logging
+      // it as zero would quietly drop it out of volume and records.
+      reps: reps != null && reps > 0 ? reps : 1,
       type: draftWarmup ? 'warmup' : 'normal',
     })
 

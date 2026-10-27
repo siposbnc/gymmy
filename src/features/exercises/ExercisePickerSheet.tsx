@@ -44,9 +44,9 @@ export function ExercisePickerSheet({
   })
 
   return (
-    // No max-height override: Sheet sizes itself against the visible viewport
-    // so it stays clear of the keyboard.
-    <Sheet open={open} onOpenChange={onOpenChange} title="Add exercise">
+    // Full height: this sheet exists to browse a list, and once you are
+    // searching every visible row is worth more than the backdrop behind it.
+    <Sheet open={open} onOpenChange={onOpenChange} title="Add exercise" fullHeight>
       <div className="sticky top-0 z-10 bg-raised px-5 pt-3 pb-2">
         <label className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-3.5 py-2.5">
           <Search size={17} className="shrink-0 text-ink-faint" aria-hidden />
@@ -60,7 +60,17 @@ export function ExercisePickerSheet({
           />
         </label>
 
-        <div className="-mx-5 mt-2.5 flex gap-2 overflow-x-auto px-5 pb-1">
+        {/* The fade tells you the row scrolls — there are more groups than
+            fit, and without it the list looks like it simply ends. */}
+        <div
+          className="-mx-5 mt-2.5 flex gap-2 overflow-x-auto px-5 pb-2"
+          style={{
+            maskImage:
+              'linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)',
+            WebkitMaskImage:
+              'linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)',
+          }}
+        >
           {GROUPS.map((option) => (
             <button
               key={option.value}
@@ -79,7 +89,7 @@ export function ExercisePickerSheet({
         </div>
       </div>
 
-      <ul className="divide-y divide-line px-5 pb-4">
+      <ul className="divide-y divide-line px-5 pt-2 pb-4">
         {(exercises ?? []).map((exercise) => {
           const added = alreadyAdded.includes(exercise.id)
           return (

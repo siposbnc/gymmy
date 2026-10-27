@@ -10,6 +10,7 @@ import {
   listHeadlineRecords,
   listRecordsForExercise,
   listRecordsFromSession,
+  recomputeRecordsForSession,
 } from './history'
 import {
   addExerciseToSession,
@@ -97,6 +98,40 @@ describe('history and records', () => {
         value: 145,
         sessionId: second.sessionId,
       })
+    })
+  })
+
+  describe('editing a past session', () => {
+    it('does not stretch its duration', async () => {
+      const { sessionId, link } = await squatSession([[100, 5]])
+      const before = await db.sessions.get(sessionId)
+
+      // Pretend the session finished two hours ago, then fix a typo now.
+      const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000
+      await db.sessions.update(sessionId, {
+        startedAt: twoHoursAgo,
+        endedAt: twoHoursAgo + 60 * 60 * 1000,
+      })
+
+      const [set] = await listSets(link)
+      await updateSet(set!.id, { weightKg: 105 })
+      await recomputeRecordsForSession(sessionId)
+
+      const after = await db.sessions.get(sessionId)
+      // An hour-long session must stay an hour long after an edit.
+      expect(after!.endedAt! - after!.startedAt).toBe(60 * 60 * 1000)
+      expect(before).toBeDefined()
+    })
+
+    it('still updates records', async () => {
+      const { sessionId, link } = await squatSession([[100, 5]])
+
+      const [set] = await listSets(link)
+      await updateSet(set!.id, { weightKg: 140 })
+      await recomputeRecordsForSession(sessionId)
+
+      const records = await listRecordsForExercise('ex_squat')
+      expect(records.find((record) => record.kind === 'max_weight')?.value).toBe(140)
     })
   })
 

@@ -41,7 +41,7 @@ export function AboutSection() {
             {BUILD_COMMIT}
             {builtAt ? ` · ${builtAt}` : ''}
           </span>
-          {BUILD_NUMBER === 0 ? (
+          {!BUILD_NUMBER ? (
             <span className="mt-1 block text-[0.72rem] leading-relaxed text-ink-muted">
               Built outside version control, so there is no build number to compare.
             </span>
