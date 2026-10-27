@@ -30,6 +30,9 @@
 
   /* Accent */
   --color-accent: var(--accent);
+  /* The accent as text on a page background; the fill step is slightly under
+     AA there. Use `text-accent-ink` for words, `bg-accent` for fills. */
+  --color-accent-ink: var(--accent-ink);
   --color-accent-bright: var(--accent-bright);
   --color-accent-wash: var(--accent-wash);
   --color-on-accent: var(--on-accent);

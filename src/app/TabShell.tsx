@@ -52,7 +52,10 @@ export function TabShell() {
                   cn(
                     'touch-min grid w-full place-items-center gap-0.5 rounded-md py-1',
                     'transition-colors duration-(--dur-fast)',
-                    isActive ? 'text-accent' : 'text-ink-faint',
+                    // accent-ink and ink-muted, not accent and ink-faint: the
+                    // tab labels are 9.6px, so both need to clear AA on their
+                    // own. The fill steps do not.
+                    isActive ? 'text-accent-ink' : 'text-ink-muted',
                   )
                 }
               >

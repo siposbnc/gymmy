@@ -201,7 +201,7 @@ export function ExerciseCard({
         <div className="mb-0.5 flex items-center gap-2">
           <h2 className="min-w-0 flex-1">
             {groupedWithPrevious ? (
-              <span className="label-caps block text-accent">Superset</span>
+              <span className="label-caps block text-accent-ink">Superset</span>
             ) : null}
             <span className="block truncate text-lead font-semibold tracking-tight">
               {exercise?.name ?? 'Unknown exercise'}

@@ -48,7 +48,7 @@ export function ProgressScreen() {
       <div className="grid gap-3 px-4 pb-6">
         {settings.showStreak ? (
           <Card className="flex items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent-wash text-accent">
+            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent-wash text-accent-ink">
               <Flame size={20} aria-hidden />
             </span>
             <span className="min-w-0 flex-1">

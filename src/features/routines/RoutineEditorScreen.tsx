@@ -243,7 +243,7 @@ function RoutineEntryCard({
         <div className="mb-2.5 flex items-center gap-2">
           <span className="min-w-0 flex-1">
             {groupedWithPrevious ? (
-              <span className="label-caps block text-accent">Superset</span>
+              <span className="label-caps block text-accent-ink">Superset</span>
             ) : null}
             <span className="block truncate text-lead font-semibold tracking-tight">
               {exercise?.name ?? 'Unknown exercise'}
@@ -313,7 +313,7 @@ function RoutineEntryCard({
               {entry.targetRepsMax != null && entry.targetRepsMax !== entry.targetRepsMin
                 ? `${entry.targetRepsMin}–${entry.targetRepsMax}`
                 : entry.targetRepsMin}
-              {entry.isAmrap ? <span className="text-accent">+</span> : null}
+              {entry.isAmrap ? <span className="text-accent-ink">+</span> : null}
             </span>
           </button>
 
@@ -462,7 +462,7 @@ function IconButton({
       className={cn(
         'grid size-8 cursor-pointer place-items-center rounded-full',
         'disabled:pointer-events-none disabled:opacity-30',
-        destructive ? 'text-danger' : active ? 'text-accent' : 'text-ink-muted',
+        destructive ? 'text-danger' : active ? 'text-accent-ink' : 'text-ink-muted',
       )}
     >
       {children}

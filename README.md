@@ -3,11 +3,11 @@
 A gym buddy app. Log your sets and reps fast, build your own training plans, and watch the
 numbers go up.
 
-> **Status: M4 complete — the app does what it set out to do.** Build routines,
-> log in one tap, rest on a timer that survives the phone sleeping, then see
-> editable history, personal records and progress charts. M5 is polish, PWA
-> install and offline verification. The full design lives in
-> **[docs/PLAN.md](docs/PLAN.md)**, the visual system in **[design/](design/)**.
+> **Status: v1 complete.** Build routines, log in one tap, rest on a timer that
+> survives the phone sleeping, then see editable history, personal records and
+> progress charts — all of it offline, on your device, with no account. The full
+> design lives in **[docs/PLAN.md](docs/PLAN.md)**, the visual system in
+> **[design/](design/)**.
 
 ## Getting started
 

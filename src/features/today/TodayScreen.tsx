@@ -12,6 +12,7 @@ import { Card } from '~/ui/Card'
 import { ScreenHeader } from '~/ui/ScreenHeader'
 import { Sheet } from '~/ui/Sheet'
 import { cn } from '~/ui/cn'
+import { InstallNudge } from '~/features/install/InstallCard'
 import { formatDuration, useElapsed } from '~/features/session/useElapsed'
 
 export function TodayScreen() {
@@ -73,7 +74,7 @@ export function TodayScreen() {
                 >
                   <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
                   <span className="min-w-0 flex-1 text-left">
-                    <span className="label-caps block opacity-70">
+                    <span className="label-caps block">
                       {summary.exerciseCount} exercise{summary.exerciseCount === 1 ? '' : 's'}
                     </span>
                     <span className="block truncate text-[1.1rem] font-bold tracking-tight">
@@ -96,7 +97,7 @@ export function TodayScreen() {
             >
               <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
               <span className="flex-1 text-left">
-                <span className="label-caps block opacity-70">No plan needed</span>
+                <span className="label-caps block">No plan needed</span>
                 <span className="block text-[1.1rem] font-bold tracking-tight">
                   Empty workout
                 </span>
@@ -105,6 +106,8 @@ export function TodayScreen() {
             </button>
           </>
         )}
+
+        <InstallNudge />
 
         <button
           type="button"
@@ -179,7 +182,7 @@ function ResumeCard({
         onClick={onResume}
         className="w-full cursor-pointer px-4 pt-4 pb-3 text-left"
       >
-        <p className="label-caps text-accent">In progress</p>
+        <p className="label-caps text-accent-ink">In progress</p>
         <p className="mt-1 font-display text-[1.6rem] leading-tight">{name}</p>
         <p className="num mt-1.5 text-[0.8rem] text-ink-muted">
           {formatDuration(elapsed)} · {setCount} set{setCount === 1 ? '' : 's'} · {volume}

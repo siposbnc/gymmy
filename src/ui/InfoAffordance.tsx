@@ -49,7 +49,7 @@ export function InfoAffordance({
           'grid size-[1.0625rem] shrink-0 cursor-pointer place-items-center rounded-full',
           'border-[1.2px] text-[0.6rem] leading-none font-extrabold',
           hint
-            ? 'border-accent text-accent shadow-[0_0_0_4px_var(--accent-wash)]'
+            ? 'border-accent text-accent-ink shadow-[0_0_0_4px_var(--accent-wash)]'
             : 'border-ink-faint text-ink-faint',
           className,
         )}

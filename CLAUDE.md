@@ -55,17 +55,25 @@ user-facing explanation cannot drift from the maths.
 
 ## Verification
 
-`npm run check` is typecheck + lint + tests. It is not enough on its own —
-two milestones' worth of real bugs were invisible to a green suite and obvious
-on screen.
+`npm run check` is typecheck + lint + tests. **It is not enough on its own** —
+several milestones' worth of real bugs were invisible to a green suite and
+obvious the moment the app was rendered or measured.
+
+Everything below needs a build and a server first:
 
 ```bash
-npm run build && npm run shots
+npm run build
+npx vite preview --port 4317 --strictPort &
 ```
 
-drives the built app in a real mobile-sized Chromium, captures every screen in
-both themes into `.shots/`, and fails on any console error. Look at the output
-before calling a milestone done.
+| Command | What it catches |
+| --- | --- |
+| `npm run shots` | Every screen in both themes into `.shots/`, plus console errors. Also asserts at iPhone dimensions that the document does not scroll and the tab bar is pinned — a bug that shipped once. |
+| `npm run a11y` | axe-core across 9 screens × 2 themes. Found four genuine contrast failures the first time it ran. `--verbose` for the failing nodes. |
+| `npm run e2e:offline` | The whole critical path with the network off: log a workout, kill the app, recover, finish, see records. This is the claim the architecture exists to support. |
+
+Look at the screenshots. The scripts catch mechanical faults; they cannot tell
+you a layout reads badly.
 
 ## Deployment
 

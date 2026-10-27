@@ -56,7 +56,7 @@ export function Stepper({
         type="button"
         aria-label={decreaseLabel}
         onClick={() => onChange(round(clamp(value - step)))}
-        className="touch-comfortable grid w-13 shrink-0 cursor-pointer place-items-center bg-sunken transition-colors duration-(--dur-fast) hover:bg-accent-wash hover:text-accent active:scale-95"
+        className="touch-comfortable grid w-13 shrink-0 cursor-pointer place-items-center bg-sunken transition-colors duration-(--dur-fast) hover:bg-accent-wash hover:text-accent-ink active:scale-95"
       >
         <Minus size={22} strokeWidth={2.5} />
       </button>
@@ -76,7 +76,7 @@ export function Stepper({
         type="button"
         aria-label={increaseLabel}
         onClick={() => onChange(round(clamp(value + step)))}
-        className="touch-comfortable grid w-13 shrink-0 cursor-pointer place-items-center bg-sunken transition-colors duration-(--dur-fast) hover:bg-accent-wash hover:text-accent active:scale-95"
+        className="touch-comfortable grid w-13 shrink-0 cursor-pointer place-items-center bg-sunken transition-colors duration-(--dur-fast) hover:bg-accent-wash hover:text-accent-ink active:scale-95"
       >
         <Plus size={22} strokeWidth={2.5} />
       </button>

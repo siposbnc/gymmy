@@ -1,8 +1,10 @@
-import { Download, Upload } from 'lucide-react'
+import { Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { useState } from 'react'
 
 import { backupFilename, exportToJson, importFromJson, type ImportMode } from '~/db/backup'
+import { allSetsForExport } from '~/db/repositories/history'
 import { updateSettings } from '~/db/repositories/settings'
+import { csvFilename, toCsv } from '~/domain/csv'
 import type { Settings } from '~/domain/types'
 import { platform } from '~/lib/platform'
 import { Button } from '~/ui/Button'
@@ -42,6 +44,27 @@ export function BackupSection({ settings }: { settings: Settings }) {
       setStatus('Backup saved.')
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Export failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleCsvExport() {
+    setBusy(true)
+    try {
+      const rows = await allSetsForExport()
+      if (rows.length === 0) {
+        setStatus('Nothing to export yet — finish a workout first.')
+        return
+      }
+      await platform.files.save({
+        filename: csvFilename(),
+        mimeType: 'text/csv',
+        data: toCsv(rows, settings.units),
+      })
+      setStatus(`Exported ${rows.length} set${rows.length === 1 ? '' : 's'}.`)
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'CSV export failed.')
     } finally {
       setBusy(false)
     }
@@ -90,6 +113,23 @@ export function BackupSection({ settings }: { settings: Settings }) {
           >
             <Upload size={16} aria-hidden />
             Import
+          </Button>
+        </div>
+
+        <div className="border-t border-dashed border-line pt-3">
+          <p className="mb-2 text-[0.78rem] leading-relaxed text-ink-muted">
+            A spreadsheet copy, one row per set. Useful for a coach or your own digging — but it
+            is <strong className="font-semibold text-ink">not</strong> a backup, because Gymmy
+            cannot read it back in.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={busy}
+            onClick={() => void handleCsvExport()}
+          >
+            <FileSpreadsheet size={16} aria-hidden />
+            Export sets as CSV
           </Button>
         </div>
 

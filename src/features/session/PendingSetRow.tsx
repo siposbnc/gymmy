@@ -58,7 +58,7 @@ export function PendingSetRow({
         aria-pressed={isWarmup}
         className={cn(
           'num w-5 shrink-0 cursor-pointer rounded-sm text-center text-[0.7rem] font-extrabold',
-          isWarmup ? 'text-accent' : 'text-ink-faint',
+          isWarmup ? 'text-accent-ink' : 'text-ink-faint',
         )}
       >
         {isWarmup ? 'W' : setIndex}

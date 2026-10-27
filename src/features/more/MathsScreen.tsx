@@ -34,7 +34,7 @@ export function MathsScreen() {
             >
               <p className="text-[1.05rem] font-semibold tracking-tight">{entry.label}</p>
               {entry.formula ? (
-                <p className="num mt-1 text-[0.8rem] text-accent">{entry.formula}</p>
+                <p className="num mt-1 text-[0.8rem] text-accent-ink">{entry.formula}</p>
               ) : null}
               <p className="mt-1.5 line-clamp-2 text-[0.8rem] leading-relaxed text-ink-muted">
                 {entry.explainer.whatItIs}
