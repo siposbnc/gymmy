@@ -141,6 +141,22 @@ export interface SessionExercise {
   restSeconds?: number
   supersetGroup?: number
   notes?: string
+
+  /**
+   * The routine's targets, copied at session start.
+   *
+   * Snapshotted rather than read live through `routineId` for the same reason
+   * the session name is: editing "Push A" halfway through training it must not
+   * change what the remaining sets are asking for. Absent for freestyle
+   * workouts, which is why every field is optional — and why adding them
+   * needed no migration. Unlike the v2 settings fields, "missing" is the
+   * correct value for every row written before M3.
+   */
+  targetSets?: number
+  targetRepsMin?: number
+  targetRepsMax?: number
+  targetWeight?: TargetWeight
+  isAmrap?: boolean
 }
 
 /**

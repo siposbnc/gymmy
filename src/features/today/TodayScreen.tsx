@@ -2,7 +2,8 @@ import { ArrowRight, Play } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { useActiveSession, useSettings } from '~/db/hooks'
+import { useActiveSession, useRoutines, useSettings } from '~/db/hooks'
+import { startSessionFromRoutine } from '~/db/repositories/routines'
 import { discardSession, isStale, startEmptySession } from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
 import { formatVolume } from '~/domain/units'
@@ -10,12 +11,14 @@ import { Button } from '~/ui/Button'
 import { Card } from '~/ui/Card'
 import { ScreenHeader } from '~/ui/ScreenHeader'
 import { Sheet } from '~/ui/Sheet'
+import { cn } from '~/ui/cn'
 import { formatDuration, useElapsed } from '~/features/session/useElapsed'
 
 export function TodayScreen() {
   const navigate = useNavigate()
   const active = useActiveSession()
   const settings = useSettings()
+  const routines = useRoutines()
   const [confirmStale, setConfirmStale] = useState(false)
 
   const session = active?.session ?? null
@@ -23,6 +26,11 @@ export function TodayScreen() {
 
   async function start() {
     await startEmptySession('Workout')
+    await navigate('/session')
+  }
+
+  async function startRoutine(routineId: string) {
+    await startSessionFromRoutine(routineId)
     await navigate('/session')
   }
 
@@ -50,18 +58,52 @@ export function TodayScreen() {
             onDiscard={() => setConfirmStale(true)}
           />
         ) : (
-          <button
-            type="button"
-            onClick={() => void start()}
-            className="flex h-16 cursor-pointer items-center gap-3 rounded-xl bg-accent px-5 text-on-accent shadow-(--shadow-md) transition-transform duration-(--dur-fast) active:scale-[0.98]"
-          >
-            <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
-            <span className="flex-1 text-left">
-              <span className="label-caps block opacity-70">No plan needed</span>
-              <span className="block text-[1.1rem] font-bold tracking-tight">Start a workout</span>
-            </span>
-            <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
-          </button>
+          <>
+            {/* Routines first when they exist — most sessions come from a plan.
+                The empty workout stays one tap away for everyone else. */}
+            {(routines ?? [])
+              .filter((summary) => summary.exerciseCount > 0)
+              .slice(0, 3)
+              .map((summary) => (
+                <button
+                  key={summary.routine.id}
+                  type="button"
+                  onClick={() => void startRoutine(summary.routine.id)}
+                  className="flex h-16 cursor-pointer items-center gap-3 rounded-xl bg-accent px-5 text-on-accent shadow-(--shadow-md) transition-transform duration-(--dur-fast) active:scale-[0.98]"
+                >
+                  <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="label-caps block opacity-70">
+                      {summary.exerciseCount} exercise{summary.exerciseCount === 1 ? '' : 's'}
+                    </span>
+                    <span className="block truncate text-[1.1rem] font-bold tracking-tight">
+                      {summary.routine.name}
+                    </span>
+                  </span>
+                  <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
+                </button>
+              ))}
+
+            <button
+              type="button"
+              onClick={() => void start()}
+              className={cn(
+                'flex h-16 cursor-pointer items-center gap-3 rounded-xl px-5 transition-transform duration-(--dur-fast) active:scale-[0.98]',
+                (routines ?? []).some((summary) => summary.exerciseCount > 0)
+                  ? 'border border-line-strong bg-surface text-ink shadow-(--shadow-sm)'
+                  : 'bg-accent text-on-accent shadow-(--shadow-md)',
+              )}
+            >
+              <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
+              <span className="flex-1 text-left">
+                <span className="label-caps block opacity-70">No plan needed</span>
+                <span className="block text-[1.1rem] font-bold tracking-tight">
+                  Empty workout
+                </span>
+              </span>
+              <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
+            </button>
+          </>
         )}
 
         <Card>

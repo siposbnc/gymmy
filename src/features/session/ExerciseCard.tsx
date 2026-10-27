@@ -37,9 +37,16 @@ interface ExerciseCardProps {
   view: SessionExerciseView
   settings: Settings
   active?: boolean
+  /** Shares a superset group with the exercise above it. */
+  groupedWithPrevious?: boolean
 }
 
-export function ExerciseCard({ view, settings, active = false }: ExerciseCardProps) {
+export function ExerciseCard({
+  view,
+  settings,
+  active = false,
+  groupedWithPrevious = false,
+}: ExerciseCardProps) {
   const { sessionExercise, exercise, sets, previousSets } = view
   const unit = settings.units
 
@@ -63,8 +70,14 @@ export function ExerciseCard({ view, settings, active = false }: ExerciseCardPro
         setIndex: nextIndex,
         currentSessionSets: sets,
         previousSessionSets: previousSets,
+        // Snapshotted at session start, so editing the routine mid-workout
+        // cannot change what the remaining sets ask for.
+        target: {
+          weight: sessionExercise.targetWeight,
+          reps: sessionExercise.targetRepsMin,
+        },
       }),
-    [nextIndex, sets, previousSets],
+    [nextIndex, sets, previousSets, sessionExercise.targetWeight, sessionExercise.targetRepsMin],
   )
 
   const weightKg = draftWeight ?? prefill.weightKg
@@ -174,151 +187,169 @@ export function ExerciseCard({ view, settings, active = false }: ExerciseCardPro
   })()
 
   return (
-    <Card active={active}>
-      <div className="mb-0.5 flex items-center gap-2">
-        <h2 className="flex-1 text-lead font-semibold tracking-tight">
-          {exercise?.name ?? 'Unknown exercise'}
-        </h2>
-        <span className="num shrink-0 text-[0.7rem] font-extrabold tracking-wide text-ink-faint">
-          {workingSets.length} set{workingSets.length === 1 ? '' : 's'} · rest{' '}
-          {formatRestLength(restSeconds)}
-        </span>
-        <button
-          type="button"
-          onClick={() => setExerciseMenu(true)}
-          aria-label={`${exercise?.name ?? 'Exercise'} options`}
-          className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-ink-faint"
-        >
-          <MoreVertical size={16} aria-hidden />
-        </button>
-      </div>
-
-      {/* The most-read text in the app, so it is never behind a tap. */}
-      <p className="num mb-2.5 text-meta text-ink-muted">
-        <span className="label-caps mr-1.5 text-ink-faint">last time</span>
-        {ghost ?? <span className="text-ink-faint italic">first time — no history yet</span>}
-      </p>
-
-      <div className="grid gap-1.5">
-        {sets.map((set) => (
-          <SetRow
-            key={set.id}
-            set={set}
-            unit={unit}
-            trackingType={exercise?.trackingType ?? 'weight_reps'}
-            onEditWeight={() => setPad({ kind: 'set-weight', setId: set.id })}
-            onEditReps={() => setPad({ kind: 'set-reps', setId: set.id })}
-            onOpenActions={() => setActionsFor(set.id)}
-          />
-        ))}
-
-        <PendingSetRow
-          setIndex={nextIndex}
-          weightKg={weightKg}
-          reps={reps}
-          source={prefill.source}
-          isWarmup={draftWarmup}
-          unit={unit}
-          trackingType={exercise?.trackingType ?? 'weight_reps'}
-          onEditWeight={() => setPad({ kind: 'pending-weight' })}
-          onEditReps={() => setPad({ kind: 'pending-reps' })}
-          onToggleWarmup={() => setDraftWarmup((current) => !current)}
-          onLog={() => void handleLog()}
-        />
-      </div>
-
-      {plates ? (
-        <p className="num mt-2.5 flex items-center gap-1.5 border-t border-dashed border-line pt-2.5 text-[0.72rem] text-ink-muted">
-          <span className="label-caps text-ink-faint">plates / side</span>
-          <strong className="font-semibold text-ink">{formatPlates(plates)}</strong>
-          {!plates.exact ? <span className="text-ink-faint">· not exact</span> : null}
-          <InfoAffordance
-            explainerId="plates"
-            exampleInput={{
-              targetKg: weightKg,
-              barWeightKg: settings.barWeightKg,
-              inventory: settings.plateInventory,
-            }}
-          />
-        </p>
-      ) : null}
-
-      {padConfig ? (
-        <NumericPad
-          open
-          onOpenChange={(open) => !open && setPad(null)}
-          value={padConfig.value}
-          onCommit={padConfig.commit}
-          {...(padConfig.unit ? { unit: padConfig.unit } : {})}
-          eyebrow={padConfig.eyebrow}
-          increment={padConfig.increment}
-          allowDecimal={padConfig.allowDecimal}
+    <div className={groupedWithPrevious ? 'relative ml-4' : undefined}>
+      {groupedWithPrevious ? (
+        // Same elbow connector as the routine editor: the grouping has to be
+        // visible where you train it, not only where you planned it.
+        <span
+          aria-hidden
+          className="absolute -top-3 -left-3.5 h-[calc(50%+0.75rem)] w-3 rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-strong"
         />
       ) : null}
 
-      <SetActionsSheet
-        set={activeSet}
-        open={actionsFor !== null}
-        onOpenChange={(open) => !open && setActionsFor(null)}
-        onToggleWarmup={() => {
-          if (activeSet) void toggleWarmup(activeSet.id)
-          setActionsFor(null)
-        }}
-        onEditRpe={() => {
-          if (activeSet) setPad({ kind: 'set-rpe', setId: activeSet.id })
-          setActionsFor(null)
-        }}
-        onDelete={() => {
-          if (activeSet) void deleteSet(activeSet.id)
-          setActionsFor(null)
-        }}
-      />
-
-      <Sheet
-        open={exerciseMenu}
-        onOpenChange={setExerciseMenu}
-        eyebrow={exercise?.name}
-        title="Exercise options"
-      >
-        <div className="border-b border-line px-5 py-4">
-          <p className="label-caps mb-2 text-ink-faint">Rest after each set</p>
-          <Stepper
-            value={restSeconds}
-            onChange={(seconds) => {
-              if (exercise) void setExerciseRest(sessionExercise.id, exercise.id, seconds)
-            }}
-            step={15}
-            min={0}
-            max={600}
-            unit={formatRestLength(restSeconds)}
-            hint="Remembered for this exercise next time"
-            decreaseLabel="Decrease rest by 15 seconds"
-            increaseLabel="Increase rest by 15 seconds"
-          />
-        </div>
-
-        <div className="pb-2">
+      <Card active={active}>
+        <div className="mb-0.5 flex items-center gap-2">
+          <h2 className="min-w-0 flex-1">
+            {groupedWithPrevious ? (
+              <span className="label-caps block text-accent">Superset</span>
+            ) : null}
+            <span className="block truncate text-lead font-semibold tracking-tight">
+              {exercise?.name ?? 'Unknown exercise'}
+            </span>
+          </h2>
+          <span className="num shrink-0 text-[0.7rem] font-extrabold tracking-wide text-ink-faint">
+            {sessionExercise.targetSets == null
+              ? `${workingSets.length} set${workingSets.length === 1 ? '' : 's'}`
+              : `${workingSets.length} of ${sessionExercise.targetSets}`}{' '}
+            · rest {formatRestLength(restSeconds)}
+          </span>
           <button
             type="button"
-            onClick={() => {
-              void removeSessionExercise(sessionExercise.id)
-              setExerciseMenu(false)
-            }}
-            className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
+            onClick={() => setExerciseMenu(true)}
+            aria-label={`${exercise?.name ?? 'Exercise'} options`}
+            className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-ink-faint"
           >
-            <span className="min-w-0 flex-1">
-              <span className="block text-[0.95rem] font-medium text-danger">
-                Remove from this workout
-              </span>
-              <span className="block text-[0.75rem] text-ink-muted">
-                {sets.length > 0
-                  ? `Deletes ${sets.length} logged set${sets.length === 1 ? '' : 's'}`
-                  : 'Nothing logged yet'}
-              </span>
-            </span>
+            <MoreVertical size={16} aria-hidden />
           </button>
         </div>
-      </Sheet>
-    </Card>
+
+        {/* The most-read text in the app, so it is never behind a tap. */}
+        <p className="num mb-2.5 text-meta text-ink-muted">
+          <span className="label-caps mr-1.5 text-ink-faint">last time</span>
+          {ghost ?? <span className="text-ink-faint italic">first time — no history yet</span>}
+        </p>
+
+        <div className="grid gap-1.5">
+          {sets.map((set) => (
+            <SetRow
+              key={set.id}
+              set={set}
+              unit={unit}
+              trackingType={exercise?.trackingType ?? 'weight_reps'}
+              onEditWeight={() => setPad({ kind: 'set-weight', setId: set.id })}
+              onEditReps={() => setPad({ kind: 'set-reps', setId: set.id })}
+              onOpenActions={() => setActionsFor(set.id)}
+            />
+          ))}
+
+          <PendingSetRow
+            setIndex={nextIndex}
+            weightKg={weightKg}
+            reps={reps}
+            source={prefill.source}
+            isWarmup={draftWarmup}
+            unit={unit}
+            trackingType={exercise?.trackingType ?? 'weight_reps'}
+            onEditWeight={() => setPad({ kind: 'pending-weight' })}
+            onEditReps={() => setPad({ kind: 'pending-reps' })}
+            onToggleWarmup={() => setDraftWarmup((current) => !current)}
+            onLog={() => void handleLog()}
+          />
+        </div>
+
+        {plates ? (
+          <p className="num mt-2.5 flex items-center gap-1.5 border-t border-dashed border-line pt-2.5 text-[0.72rem] text-ink-muted">
+            <span className="label-caps text-ink-faint">plates / side</span>
+            <strong className="font-semibold text-ink">{formatPlates(plates)}</strong>
+            {!plates.exact ? <span className="text-ink-faint">· not exact</span> : null}
+            <InfoAffordance
+              explainerId="plates"
+              exampleInput={{
+                targetKg: weightKg,
+                barWeightKg: settings.barWeightKg,
+                inventory: settings.plateInventory,
+              }}
+            />
+          </p>
+        ) : null}
+
+        {padConfig ? (
+          <NumericPad
+            open
+            onOpenChange={(open) => !open && setPad(null)}
+            value={padConfig.value}
+            onCommit={padConfig.commit}
+            {...(padConfig.unit ? { unit: padConfig.unit } : {})}
+            eyebrow={padConfig.eyebrow}
+            increment={padConfig.increment}
+            allowDecimal={padConfig.allowDecimal}
+          />
+        ) : null}
+
+        <SetActionsSheet
+          set={activeSet}
+          open={actionsFor !== null}
+          onOpenChange={(open) => !open && setActionsFor(null)}
+          onToggleWarmup={() => {
+            if (activeSet) void toggleWarmup(activeSet.id)
+            setActionsFor(null)
+          }}
+          onEditRpe={() => {
+            if (activeSet) setPad({ kind: 'set-rpe', setId: activeSet.id })
+            setActionsFor(null)
+          }}
+          onDelete={() => {
+            if (activeSet) void deleteSet(activeSet.id)
+            setActionsFor(null)
+          }}
+        />
+
+        <Sheet
+          open={exerciseMenu}
+          onOpenChange={setExerciseMenu}
+          eyebrow={exercise?.name}
+          title="Exercise options"
+        >
+          <div className="border-b border-line px-5 py-4">
+            <p className="label-caps mb-2 text-ink-faint">Rest after each set</p>
+            <Stepper
+              value={restSeconds}
+              onChange={(seconds) => {
+                if (exercise) void setExerciseRest(sessionExercise.id, exercise.id, seconds)
+              }}
+              step={15}
+              min={0}
+              max={600}
+              unit={formatRestLength(restSeconds)}
+              hint="Remembered for this exercise next time"
+              decreaseLabel="Decrease rest by 15 seconds"
+              increaseLabel="Increase rest by 15 seconds"
+            />
+          </div>
+
+          <div className="pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                void removeSessionExercise(sessionExercise.id)
+                setExerciseMenu(false)
+              }}
+              className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.95rem] font-medium text-danger">
+                  Remove from this workout
+                </span>
+                <span className="block text-[0.75rem] text-ink-muted">
+                  {sets.length > 0
+                    ? `Deletes ${sets.length} logged set${sets.length === 1 ? '' : 's'}`
+                    : 'Nothing logged yet'}
+                </span>
+              </span>
+            </button>
+          </div>
+        </Sheet>
+      </Card>
+    </div>
   )
 }

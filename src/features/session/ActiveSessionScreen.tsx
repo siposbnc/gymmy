@@ -13,8 +13,9 @@ import { formatVolume } from '~/domain/units'
 import { Button } from '~/ui/Button'
 import { Sheet } from '~/ui/Sheet'
 
+import { ExercisePickerSheet } from '~/features/exercises/ExercisePickerSheet'
+
 import { ExerciseCard } from './ExerciseCard'
-import { ExercisePickerSheet } from './ExercisePickerSheet'
 import { ProgressRibbon } from './ProgressRibbon'
 import { formatDuration, useElapsed } from './useElapsed'
 
@@ -59,15 +60,22 @@ export function ActiveSessionScreen() {
       <ProgressRibbon views={views} />
 
       <div className="grid gap-3 px-4 pt-3.5 pb-6">
-        {views.map((view, index) => (
-          <ExerciseCard
-            key={view.sessionExercise.id}
-            view={view}
-            settings={settings}
-            // The first exercise with an unfinished set is the one in hand.
-            active={index === views.findIndex((candidate) => candidate.sets.length === 0)}
-          />
-        ))}
+        {views.map((view, index) => {
+          const previous = views[index - 1]
+          const group = view.sessionExercise.supersetGroup
+          return (
+            <ExerciseCard
+              key={view.sessionExercise.id}
+              view={view}
+              settings={settings}
+              // The first exercise with an unfinished set is the one in hand.
+              active={index === views.findIndex((candidate) => candidate.sets.length === 0)}
+              groupedWithPrevious={
+                group != null && group === previous?.sessionExercise.supersetGroup
+              }
+            />
+          )
+        })}
 
         <button
           type="button"

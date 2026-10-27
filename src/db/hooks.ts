@@ -1,8 +1,17 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 
-import type { Exercise, Session, SessionExercise, SetEntry, Settings } from '~/domain/types'
+import type {
+  Exercise,
+  Routine,
+  RoutineExercise,
+  Session,
+  SessionExercise,
+  SetEntry,
+  Settings,
+} from '~/domain/types'
 
 import { listExercises, type ExerciseFilter } from './repositories/exercises'
+import { listRoutineExercises, listRoutines } from './repositories/routines'
 import { db } from './schema'
 import { getSettings } from './repositories/settings'
 import {
@@ -31,6 +40,55 @@ export function useExercises(filter: ExerciseFilter = {}): Exercise[] | undefine
     () => listExercises({ search, muscleGroup, includeArchived }),
     [search, muscleGroup, includeArchived],
   )
+}
+
+/** A routine plus the number of exercises in it, for the list screen. */
+export interface RoutineSummary {
+  routine: Routine
+  exerciseCount: number
+  /** First few exercise names, so a card is identifiable at a glance. */
+  preview: string[]
+}
+
+export function useRoutines(includeArchived = false): RoutineSummary[] | undefined {
+  return useLiveQuery(async () => {
+    const routines = await listRoutines(includeArchived)
+    return Promise.all(
+      routines.map(async (routine) => {
+        const planned = await listRoutineExercises(routine.id)
+        const names = await Promise.all(
+          planned.slice(0, 4).map(async (entry) => {
+            const exercise = await db.exercises.get(entry.exerciseId)
+            return exercise?.name ?? 'Unknown'
+          }),
+        )
+        return { routine, exerciseCount: planned.length, preview: names }
+      }),
+    )
+  }, [includeArchived])
+}
+
+/** One routine with its exercises resolved, for the editor. */
+export interface RoutineDetail {
+  routine: Routine
+  entries: { entry: RoutineExercise; exercise: Exercise | undefined }[]
+}
+
+export function useRoutine(routineId: string | undefined): RoutineDetail | null | undefined {
+  return useLiveQuery(async () => {
+    if (!routineId) return null
+    const routine = await db.routines.get(routineId)
+    if (!routine) return null
+
+    const planned = await listRoutineExercises(routineId)
+    const entries = await Promise.all(
+      planned.map(async (entry) => ({
+        entry,
+        exercise: await db.exercises.get(entry.exerciseId),
+      })),
+    )
+    return { routine, entries }
+  }, [routineId])
 }
 
 /** Everything one exercise needs to render a set list and prefill the next row. */

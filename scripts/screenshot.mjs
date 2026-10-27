@@ -70,9 +70,28 @@ async function logSet(page, weight, reps) {
 }
 
 async function intoSession(page) {
-  await tap(page, /start a workout/i)
+  await tap(page, /empty workout/i)
   await tap(page, /add exercise/i)
   await page.getByRole('button', { name: /^Bench Press/ }).click()
+  await page.waitForTimeout(250)
+}
+
+/** Build a small routine through the UI, leaving the editor open. */
+async function buildRoutine(page) {
+  await page.getByRole('link', { name: 'Routines' }).click()
+  // The header "New" and the empty-state "Build a routine" both create one.
+  await tap(page, 'New', true)
+  await page.waitForTimeout(200)
+
+  for (const name of ['Bench Press', 'Incline Dumbbell Press', 'Cable Fly']) {
+    await tap(page, /add exercise/i)
+    await page.getByRole('button', { name: new RegExp(`^${name}`) }).click()
+    await page.waitForTimeout(150)
+  }
+
+  // Group the SECOND exercise with the first, so the connector shows. The
+  // first exercise's button is correctly disabled — nothing sits above it.
+  await page.getByRole('button', { name: /superset with the exercise above/i }).nth(1).click()
   await page.waitForTimeout(250)
 }
 
@@ -85,7 +104,7 @@ for (const theme of ['light', 'dark']) {
     ...(await shoot('session-empty', {
       theme,
       steps: async (page) => {
-        await tap(page, /start a workout/i)
+        await tap(page, /empty workout/i)
         await page.waitForTimeout(200)
       },
     })),
@@ -98,6 +117,36 @@ for (const theme of ['light', 'dark']) {
         await intoSession(page)
         await logSet(page, 80, 8)
         await logSet(page, 80, 8)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('routines-empty', {
+      theme,
+      steps: async (page) => {
+        await page.getByRole('link', { name: 'Routines' }).click()
+        await page.waitForTimeout(200)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('routine-editor', {
+      theme,
+      steps: buildRoutine,
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('routine-session', {
+      theme,
+      steps: async (page) => {
+        await buildRoutine(page)
+        await page.getByRole('button', { name: /back to routines/i }).click()
+        await page.waitForTimeout(250)
+        await tap(page, 'Start', true)
+        await page.waitForTimeout(400)
       },
     })),
   )

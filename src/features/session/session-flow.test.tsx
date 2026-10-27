@@ -4,6 +4,12 @@ import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { ThemeProvider } from '~/app/ThemeProvider'
+import {
+  addExerciseToRoutine,
+  createRoutine,
+  startSessionFromRoutine,
+  updateRoutineExercise,
+} from '~/db/repositories/routines'
 import { addExerciseToSession, listSets, startEmptySession } from '~/db/repositories/sessions'
 import { db } from '~/db/schema'
 import { bootstrapDatabase } from '~/db/seed'
@@ -165,6 +171,42 @@ describe('logging a set', () => {
     await startEmptySession('Interrupted workout')
     renderSession()
     expect(await screen.findByText('Interrupted workout')).toBeInTheDocument()
+  })
+
+  it('pre-fills the first set from the routine, then carries forward', async () => {
+    const user = userEvent.setup()
+
+    const routineId = await createRoutine('Push A')
+    const entryId = await addExerciseToRoutine(routineId, 'ex_bench-press')
+    await updateRoutineExercise(entryId, {
+      targetSets: 3,
+      targetRepsMin: 5,
+      targetWeight: { kind: 'absolute', kg: 100 },
+    })
+    await startSessionFromRoutine(routineId)
+
+    renderSession()
+    expect(await screen.findByText('Push A')).toBeInTheDocument()
+
+    // The plan's numbers are already in the row — nothing typed.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 100 kg\. edit/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /reps: 5\. edit/i })).toBeInTheDocument()
+    })
+    expect(screen.getByText(/0 of 3/)).toBeInTheDocument()
+
+    // Deviate from the plan: this set actually went heavier.
+    await user.click(screen.getByRole('button', { name: /weight: 100 kg\. edit/i }))
+    await user.click(await screen.findByRole('button', { name: '1' }))
+    await user.click(screen.getByRole('button', { name: '0' }))
+    await user.click(screen.getByRole('button', { name: '5' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(screen.getByRole('button', { name: 'Log' }))
+
+    // Set two follows what you just did, not what the plan still says.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 105 kg\. edit/i })).toBeInTheDocument()
+    })
   })
 
   it('auto-starts rest using the exercise own default', async () => {

@@ -5,6 +5,8 @@ import { ActiveSessionScreen } from '~/features/session/ActiveSessionScreen'
 import { MathsScreen } from '~/features/more/MathsScreen'
 import { MoreScreen } from '~/features/more/MoreScreen'
 import { ComingSoon } from '~/features/placeholder/ComingSoon'
+import { RoutineEditorScreen } from '~/features/routines/RoutineEditorScreen'
+import { RoutinesScreen } from '~/features/routines/RoutinesScreen'
 import { SettingsScreen } from '~/features/settings/SettingsScreen'
 import { TodayScreen } from '~/features/today/TodayScreen'
 
@@ -25,16 +27,10 @@ export function App() {
                   but the session bar hides itself here. */}
               <Route path="session" element={<ActiveSessionScreen />} />
 
-              <Route
-                path="routines"
-                element={
-                  <ComingSoon
-                    title="Routines"
-                    milestone="M3"
-                    description="Build reusable training plans with target sets, reps, weight and rest — then start a session with everything pre-filled."
-                  />
-                }
-              />
+              <Route path="routines">
+                <Route index element={<RoutinesScreen />} />
+                <Route path=":routineId" element={<RoutineEditorScreen />} />
+              </Route>
               <Route
                 path="history"
                 element={
