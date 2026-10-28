@@ -209,6 +209,67 @@ describe('logging a set', () => {
     })
   })
 
+  it('refuses to log a weight-tracked set with no weight', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Push A')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_bench-press')
+
+    renderSession()
+    await screen.findByText('Bench Press')
+
+    // Reps alone are not a set here — the weight is the thing being tracked.
+    await user.click(screen.getByRole('button', { name: /reps: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '8' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    const log = await screen.findByRole('button', { name: 'Log. Enter a weight first.' })
+    expect(log).toBeDisabled()
+    expect(screen.getByText(/enter a weight to log this set/i)).toBeInTheDocument()
+
+    // And zero is not a weight: the pad will not commit it.
+    await user.click(screen.getByRole('button', { name: /weight: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '0' }))
+    expect(screen.getByRole('button', { name: 'Done' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: '6' }))
+    await user.click(screen.getByRole('button', { name: '0' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await user.click(await screen.findByRole('button', { name: /^log$/i }))
+
+    await waitFor(async () => {
+      const sets = await listSets(sessionExerciseId)
+      expect(sets).toHaveLength(1)
+      expect(sets[0]?.weightKg).toBe(60)
+    })
+  })
+
+  it('logs bodyweight work with reps alone', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Pull')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_pull-up')
+
+    renderSession()
+    await screen.findByText('Pull-up')
+
+    // No weight field at all on a reps-only exercise, so nothing to require.
+    expect(screen.queryByRole('button', { name: /weight:/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /reps: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '9' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await user.click(await screen.findByRole('button', { name: /^log$/i }))
+
+    await waitFor(async () => {
+      const sets = await listSets(sessionExerciseId)
+      expect(sets).toHaveLength(1)
+      expect(sets[0]?.reps).toBe(9)
+    })
+  })
+
   it('auto-starts rest using the exercise own default', async () => {
     const user = userEvent.setup()
 
@@ -239,5 +300,111 @@ describe('logging a set', () => {
       expect(label).toBe('Squat')
       expect(endsAt).toBeGreaterThan(Date.now())
     })
+  })
+
+  it('offers more weight once the rep range was cleared, and applies it in one tap', async () => {
+    const user = userEvent.setup()
+
+    const routineId = await createRoutine('Push A')
+    const entryId = await addExerciseToRoutine(routineId, 'ex_bench-press')
+    await updateRoutineExercise(entryId, { targetSets: 3, targetRepsMin: 5, targetRepsMax: 8 })
+
+    // Last week: three sets of eight at 80 — the top of the range, cleared.
+    const past = await startSessionFromRoutine(routineId)
+    const pastExercise = (await db.sessionExercises.where('sessionId').equals(past).toArray())[0]!
+    for (let setIndex = 1; setIndex <= 3; setIndex += 1) {
+      await db.sets.add({
+        id: `past-${setIndex}`,
+        sessionExerciseId: pastExercise.id,
+        setIndex,
+        weightKg: 80,
+        reps: 8,
+        type: 'normal',
+        completedAt: Date.now() - 100_000 + setIndex,
+      })
+    }
+    await db.sessions.update(past, { status: 'completed', endedAt: Date.now() - 90_000 })
+
+    const sessionId = await startSessionFromRoutine(routineId)
+    renderSession()
+
+    // The smallest loadable step on a seeded rack is 2 × 1.25 kg.
+    expect(await screen.findByText(/ready for/i)).toBeInTheDocument()
+    expect(screen.getByText('82.5 kg')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /use 82\.5 kg for 5 reps/i }))
+
+    // Heavier means back to the bottom of the range — that is the other half
+    // of double progression, and it has to happen without a second tap.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 82\.5 kg\. edit/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /reps: 5\. edit/i })).toBeInTheDocument()
+    })
+
+    // Accepted, so it stops asking.
+    expect(screen.queryByText(/ready for/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+
+    const links = await db.sessionExercises.where('sessionId').equals(sessionId).toArray()
+    await waitFor(async () => {
+      const logged = await listSets(links[0]!.id)
+      expect(logged[0]?.weightKg).toBe(82.5)
+      expect(logged[0]?.reps).toBe(5)
+    })
+  })
+
+  it('says nothing when the rep range was not cleared', async () => {
+    const routineId = await createRoutine('Push A')
+    const entryId = await addExerciseToRoutine(routineId, 'ex_bench-press')
+    await updateRoutineExercise(entryId, { targetSets: 3, targetRepsMin: 5, targetRepsMax: 8 })
+
+    const past = await startSessionFromRoutine(routineId)
+    const pastExercise = (await db.sessionExercises.where('sessionId').equals(past).toArray())[0]!
+    for (let setIndex = 1; setIndex <= 3; setIndex += 1) {
+      await db.sets.add({
+        id: `past-${setIndex}`,
+        sessionExerciseId: pastExercise.id,
+        setIndex,
+        weightKg: 80,
+        reps: 6,
+        type: 'normal',
+        completedAt: Date.now() - 100_000 + setIndex,
+      })
+    }
+    await db.sessions.update(past, { status: 'completed', endedAt: Date.now() - 90_000 })
+
+    await startSessionFromRoutine(routineId)
+    renderSession()
+
+    // Six of a possible eight is progress, and Gymmy has nothing to say about
+    // it. There is no "hold here" state, because that would be a scoreboard.
+    expect(await screen.findByText('Bench Press')).toBeInTheDocument()
+    expect(screen.queryByText(/ready for/i)).not.toBeInTheDocument()
+  })
+
+  it('stops the rest timer when the workout is finished', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Legs')
+    await addExerciseToSession(sessionId, 'ex_squat')
+
+    renderSession()
+    await screen.findByText('Squat')
+
+    await user.click(screen.getByRole('button', { name: /weight: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '6' }))
+    await user.click(screen.getByRole('button', { name: '0' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(await screen.findByRole('button', { name: /^log$/i }))
+
+    await waitFor(() => expect(useRestTimer.getState().endsAt).not.toBeNull())
+
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+    await user.click(await screen.findByRole('button', { name: 'Finish workout' }))
+
+    // The rest bar lives in the app shell — left running it would count down
+    // over the session summary and then chime for a workout that is over.
+    await waitFor(() => expect(useRestTimer.getState().endsAt).toBeNull())
   })
 })

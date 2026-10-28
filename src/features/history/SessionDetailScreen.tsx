@@ -1,6 +1,6 @@
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { useSessionDetail, useSettings } from '~/db/hooks'
 import {
@@ -17,6 +17,7 @@ import {
   toggleWarmup,
   updateSet,
 } from '~/db/repositories/sessions'
+import { BackupPrompt } from '~/features/backup/BackupPrompt'
 import { ExercisePickerSheet } from '~/features/exercises/ExercisePickerSheet'
 import { describeVolumeGoal, resolveVolumeGoal, type VolumeGoalResult } from '~/domain/goals'
 import { totalVolume } from '~/domain/metrics'
@@ -55,6 +56,9 @@ type PadTarget =
 export function SessionDetailScreen() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
+  // Set only by finishing a workout, so the backup prompt cannot ambush
+  // someone who opened an old session from History to fix a typo.
+  const justFinished = (useLocation().state as { justFinished?: boolean } | null)?.justFinished
   const detail = useSessionDetail(sessionId)
   const settings = useSettings()
 
@@ -213,6 +217,11 @@ export function SessionDetailScreen() {
             </ul>
           </div>
         ) : null}
+
+        {/* After the records, never before them. What you earned is the reason
+            you opened this screen; the backup is a chore, and a chore does not
+            get to go first. */}
+        {justFinished ? <BackupPrompt /> : null}
 
         {exercises.map((entry) => (
           <Card key={entry.sessionExerciseId}>

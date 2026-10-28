@@ -237,6 +237,20 @@ for (const theme of ['light', 'dark']) {
     })),
   )
 
+  // The picker with history behind it: the sections only exist once there is
+  // something to rank, and an empty install cannot show that.
+  allErrors.push(
+    ...(await shoot('exercise-picker', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await tap(page, /empty workout/i)
+        await tap(page, /add exercise/i)
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
   allErrors.push(
     ...(await shoot('routines-empty', {
       theme,
@@ -258,6 +272,22 @@ for (const theme of ['light', 'dark']) {
     ...(await shoot('routine-session', {
       theme,
       steps: async (page) => {
+        await buildRoutine(page)
+        await page.getByRole('button', { name: /back to routines/i }).click()
+        await page.waitForTimeout(250)
+        await tap(page, 'Start', true)
+        await page.waitForTimeout(400)
+      },
+    })),
+  )
+
+  // The progression nudge needs a previous session that actually cleared the
+  // routine's rep range, so it only exists with history behind it.
+  allErrors.push(
+    ...(await shoot('progression', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
         await buildRoutine(page)
         await page.getByRole('button', { name: /back to routines/i }).click()
         await page.waitForTimeout(250)
@@ -297,6 +327,21 @@ for (const theme of ['light', 'dark']) {
         await seedHistory(page)
         await page.getByRole('link', { name: 'History' }).click()
         await page.waitForTimeout(400)
+      },
+    })),
+  )
+
+  // The post-workout summary as it actually arrives: finished just now, so
+  // the backup prompt is on it. Reached by finishing, never from History.
+  allErrors.push(
+    ...(await shoot('session-finished', {
+      theme,
+      steps: async (page) => {
+        await intoSession(page)
+        await logSet(page, 80, 8)
+        await tap(page, 'Finish', true)
+        await tap(page, 'Finish workout', true)
+        await page.waitForTimeout(500)
       },
     })),
   )

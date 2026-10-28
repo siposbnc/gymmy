@@ -1,5 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 
+import { backupStatus, type BackupStatus } from '~/domain/backup-reminder'
+import { rankExerciseUsage, type ExerciseUsage } from '~/domain/exercise-usage'
 import { muscleSetProgress, type MuscleSetProgress } from '~/domain/goals'
 import { muscleLabel } from '~/domain/muscles'
 import {
@@ -24,7 +26,11 @@ import type {
   Settings,
 } from '~/domain/types'
 
-import { listExercises, type ExerciseFilter } from './repositories/exercises'
+import {
+  listExerciseAppearances,
+  listExercises,
+  type ExerciseFilter,
+} from './repositories/exercises'
 import {
   getSessionDetail,
   listCompletedSessions,
@@ -62,6 +68,42 @@ export function useExercises(filter: ExerciseFilter = {}): Exercise[] | undefine
     () => listExercises({ search, muscleGroup, includeArchived }),
     [search, muscleGroup, includeArchived],
   )
+}
+
+/**
+ * How much each exercise is trained, ranked.
+ *
+ * Gated on `enabled` because the picker that needs this stays mounted for the
+ * whole workout while closed, and every set you log touches the tables this
+ * reads. Nobody should pay for a ranking of a list that is not on screen.
+ */
+export function useExerciseUsage(enabled = true): ExerciseUsage[] | undefined {
+  return useLiveQuery(
+    async () => (enabled ? rankExerciseUsage(await listExerciseAppearances()) : []),
+    [enabled],
+  )
+}
+
+/**
+ * How exposed the training history currently is.
+ *
+ * Counts finished workouts the last backup does not contain, which is the
+ * thing a lost phone would actually cost. `endedAt` rather than `startedAt`:
+ * a session is at risk from the moment it is complete, and one started before
+ * the backup but finished after it is not in that file.
+ */
+export function useBackupStatus(): BackupStatus | undefined {
+  const lastExportAt = useSettings().lastExportAt
+
+  return useLiveQuery(async () => {
+    const sessions = await db.sessions.where('status').equals('completed').toArray()
+    const unsavedSessions =
+      lastExportAt == null
+        ? sessions.length
+        : sessions.filter((session) => (session.endedAt ?? session.startedAt) > lastExportAt).length
+
+    return backupStatus({ lastExportAt, unsavedSessions })
+  }, [lastExportAt])
 }
 
 // ---------------------------------------------------------------------------

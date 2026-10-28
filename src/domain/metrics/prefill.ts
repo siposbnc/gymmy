@@ -47,12 +47,22 @@ const isWorking = (set: PrefillSet) => set.type !== 'warmup'
  *    this session. If you bumped to 80 kg on set 1, set 2 should say 80, not
  *    last week's 77.5 and not the plan's stale number. What you just did is the
  *    best evidence of what you are about to do.
- * 2. **Routine target** — what the plan asks for. Only reachable on the first
- *    set, since after that tier 1 has an answer.
+ * 2. **Routine target** — what the plan asks for.
  * 3. **Same set index last time** — set 3 prefills from last session's set 3,
  *    which matters when a lifter ramps or drops across a session.
  * 4. **Last set ever** — the final working set of the previous session.
  * 5. **Empty** — a genuinely new exercise. Say so rather than inventing a zero.
+ *
+ * **Weight and reps are resolved independently**, each taking the first tier
+ * that has an answer for it. This matters more than it sounds: a routine
+ * exercise is created with a rep target and no weight target, so a tier that
+ * answered as a unit would let the plan's "8 reps" swallow the whole turn and
+ * leave the weight blank — on an exercise you benched 82.5 kg for three sets
+ * last week, with the ghost line directly above saying so. The plan is
+ * authoritative about reps whether or not it names a weight.
+ *
+ * `source` reports where the **weight** came from, since that is the number
+ * being justified; for a bodyweight exercise it reports the reps instead.
  *
  * Percent-based targets are deliberately not resolved here: they need a
  * training max this function has no business knowing about, so the caller
@@ -61,52 +71,50 @@ const isWorking = (set: PrefillSet) => set.type !== 'warmup'
 export function resolvePrefill(input: PrefillInput): PrefillResult {
   const { setIndex, currentSessionSets = [], previousSessionSets = [], target } = input
 
-  // 1 — carry forward within the session
-  const carried = [...currentSessionSets].filter(isWorking).at(-1)
-  if (carried && (carried.weightKg != null || carried.reps != null)) {
-    return {
-      ...(carried.weightKg == null ? {} : { weightKg: carried.weightKg }),
-      ...(carried.reps == null ? {} : { reps: carried.reps }),
-      source: 'carried_forward',
-    }
-  }
-
-  // 2 — the plan
-  if (target && (target.weight?.kind === 'absolute' || target.reps != null)) {
-    const weightKg = target.weight?.kind === 'absolute' ? target.weight.kg : undefined
-    if (weightKg != null || target.reps != null) {
-      return {
-        ...(weightKg == null ? {} : { weightKg }),
-        ...(target.reps == null ? {} : { reps: target.reps }),
-        source: 'routine_target',
-      }
-    }
-  }
-
   const previousWorking = previousSessionSets.filter(isWorking)
-
-  // 3 — same position last time
+  const carried = [...currentSessionSets].filter(isWorking).at(-1)
   const sameIndex = previousWorking.find((set) => set.setIndex === setIndex)
-  if (sameIndex && (sameIndex.weightKg != null || sameIndex.reps != null)) {
-    return {
-      ...(sameIndex.weightKg == null ? {} : { weightKg: sameIndex.weightKg }),
-      ...(sameIndex.reps == null ? {} : { reps: sameIndex.reps }),
-      source: 'same_set_last_time',
-    }
-  }
-
-  // 4 — whatever you finished on
   const lastEver = previousWorking.at(-1)
-  if (lastEver && (lastEver.weightKg != null || lastEver.reps != null)) {
-    return {
-      ...(lastEver.weightKg == null ? {} : { weightKg: lastEver.weightKg }),
-      ...(lastEver.reps == null ? {} : { reps: lastEver.reps }),
-      source: 'last_set_ever',
+
+  const tiers: {
+    source: PrefillSource
+    weightKg: number | undefined
+    reps: number | undefined
+  }[] = [
+    { source: 'carried_forward', weightKg: carried?.weightKg, reps: carried?.reps },
+    {
+      source: 'routine_target',
+      // A percent target resolves to nothing here on purpose; the caller
+      // converts it first or it falls through to history.
+      weightKg: target?.weight?.kind === 'absolute' ? target.weight.kg : undefined,
+      reps: target?.reps,
+    },
+    { source: 'same_set_last_time', weightKg: sameIndex?.weightKg, reps: sameIndex?.reps },
+    { source: 'last_set_ever', weightKg: lastEver?.weightKg, reps: lastEver?.reps },
+  ]
+
+  let weightKg: number | undefined
+  let reps: number | undefined
+  let weightSource: PrefillSource | undefined
+  let repsSource: PrefillSource | undefined
+
+  for (const tier of tiers) {
+    if (weightKg == null && tier.weightKg != null) {
+      weightKg = tier.weightKg
+      weightSource = tier.source
     }
+    if (reps == null && tier.reps != null) {
+      reps = tier.reps
+      repsSource = tier.source
+    }
+    if (weightKg != null && reps != null) break
   }
 
-  // 5 — nothing to go on
-  return { source: 'empty' }
+  return {
+    ...(weightKg == null ? {} : { weightKg }),
+    ...(reps == null ? {} : { reps }),
+    source: weightSource ?? repsSource ?? 'empty',
+  }
 }
 
 /**
@@ -164,6 +172,7 @@ export const prefillMetric: Metric<PrefillInput, PrefillResult> = {
     caveats: [
       'It is a starting point, not a recommendation — Gymmy is not telling you to lift that. Change it freely.',
       'Editing a pre-filled value only affects the set you are logging. It never changes past sessions.',
+      'Weight and reps are filled separately. If your routine asks for 8 reps but names no weight, the reps come from the plan and the weight from what you last lifted.',
     ],
   },
 

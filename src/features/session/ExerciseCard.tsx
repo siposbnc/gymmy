@@ -1,4 +1,4 @@
-import { MoreVertical } from 'lucide-react'
+import { MoreVertical, TrendingUp } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import type { SessionExerciseView } from '~/db/hooks'
@@ -15,9 +15,16 @@ import { platform } from '~/lib/platform'
 import { formatRestLength } from '~/lib/time'
 import { Stepper } from '~/ui/Stepper'
 import { barContext, describeBar, resolveBar, resolveBarWeight, usesBar } from '~/domain/bars'
-import { calculatePlates, formatPlates, lastTimeSummary, resolvePrefill } from '~/domain/metrics'
+import {
+  calculatePlates,
+  formatPlates,
+  lastTimeSummary,
+  resolvePrefill,
+  smallestStepKg,
+  suggestProgression,
+} from '~/domain/metrics'
 import type { Settings, SetEntry } from '~/domain/types'
-import { fromDisplayUnit, INCREMENT, toDisplayUnit } from '~/domain/units'
+import { formatWeight, fromDisplayUnit, INCREMENT, toDisplayUnit } from '~/domain/units'
 import { Card } from '~/ui/Card'
 import { InfoAffordance } from '~/ui/InfoAffordance'
 import { NumericPad } from '~/ui/NumericPad'
@@ -86,6 +93,28 @@ export function ExerciseCard({
 
   const ghost = useMemo(() => lastTimeSummary(previousSets, unit), [previousSets, unit])
 
+  const progressionInput = useMemo(
+    () => ({
+      previousSessionSets: previousSets,
+      target: {
+        sets: sessionExercise.targetSets,
+        repsMin: sessionExercise.targetRepsMin,
+        repsMax: sessionExercise.targetRepsMax,
+      },
+      stepKg: smallestStepKg(
+        usesBar(exercise),
+        settings.plateInventory,
+        fromDisplayUnit(INCREMENT[unit], unit),
+      ),
+    }),
+    [previousSets, sessionExercise, exercise, settings.plateInventory, unit],
+  )
+
+  // Only before the first set of this exercise: once you have logged something,
+  // what you are lifting today is settled and the advice is noise.
+  const suggestion =
+    settings.suggestProgression && sets.length === 0 ? suggestProgression(progressionInput) : null
+
   const bar = useMemo(() => resolveBar(exercise, barContext(settings)), [exercise, settings])
 
   const plates = useMemo(
@@ -135,6 +164,10 @@ export function ExerciseCard({
 
   // --- numeric pad plumbing ------------------------------------------------
 
+  // Only reps-only work may be logged weightless; everywhere else a zero is a
+  // set that silently vanishes from volume and records.
+  const weightRequired = (exercise?.trackingType ?? 'weight_reps') !== 'reps_only'
+
   const padConfig = (() => {
     if (!pad) return null
 
@@ -144,6 +177,7 @@ export function ExerciseCard({
         unit,
         increment: INCREMENT[unit],
         allowDecimal: true,
+        requirePositive: weightRequired,
         eyebrow: `${exercise?.name ?? 'Exercise'} · set ${nextIndex} · weight`,
         commit: (value: number) => setDraftWeight(fromDisplayUnit(value, unit)),
       }
@@ -167,6 +201,7 @@ export function ExerciseCard({
         unit,
         increment: INCREMENT[unit],
         allowDecimal: true,
+        requirePositive: weightRequired,
         eyebrow: `${exercise?.name ?? 'Exercise'} · edit weight`,
         commit: (value: number) =>
           void updateSet(target.id, { weightKg: fromDisplayUnit(value, unit) }),
@@ -234,6 +269,43 @@ export function ExerciseCard({
           {ghost ?? <span className="text-ink-faint italic">first time — no history yet</span>}
         </p>
 
+        {/* Advice, not instruction: it sits beside the plan rather than inside
+            the set row, and nothing changes until it is tapped. Hidden once
+            accepted, because by then the pending row says the same thing. */}
+        {suggestion && weightKg !== suggestion.toKg ? (
+          <div className="mb-2.5 flex items-center gap-2 rounded-md bg-accent-wash px-2.5 py-1.5">
+            <TrendingUp size={14} className="shrink-0 self-start text-accent-ink" aria-hidden />
+            <p className="min-w-0 flex-1 text-[0.75rem] leading-snug text-ink">
+              {/* The ⓘ is display:grid, so it needs a flex row around it or it
+                  takes a line of its own inside running text. */}
+              <span className="flex items-center gap-1.5">
+                <span>
+                  Ready for{' '}
+                  <strong className="num font-semibold">
+                    {formatWeight(suggestion.toKg, unit)}
+                  </strong>
+                </span>
+                <InfoAffordance explainerId="progression" exampleInput={progressionInput} />
+              </span>
+              <span className="mt-0.5 block text-ink-muted">
+                you cleared {suggestion.sets}×{suggestion.clearedReps} at{' '}
+                {formatWeight(suggestion.fromKg, unit)}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setDraftWeight(suggestion.toKg)
+                setDraftReps(suggestion.reps)
+              }}
+              aria-label={`Use ${formatWeight(suggestion.toKg, unit)} for ${suggestion.reps} reps`}
+              className="h-8 shrink-0 cursor-pointer rounded-full bg-accent px-3 text-[0.72rem] font-extrabold text-on-accent active:scale-95"
+            >
+              Use
+            </button>
+          </div>
+        ) : null}
+
         <div className="grid gap-1.5">
           {sets.map((set) => (
             <SetRow
@@ -291,6 +363,7 @@ export function ExerciseCard({
             eyebrow={padConfig.eyebrow}
             increment={padConfig.increment}
             allowDecimal={padConfig.allowDecimal}
+            requirePositive={padConfig.requirePositive ?? false}
           />
         ) : null}
 

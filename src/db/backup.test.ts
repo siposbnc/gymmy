@@ -141,4 +141,31 @@ describe('backup', () => {
     expect(records.length).toBeGreaterThan(0)
     expect(records.find((record) => record.kind === 'max_weight')?.value).toBe(80)
   })
+
+  it('fills in settings fields the restored row predates', async () => {
+    const json = JSON.stringify(await buildBackup())
+
+    // An older export: written before `suggestProgression` existed, with the
+    // user's own units kept so the merge can be seen to preserve them.
+    const old = JSON.parse(json) as {
+      schemaVersion: number
+      data: { settings: Record<string, unknown>[] }
+    }
+    old.schemaVersion = 2
+    old.data.settings = old.data.settings.map((row) => {
+      const { suggestProgression: _dropped, ...rest } = row
+      return { ...rest, units: 'lb' }
+    })
+
+    await db.delete()
+    await db.open()
+    await importFromJson(JSON.stringify(old), 'replace')
+
+    // An import bypasses the Dexie upgrades, so without the gap-fill this field
+    // would be absent forever and the feature would read as switched off.
+    const settings = await db.settings.get('singleton')
+    expect(settings?.suggestProgression).toBe(true)
+    // The restored values still win over the defaults.
+    expect(settings?.units).toBe('lb')
+  })
 })

@@ -1,47 +1,38 @@
 import { Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { useState } from 'react'
 
-import { backupFilename, exportToJson, importFromJson, type ImportMode } from '~/db/backup'
+import { importFromJson, type ImportMode } from '~/db/backup'
+import { useBackupStatus } from '~/db/hooks'
 import { allSetsForExport } from '~/db/repositories/history'
-import { updateSettings } from '~/db/repositories/settings'
+import { describeBackup } from '~/domain/backup-reminder'
 import { csvFilename, toCsv } from '~/domain/csv'
 import type { Settings } from '~/domain/types'
+import { saveBackup } from '~/features/backup/saveBackup'
 import { platform } from '~/lib/platform'
 import { Button } from '~/ui/Button'
 import { Card } from '~/ui/Card'
 import { Sheet } from '~/ui/Sheet'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
 /**
  * Export and import.
  *
  * Prominent rather than tucked away, because with no account this is the whole
- * backup story — and the only way to move to a new phone. The age nudge exists
- * because iOS will evict IndexedDB for an uninstalled site under storage
- * pressure, and a user who has never exported would lose everything.
+ * backup story — and the only way to move to a new phone. The state of it is
+ * measured in unsaved workouts rather than elapsed days, and the same figure
+ * drives the prompt offered after a session ends: Settings is where a backup
+ * lives, but nobody comes to Settings after training.
  */
 export function BackupSection({ settings }: { settings: Settings }) {
   const [importing, setImporting] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-
-  const daysSinceExport =
-    settings.lastExportAt == null
-      ? null
-      : Math.floor((Date.now() - settings.lastExportAt) / DAY_MS)
+  const backup = useBackupStatus()
 
   async function handleExport() {
     setBusy(true)
     try {
-      const json = await exportToJson()
-      await platform.files.save({
-        filename: backupFilename(),
-        mimeType: 'application/json',
-        data: json,
-      })
-      await updateSettings({ lastExportAt: Date.now() })
-      setStatus('Backup saved.')
+      await saveBackup()
+      setStatus('Backup created.')
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Export failed.')
     } finally {
@@ -139,21 +130,32 @@ export function BackupSection({ settings }: { settings: Settings }) {
           </p>
         ) : null}
 
-        {daysSinceExport === null ? (
-          <p className="rounded-md border border-accent bg-accent-wash px-3 py-2 text-[0.78rem] leading-relaxed">
-            You have never exported. If this device is lost or the browser clears its storage, your
-            training history goes with it.
-          </p>
-        ) : daysSinceExport > 30 ? (
-          <p className="rounded-md border border-accent bg-accent-wash px-3 py-2 text-[0.78rem] leading-relaxed">
-            Last backup was {daysSinceExport} days ago.
-          </p>
-        ) : (
-          <p className="text-[0.75rem] text-ink-faint">
-            Last backup{' '}
-            {daysSinceExport === 0 ? 'today' : `${daysSinceExport} day${daysSinceExport === 1 ? '' : 's'} ago`}.
-          </p>
-        )}
+        {backup ? (
+          <div
+            className={
+              backup.shouldPrompt
+                ? 'rounded-md border border-accent bg-accent-wash px-3 py-2'
+                : 'px-1'
+            }
+          >
+            <p
+              className={
+                backup.shouldPrompt
+                  ? 'text-[0.78rem] leading-relaxed'
+                  : 'text-[0.75rem] text-ink-faint'
+              }
+            >
+              {describeBackup(backup)}
+            </p>
+            {/* Said once, here, rather than every time a backup is made: the
+                share sheet reports nothing back, so "saved" is a claim Gymmy
+                is not in a position to make. */}
+            <p className="mt-1 text-[0.72rem] leading-relaxed text-ink-muted">
+              Gymmy can tell that it handed a file to your phone, not where the phone put it. Check
+              it landed somewhere that outlives this device.
+            </p>
+          </div>
+        ) : null}
       </Card>
 
       <Sheet

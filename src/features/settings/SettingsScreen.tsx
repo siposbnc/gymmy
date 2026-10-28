@@ -134,6 +134,22 @@ export function SettingsScreen() {
               onChange={(next) => void updateSettings({ showRpe: next === 'on' })}
             />
           </Row>
+
+          <Row
+            label="Suggest next weight"
+            hint="Offers more weight once you clear the top of a routine's rep range"
+            explainerId="progression"
+          >
+            <Segmented
+              label="Suggest next weight"
+              value={settings.suggestProgression ? 'on' : 'off'}
+              options={[
+                { value: 'off', label: 'Off' },
+                { value: 'on', label: 'On' },
+              ]}
+              onChange={(next) => void updateSettings({ suggestProgression: next === 'on' })}
+            />
+          </Row>
         </Card>
 
         <RestSection settings={settings} />

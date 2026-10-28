@@ -79,6 +79,34 @@ describe('resolvePrefill — the fallback chain', () => {
     expect(result.weightKg).toBe(120)
   })
 
+  it('takes the plan reps and the weight from history when the plan names no weight', () => {
+    // Adding an exercise to a routine gives it a rep target and no weight
+    // target, so this is the DEFAULT shape of a planned exercise — not an
+    // edge case. A tier that answered as a unit would leave the weight blank
+    // with "last time 82.5 kg × 8, 8, 8" written directly above it.
+    const result = resolvePrefill({
+      setIndex: 1,
+      target: { reps: 8 },
+      previousSessionSets: [working(1, 82.5, 8), working(2, 82.5, 8), working(3, 82.5, 8)],
+    })
+
+    expect(result.weightKg).toBe(82.5)
+    expect(result.reps).toBe(8)
+    // The weight is the number being justified, so that is what source names.
+    expect(result.source).toBe('same_set_last_time')
+  })
+
+  it('lets the plan override reps while history supplies the weight', () => {
+    // The plan asks for heavy triples; last time at this weight you did eight.
+    const result = resolvePrefill({
+      setIndex: 1,
+      target: { reps: 3 },
+      previousSessionSets: [working(1, 100, 8)],
+    })
+
+    expect(result).toEqual({ weightKg: 100, reps: 3, source: 'same_set_last_time' })
+  })
+
   it('handles reps-only exercises with no weight', () => {
     const result = resolvePrefill({
       setIndex: 2,

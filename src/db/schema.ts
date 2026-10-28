@@ -25,7 +25,7 @@ import type {
  * SCHEMA_VERSION is also written into exports so an import can tell what it is
  * looking at.
  */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 /** Indexes only. Dexie stores the whole object regardless of what is listed. */
 export class GymmyDB extends Dexie {
@@ -109,6 +109,24 @@ export class GymmyDB extends Dexie {
             ]
             settings.defaultBarId = theirBar.id
             settings.schemaVersion = 3
+          })
+      })
+
+    // v4 — progression suggestions.
+    //
+    // On for existing installs as well as new ones: the suggestion is quiet,
+    // appears only when a rep range has actually been cleared, and changes
+    // nothing until it is tapped. Backfilled rather than defaulted on read so
+    // the stored row stays complete — see the v2 note above.
+    this.version(4)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table<Settings, string>('settings')
+          .toCollection()
+          .modify((settings) => {
+            settings.suggestProgression ??= true
+            settings.schemaVersion = 4
           })
       })
   }

@@ -1,3 +1,4 @@
+import type { ExerciseAppearance } from '~/domain/exercise-usage'
 import type { Exercise, MuscleGroup } from '~/domain/types'
 import { newId } from '~/lib/uuid'
 
@@ -34,6 +35,37 @@ export async function listExercises(filter: ExerciseFilter = {}): Promise<Exerci
   return results
 }
 
+/**
+ * Every time an exercise was actually trained, for ranking the picker.
+ *
+ * Two deliberate exclusions. Unfinished sessions do not count: an abandoned
+ * workout is not evidence of what you train, and the session you are in right
+ * now would otherwise re-rank the list underneath you while you are using it.
+ * Neither does an exercise that was added to a session and never logged
+ * against — the count beside each row says "12 sessions", and that has to mean
+ * twelve times you did it.
+ *
+ * The distinct-set lookup rides the `sessionExerciseId` index, so finding out
+ * which entries were performed costs a key scan rather than loading every set
+ * you have ever logged.
+ */
+export async function listExerciseAppearances(): Promise<ExerciseAppearance[]> {
+  const [links, sessions, performed] = await Promise.all([
+    db.sessionExercises.toArray(),
+    db.sessions.where('status').equals('completed').toArray(),
+    db.sets.orderBy('sessionExerciseId').uniqueKeys(),
+  ])
+
+  const trainedAt = new Map(sessions.map((session) => [session.id, session.endedAt ?? session.startedAt]))
+  const hasSets = new Set(performed as string[])
+
+  return links.flatMap((link) => {
+    const at = trainedAt.get(link.sessionId)
+    if (at == null || !hasSets.has(link.id)) return []
+    return [{ exerciseId: link.exerciseId, at }]
+  })
+}
+
 export async function getExercise(id: string): Promise<Exercise | undefined> {
   return db.exercises.get(id)
 }
@@ -58,6 +90,30 @@ export async function updateExercise(
   patch: Partial<Omit<Exercise, 'id' | 'isCustom'>>,
 ): Promise<void> {
   await db.exercises.update(id, patch)
+}
+
+/**
+ * Pin an exercise to the top of the picker, or release it.
+ *
+ * `pinnedAt` is deliberately not indexed: the picker already holds every
+ * exercise in memory to sort and section it, so an index would buy nothing and
+ * cost a schema version. Absent means unpinned, which is also what every
+ * backup taken before this existed will say.
+ */
+export async function pinExercise(id: string): Promise<void> {
+  await db.exercises.update(id, { pinnedAt: Date.now() })
+}
+
+export async function unpinExercise(id: string): Promise<void> {
+  // `modify` with a delete removes the key outright; `update` to undefined
+  // would leave it present and reading back as an own-property, exactly as
+  // with `archivedAt` below.
+  await db.exercises
+    .where('id')
+    .equals(id)
+    .modify((exercise) => {
+      delete exercise.pinnedAt
+    })
 }
 
 /** Detach an exercise from a specific bar, so it follows the default again. */

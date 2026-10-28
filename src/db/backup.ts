@@ -14,6 +14,7 @@ import type {
 
 import { recomputeRecordsFor } from './repositories/history'
 import { db, SCHEMA_VERSION } from './schema'
+import { DEFAULT_SETTINGS } from './seed'
 
 /**
  * Export and import.
@@ -208,12 +209,33 @@ export async function importFromJson(json: string, mode: ImportMode): Promise<Im
     },
   )
 
+  await completeSettings()
+
   // A merge can bring in sessions whose records were never computed on this
   // device, and a backup from a build that predates records has none at all.
   // Rebuilding here means the PR board is right the moment the import lands.
   await recomputeAllRecords()
 
   return { mode, counts }
+}
+
+/**
+ * Fill in settings fields the restored row predates.
+ *
+ * An import writes rows straight into the current schema, so it never passes
+ * through the Dexie upgrades that backfill new settings fields — a v2 backup
+ * restored today would leave `suggestProgression` simply absent, and the
+ * feature would read as off forever with no migration left to fix it. Merging
+ * over the defaults leaves the row exactly as an upgrade would have.
+ *
+ * The restored values win: this only adds keys that are missing.
+ */
+async function completeSettings(): Promise<void> {
+  const restored = await db.settings.get('singleton')
+  if (!restored) return
+
+  const complete = { ...DEFAULT_SETTINGS, ...restored, id: 'singleton' as const }
+  await db.settings.put(complete)
 }
 
 /** Rebuild records for every exercise that has been trained. */

@@ -81,6 +81,19 @@ const SCREENS = [
   ['Exercises', '/more/exercises'],
   ['Maths reference', '/more/maths'],
   ['Settings', '/more/settings'],
+  // Last, because it starts a workout and the others would then be looking at
+  // an app with a session in progress. The third element is optional setup:
+  // this one is a sheet, so there is no URL that reaches it.
+  [
+    'Add exercise',
+    '/',
+    async (page) => {
+      await page.getByRole('button', { name: /empty workout/i }).click()
+      await page.waitForTimeout(250)
+      await page.getByRole('button', { name: /add exercise/i }).click()
+      await page.waitForTimeout(350)
+    },
+  ],
 ]
 
 let total = 0
@@ -97,9 +110,10 @@ for (const theme of ['light', 'dark']) {
   await page.goto(BASE, { waitUntil: 'networkidle' })
   await seed(page)
 
-  for (const [name, path] of SCREENS) {
+  for (const [name, path, steps] of SCREENS) {
     await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(350)
+    if (steps) await steps(page)
 
     await page.evaluate(axeSource)
     const result = await page.evaluate(async () =>

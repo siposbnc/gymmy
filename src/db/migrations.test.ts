@@ -28,7 +28,7 @@ describe('schema migrations', () => {
     return legacy
   }
 
-  it('v1 → current backfills the rest settings without touching anything else', async () => {
+  it('v1 → current backfills every added setting without touching anything else', async () => {
     const name = `gymmy-migration-${Math.random().toString(36).slice(2)}`
 
     const legacy = await createV1Database(name)
@@ -66,6 +66,7 @@ describe('schema migrations', () => {
     expect(settings?.autoStartRest).toBe(true)
     expect(settings?.restSound).toBe(true)
     expect(settings?.restVibrate).toBe(true)
+    expect(settings?.suggestProgression).toBe(true)
 
     // A v1 database opened today runs every upgrade in sequence, so it lands
     // at the current version with v3's bars in place too.
@@ -127,7 +128,9 @@ describe('schema migrations', () => {
 
     // And the legacy field stays, so a v2 export still imports.
     expect(settings?.barWeightKg).toBe(15)
-    expect(settings?.schemaVersion).toBe(3)
+    // Opening runs v3 and then every later upgrade, so the row records the
+    // version it actually ended up at, not the one under test.
+    expect(settings?.schemaVersion).toBe(SCHEMA_VERSION)
 
     upgraded.close()
   })

@@ -489,6 +489,85 @@ is added and nowhere else; the explainer says plainly that it is a heuristic.
 
 Neither field needed a migration: absent is the correct value for every row written before they existed.
 
+### 13. The picker, ordered — shipped post-v1
+
+The exercise picker holds over a hundred exercises and anyone uses perhaps fifteen of them. Alphabetical
+order serves the ninety you never touch. Two mechanisms put the rest on top, in that order.
+
+**Pinned**, from a star beside each row. `Exercise.pinnedAt` is a timestamp rather than a flag so the
+block sorts oldest-pin-first: adding a pin never moves the ones a thumb has already learned the position
+of. No index and no migration — absent means unpinned, which is what every row written before this says.
+
+**Your usual**, derived and never stored. Every completed session already records what was trained, so
+the ranking cannot drift from the training the way a hand-kept list does. The order is recency-weighted
+frequency — each appearance counts for half as much after two months — because the two obvious
+alternatives are both wrong in practice: a raw count ranks the programme you abandoned above the one you
+are running, and pure recency floats one curious attempt above a year of benching.
+
+Three exclusions keep the count beside each row honest, since it reads "12 sessions" and must mean it:
+unfinished sessions do not count, the workout in progress does not count — it would re-rank the list
+underneath you while you are using it — and an exercise added to a session but never logged against does
+not count either.
+
+Headings appear only when there is something above the main list to separate it from. A search with
+three hits gets a plain list in the same priority order, because three headings explaining three rows is
+noise.
+
+### 14. Progressive overload — shipped post-v1
+
+Double progression, and only double progression. You add reps until every working set reaches the top of
+the rep range your routine asks for; then Gymmy offers the smallest weight you can actually load and
+takes the reps back to the bottom of the range. One rule, stated in one sentence, with the arithmetic
+behind it one tap away.
+
+The increment is **twice the lightest plate pair you own** on a barbell, and the stepper increment
+everywhere else. Suggesting 1.25 kg to someone whose lightest plate is 2.5 is advice they cannot take.
+
+Four refusals, each of them the same instinct as §12's "a goal is never invented":
+
+- **No rep range, no suggestion.** Freestyle work has nothing to have cleared, and inventing a range
+  would be Gymmy deciding what your training should look like.
+- **Mixed weights, no suggestion.** A ramp of 60/70/80 has no single number to add to.
+- **Short of the planned sets, no suggestion.** Two of three is not a cleared range.
+- **No "hold" and no "deload".** Silence is the whole of the negative case. A suggestion that appears
+  only when earned is information; one that appears every session to report that you did not progress is
+  a scoreboard, and §12 already settled that Gymmy does not keep score.
+
+It is also the one place in the app that advises rather than reports, which is exactly why
+`Settings.suggestProgression` exists and why accepting a suggestion changes a draft value and nothing
+else — not the routine, not a target, not a record.
+
+### 15. Backup, prompted — shipped post-v1
+
+The export has existed since M1. What was missing was anything that noticed nobody was using it.
+
+**Measured in unsaved workouts, not elapsed days.** Days are the wrong unit — a fortnight off costs
+nothing, three sessions in four days costs three sessions. Counting what a lost phone would actually take
+makes the reminder proportional to the risk and, more importantly, makes it **silent when nothing has
+changed**. A prompt that fires when it is not needed is what teaches someone to dismiss the one that is.
+Three unsaved sessions, or one that has been unsaved a fortnight, is the threshold.
+
+**Offered when a workout ends**, on the session summary, below the records — what you earned is why you
+opened that screen; a chore does not go first. It is the only place in the app that interrupts
+unprompted, and it is reached by finishing a session, never by opening an old one from History.
+
+**Why prompted and not automatic.** The decision is automatic; the write cannot be. Writing to a file the
+user picked once needs the File System Access API, which Safari does not implement, and there is no
+background execution on iOS — so on the device Gymmy is actually used on, "scheduled" can only mean
+"checked when the app is open", and the write costs one tap through the share sheet. Automating it
+properly means OAuth against Dropbox or Drive, or running a server; both were considered and declined
+rather than overlooked.
+
+**One honest limit, stated in Settings.** The share sheet reports nothing back — not success, not
+cancellation — so `lastExportAt` records that Gymmy produced a file and the OS took it. The copy says
+"backup created", never "saved", and tells the user to check where it landed.
+
+**This is backup and handoff, not sync.** Snapshot on one device, restore on the next, train on the next.
+Logging on both diverges, and a restore resolves that by replacing wholesale. Row-level sync — tombstones
+on five tables, `updatedAt` everywhere, a merge rule for the settings singleton, and an owner for the
+active session — remains deferred, and is a decision to take before, not after, there is history worth
+merging.
+
 ### v1.5 — next, once the loop is proven
 
 - **Weekly program scheduler** — assign routines to weekdays, "what's today?" on the Today tab.
@@ -499,8 +578,10 @@ Neither field needed a migration: absent is the correct value for every row writ
   estimated 1RM — consistent with §4.1, program weights shouldn't be driven by a formula's guess.
 - **Time- and distance-based tracking** — planks, carries, cardio. `trackingType` already allows for it in
   the model; this is the UI plus the set-row variants.
-- **Progressive overload suggestions** — "you hit 3×8 @ 80kg; try 82.5kg" from a configurable rule
-  (double progression / linear / RPE-based). Suggestion only, never forced.
+- ~~**Progressive overload suggestions** — "you hit 3×8 @ 80kg; try 82.5kg" from a configurable rule
+  (double progression / linear / RPE-based). Suggestion only, never forced.~~ **Shipped post-v1** — see
+  §7.14. Double progression only, not a choice of rules: linear falls out of it when the range is one
+  rep wide, and an RPE-based variant would need RPE logged on every set to say anything at all.
 - ~~**Volume targets per muscle group** with a weekly under/over indicator.~~ **Shipped post-v1**, as
   _hard sets_ per muscle rather than volume in kilograms — see §7.12. Set counts cannot be run up with
   light junk sets the way a kilogram total can.
