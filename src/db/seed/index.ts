@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoStartRest: true,
   restSound: true,
   restVibrate: true,
+  suggestProgression: true,
   schemaVersion: SCHEMA_VERSION,
 }
 

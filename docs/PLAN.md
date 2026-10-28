@@ -513,6 +513,30 @@ Headings appear only when there is something above the main list to separate it 
 three hits gets a plain list in the same priority order, because three headings explaining three rows is
 noise.
 
+### 14. Progressive overload — shipped post-v1
+
+Double progression, and only double progression. You add reps until every working set reaches the top of
+the rep range your routine asks for; then Gymmy offers the smallest weight you can actually load and
+takes the reps back to the bottom of the range. One rule, stated in one sentence, with the arithmetic
+behind it one tap away.
+
+The increment is **twice the lightest plate pair you own** on a barbell, and the stepper increment
+everywhere else. Suggesting 1.25 kg to someone whose lightest plate is 2.5 is advice they cannot take.
+
+Four refusals, each of them the same instinct as §12's "a goal is never invented":
+
+- **No rep range, no suggestion.** Freestyle work has nothing to have cleared, and inventing a range
+  would be Gymmy deciding what your training should look like.
+- **Mixed weights, no suggestion.** A ramp of 60/70/80 has no single number to add to.
+- **Short of the planned sets, no suggestion.** Two of three is not a cleared range.
+- **No "hold" and no "deload".** Silence is the whole of the negative case. A suggestion that appears
+  only when earned is information; one that appears every session to report that you did not progress is
+  a scoreboard, and §12 already settled that Gymmy does not keep score.
+
+It is also the one place in the app that advises rather than reports, which is exactly why
+`Settings.suggestProgression` exists and why accepting a suggestion changes a draft value and nothing
+else — not the routine, not a target, not a record.
+
 ### v1.5 — next, once the loop is proven
 
 - **Weekly program scheduler** — assign routines to weekdays, "what's today?" on the Today tab.
@@ -523,8 +547,10 @@ noise.
   estimated 1RM — consistent with §4.1, program weights shouldn't be driven by a formula's guess.
 - **Time- and distance-based tracking** — planks, carries, cardio. `trackingType` already allows for it in
   the model; this is the UI plus the set-row variants.
-- **Progressive overload suggestions** — "you hit 3×8 @ 80kg; try 82.5kg" from a configurable rule
-  (double progression / linear / RPE-based). Suggestion only, never forced.
+- ~~**Progressive overload suggestions** — "you hit 3×8 @ 80kg; try 82.5kg" from a configurable rule
+  (double progression / linear / RPE-based). Suggestion only, never forced.~~ **Shipped post-v1** — see
+  §7.14. Double progression only, not a choice of rules: linear falls out of it when the range is one
+  rep wide, and an RPE-based variant would need RPE logged on every set to say anything at all.
 - ~~**Volume targets per muscle group** with a weekly under/over indicator.~~ **Shipped post-v1**, as
   _hard sets_ per muscle rather than volume in kilograms — see §7.12. Set counts cannot be run up with
   light junk sets the way a kilogram total can.

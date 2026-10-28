@@ -281,6 +281,22 @@ for (const theme of ['light', 'dark']) {
     })),
   )
 
+  // The progression nudge needs a previous session that actually cleared the
+  // routine's rep range, so it only exists with history behind it.
+  allErrors.push(
+    ...(await shoot('progression', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await buildRoutine(page)
+        await page.getByRole('button', { name: /back to routines/i }).click()
+        await page.waitForTimeout(250)
+        await tap(page, 'Start', true)
+        await page.waitForTimeout(400)
+      },
+    })),
+  )
+
   allErrors.push(
     ...(await shoot('progress', {
       theme,

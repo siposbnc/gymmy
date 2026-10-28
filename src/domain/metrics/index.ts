@@ -14,6 +14,7 @@ import {
 import { oneRepMaxMetric } from './one-rep-max'
 import { platesMetric } from './plates'
 import { prefillMetric } from './prefill'
+import { progressionMetric } from './progression'
 import type { Explainable } from './types'
 import { volumeMetric } from './volume'
 
@@ -22,6 +23,7 @@ export * from './guides'
 export * from './one-rep-max'
 export * from './plates'
 export * from './prefill'
+export * from './progression'
 export * from './volume'
 
 /**
@@ -36,6 +38,7 @@ export * from './volume'
  */
 export const EXPLAINABLES: readonly Explainable[] = [
   prefillMetric,
+  progressionMetric,
   oneRepMaxMetric,
   volumeMetric,
   platesMetric,

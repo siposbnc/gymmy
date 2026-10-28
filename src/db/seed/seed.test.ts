@@ -38,6 +38,7 @@ describe('bootstrapDatabase', () => {
           autoStartRest: true,
           restSound: true,
           restVibrate: true,
+          suggestProgression: true,
           schemaVersion: SCHEMA_VERSION,
         })
       }

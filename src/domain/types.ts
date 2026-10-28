@@ -311,6 +311,14 @@ export interface Settings {
   restSound: boolean
   restVibrate: boolean
 
+  /**
+   * Whether to suggest adding weight. Added in schema v4.
+   *
+   * On by default, and it is the one place Gymmy advises rather than reports —
+   * which is exactly why it can be switched off.
+   */
+  suggestProgression: boolean
+
   schemaVersion: number
   lastExportAt?: number
 }
