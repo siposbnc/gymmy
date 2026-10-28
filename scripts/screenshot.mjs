@@ -335,7 +335,8 @@ for (const theme of ['light', 'dark']) {
     ...(await shoot('explainer', {
       theme,
       steps: async (page) => {
-        await tap(page, /how gymmy works out your numbers/i)
+        // Reached from More now — Today is for starting a session, not reading.
+        await page.goto(`${BASE}/more/maths`, { waitUntil: 'networkidle' })
         // The warm-up card's body text also mentions estimated 1RM, so target
         // the card button by its accessible name rather than loose text.
         await page.getByRole('button', { name: /^Estimated 1RM/ }).click()

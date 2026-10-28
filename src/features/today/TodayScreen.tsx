@@ -107,21 +107,10 @@ export function TodayScreen() {
           </>
         )}
 
+        {/* Nothing else belongs here. You open Gymmy to start training, not to
+            read — the maths reference lives under More, and every number that
+            needs explaining carries its own ⓘ where it appears. */}
         <InstallNudge />
-
-        <button
-          type="button"
-          onClick={() => void navigate('/more/maths')}
-          className="flex cursor-pointer items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-left"
-        >
-          <span className="min-w-0 flex-1">
-            <span className="label-caps block text-ink-faint">Every number, explained</span>
-            <span className="block text-[0.95rem] font-semibold">
-              How Gymmy works out your numbers
-            </span>
-          </span>
-          <ArrowRight size={17} aria-hidden className="shrink-0 text-ink-faint" />
-        </button>
       </div>
 
       <Sheet
