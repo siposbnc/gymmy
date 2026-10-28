@@ -244,6 +244,28 @@
   }
 
   /*
+   * The status bar cap — see the element in index.html.
+   *
+   * The dimensions are not arbitrary. WebKit only treats an element as the
+   * top bar if it is position:fixed, has a background, is at least 6px tall,
+   * spans at least 80% of the width, and sits within 4px of the top. Miss any
+   * of those and the blur falls through onto page content instead.
+   *
+   * Sits above everything, including sheet overlays, so the band stays
+   * consistent no matter what is open.
+   */
+  #status-bar-cap {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: max(env(safe-area-inset-top), 6px);
+    background-color: var(--bg);
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  /*
    * The app is exactly one viewport tall; only panes inside it scroll.
    *
    * Minus the keyboard, because iOS does not shrink dvh when it opens — the
@@ -258,11 +280,8 @@
     overflow: hidden;
 
     /*
-     * Safe-area insets are zero now that the viewport meta omits
-     * `viewport-fit=cover` — iOS keeps the web view inside the safe area
-     * itself. Kept anyway so the shell still behaves on any browser that does
-     * report an inset, and so re-adding `cover` later cannot silently push
-     * content under the system chrome.
+     * Start content below the status bar cap. The cap is fixed, so it is out
+     * of flow and would otherwise overlap the first thing on every screen.
      *
      * box-sizing is border-box everywhere, so this comes out of the height
      * rather than adding to it.
