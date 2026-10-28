@@ -258,14 +258,11 @@
     overflow: hidden;
 
     /*
-     * Reserve the status bar area here, once, rather than in every screen's
-     * header.
-     *
-     * `viewport-fit=cover` extends the web view up under the status bar, and
-     * iOS paints a translucent, blurred bar over whatever is beneath it — so
-     * content up there reads as smeared rather than merely cropped. Padding
-     * the shell leaves a solid band of page background under the status bar,
-     * which has nothing to blur, and starts the content below it.
+     * Safe-area insets are zero now that the viewport meta omits
+     * `viewport-fit=cover` — iOS keeps the web view inside the safe area
+     * itself. Kept anyway so the shell still behaves on any browser that does
+     * report an inset, and so re-adding `cover` later cannot silently push
+     * content under the system chrome.
      *
      * box-sizing is border-box everywhere, so this comes out of the height
      * rather than adding to it.
