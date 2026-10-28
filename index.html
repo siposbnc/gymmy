@@ -3,14 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <!--
+      NO `viewport-fit=cover`, deliberately.
+
+      `cover` extends the web view underneath the status bar and home
+      indicator. On iOS 26 the system then paints its glass treatment over
+      that region, and its blur reaches *below* the status bar onto real
+      content — which showed up as a smeared title with a ghost above it.
+      Padding the content down did not help, because the blurred band is
+      taller than the safe-area inset.
+
+      Without `cover`, iOS keeps the web view inside the safe area and owns
+      the status bar region itself, filling it from `theme-color`. Since that
+      matches the app background exactly, the result still reads edge to edge
+      — with nothing of ours underneath the glass to smear.
+
       `interactive-widget=resizes-content` asks the browser to shrink the
-      layout viewport when the keyboard opens, which fixes this at the source
-      on Chrome and Android. Safari ignores it, so the --keyboard-inset
-      measurement in src/lib/keyboard.ts handles iOS.
+      layout viewport when the keyboard opens, which fixes keyboard overlap at
+      the source on Chrome and Android. Safari ignores it, so the
+      --keyboard-inset measurement in src/lib/keyboard.ts handles iOS.
     -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
