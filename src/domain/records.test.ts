@@ -91,7 +91,43 @@ describe('computeRecords', () => {
     expect(volume?.sessionId).toBe('s2')
   })
 
-  it('a tie is not a record — the first to get there keeps it', () => {
+  it('prefers more reps at the same top weight', () => {
+    // The reported bug: 60 × 2 then 60 × 3 in one session left the record on
+    // the 2-rep set, because it arrived first. You work up to your best set.
+    const weaker = set('s1', 60, 2)
+    const better = set('s1', 60, 3)
+
+    const records = computeRecords('ex_squat', [weaker, better])
+    const heaviest = records.find((record) => record.kind === 'max_weight')
+
+    expect(heaviest?.setEntryId).toBe(better.id)
+    expect(heaviest?.value).toBe(60)
+  })
+
+  it('lets a later session beat the record on reps alone', () => {
+    const first = set('s1', 60, 3)
+    const later = set('s2', 60, 5)
+
+    const records = computeRecords('ex_squat', [first, later])
+    const heaviest = records.find((record) => record.kind === 'max_weight')
+
+    expect(heaviest?.setEntryId).toBe(later.id)
+    expect(heaviest?.sessionId).toBe('s2')
+  })
+
+  it('never lets reps promote a lighter set over a heavier one', () => {
+    // 60 × 10 is more total work than 100 × 1, but it is not a heavier lift.
+    const heavy = set('s1', 100, 1)
+    const lighter = set('s2', 60, 10)
+
+    const records = computeRecords('ex_squat', [heavy, lighter])
+    const heaviest = records.find((record) => record.kind === 'max_weight')
+
+    expect(heaviest?.value).toBe(100)
+    expect(heaviest?.setEntryId).toBe(heavy.id)
+  })
+
+  it('a tie on weight AND reps is not a record — the first keeps it', () => {
     const first = set('s1', 140, 3)
     const equal = set('s2', 140, 3)
 

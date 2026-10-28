@@ -459,6 +459,27 @@ for (const theme of ['light', 'dark']) {
     check('cap has an opaque background', cap.opaque)
   }
 
+  // iOS zooms the page whenever a focused text control renders under 16px.
+  // The first fix for this lived in @layer base and lost to utility classes,
+  // so measure the computed value rather than trusting the stylesheet.
+  const smallInputs = await page.evaluate(() => {
+    const controls = [...document.querySelectorAll('input, textarea, select')]
+    return controls
+      .filter((element) => {
+        const type = element.getAttribute('type')
+        if (type === 'checkbox' || type === 'radio') return false
+        return Number.parseFloat(getComputedStyle(element).fontSize) < 16
+      })
+      .map((element) => {
+        const label = element.getAttribute('aria-label') ?? element.tagName.toLowerCase()
+        return `${label} @ ${getComputedStyle(element).fontSize}`
+      })
+  })
+  check(
+    `every text control is at least 16px${smallInputs.length ? ` — ${smallInputs.join(', ')}` : ''}`,
+    smallInputs.length === 0,
+  )
+
   const before = await page.evaluate(() => {
     const sheet = document.querySelector('[role="dialog"]')
     return sheet ? Math.round(sheet.getBoundingClientRect().bottom) : -1

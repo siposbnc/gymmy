@@ -13,6 +13,7 @@ import {
   deleteSet,
   logSet,
   moveSetToExercise,
+  removeSessionExercise,
   toggleWarmup,
   updateSet,
 } from '~/db/repositories/sessions'
@@ -55,6 +56,12 @@ export function SessionDetailScreen() {
   const [picking, setPicking] = useState(false)
   const [movingSet, setMovingSet] = useState<SetEntry | null>(null)
   const [editingDuration, setEditingDuration] = useState(false)
+  /** Only set for an exercise that still has sets — an empty one just goes. */
+  const [removingExercise, setRemovingExercise] = useState<{
+    sessionExerciseId: string
+    name: string
+    sets: SetEntry[]
+  } | null>(null)
 
   /**
    * Append a set, seeded from the last one logged for that exercise.
@@ -193,7 +200,27 @@ export function SessionDetailScreen() {
 
         {exercises.map((entry) => (
           <Card key={entry.sessionExerciseId}>
-            <h2 className="mb-2 text-lead font-semibold tracking-tight">{entry.name}</h2>
+            <div className="mb-2 flex items-center gap-2">
+              <h2 className="min-w-0 flex-1 truncate text-lead font-semibold tracking-tight">
+                {entry.name}
+              </h2>
+              {/* Moving sets elsewhere leaves the old exercise behind empty,
+                  and there was no way to clear it out. */}
+              <button
+                type="button"
+                aria-label={`Remove ${entry.name} from this session`}
+                onClick={() => {
+                  if (entry.sets.length === 0) {
+                    void removeSessionExercise(entry.sessionExerciseId).then(resettle)
+                  } else {
+                    setRemovingExercise(entry)
+                  }
+                }}
+                className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-ink-faint"
+              >
+                <Trash2 size={15} aria-hidden />
+              </button>
+            </div>
             {entry.sets.length === 0 ? (
               <p className="text-[0.8rem] text-ink-faint">No sets logged.</p>
             ) : (
@@ -269,6 +296,39 @@ export function SessionDetailScreen() {
           allowDecimal={false}
         />
       ) : null}
+
+      <Sheet
+        open={removingExercise !== null}
+        onOpenChange={(open) => !open && setRemovingExercise(null)}
+        eyebrow={removingExercise?.name}
+        title="Remove this exercise?"
+        footer={
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setRemovingExercise(null)}>
+              Keep it
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                if (removingExercise) {
+                  void removeSessionExercise(removingExercise.sessionExerciseId).then(resettle)
+                }
+                setRemovingExercise(null)
+              }}
+            >
+              Remove
+            </Button>
+          </div>
+        }
+      >
+        <p className="px-5 py-4 text-[0.9rem] leading-relaxed text-ink-muted">
+          This also deletes the {removingExercise?.sets.length} set
+          {removingExercise?.sets.length === 1 ? '' : 's'} logged against it. If you meant to keep
+          them, move them to another exercise first from the set menu.
+        </p>
+      </Sheet>
 
       <Sheet
         open={movingSet !== null}

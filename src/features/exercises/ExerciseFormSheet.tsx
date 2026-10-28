@@ -156,7 +156,10 @@ export function ExerciseFormSheet({
           />
         </Field>
 
-        <Field label="Equipment" hint="Barbell exercises get the plate calculator">
+        <Field
+          label="Equipment"
+          hint="Barbell and Smith machine exercises get the plate calculator"
+        >
           <Chips
             options={EQUIPMENT}
             value={equipment}
