@@ -11,6 +11,7 @@ import {
   listRecordsForExercise,
   listRecordsFromSession,
   recomputeRecordsForSession,
+  setSessionDuration,
 } from './history'
 import {
   addExerciseToSession,
@@ -121,6 +122,26 @@ describe('history and records', () => {
       // An hour-long session must stay an hour long after an edit.
       expect(after!.endedAt! - after!.startedAt).toBe(60 * 60 * 1000)
       expect(before).toBeDefined()
+    })
+
+    it('lets a wrong duration be corrected', async () => {
+      const { sessionId } = await squatSession([[100, 5]])
+      const started = (await db.sessions.get(sessionId))!.startedAt
+
+      await setSessionDuration(sessionId, 2 * 60 * 60) // two hours
+
+      const session = await db.sessions.get(sessionId)
+      expect(session!.endedAt! - session!.startedAt).toBe(2 * 60 * 60 * 1000)
+      // The day it happened must not move, or it would jump in the calendar.
+      expect(session!.startedAt).toBe(started)
+    })
+
+    it('refuses a negative duration', async () => {
+      const { sessionId } = await squatSession([[100, 5]])
+      await setSessionDuration(sessionId, -500)
+
+      const session = await db.sessions.get(sessionId)
+      expect(session!.endedAt).toBe(session!.startedAt)
     })
 
     it('still updates records', async () => {

@@ -18,6 +18,28 @@ export const DEFAULT_BAR_ID = 'bar_olympic'
  *
  * Ids are stable slugs so an exercise pointing at one survives app updates.
  */
+/**
+ * The conventional name for a bar of a given weight.
+ *
+ * 20 kg is the men's Olympic bar and 15 kg the women's — both are "Olympic",
+ * which is why the seeded rack lists them separately. Anything unrecognised
+ * gets a neutral name rather than a wrong one.
+ */
+export function standardBarName(weightKg: number): string {
+  switch (weightKg) {
+    case 20:
+      return 'Olympic bar'
+    case 15:
+      return "Women's bar"
+    case 10:
+      return 'Technique bar'
+    case 7.5:
+      return 'EZ bar'
+    default:
+      return 'Your bar'
+  }
+}
+
 export const DEFAULT_BARS: Bar[] = [
   { id: DEFAULT_BAR_ID, name: 'Olympic bar', weightKg: 20 },
   { id: 'bar_womens', name: "Women's bar", weightKg: 15 },

@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 
-import { DEFAULT_BAR_WEIGHT_KG, DEFAULT_BARS } from './seed/plates'
+import { DEFAULT_BAR_WEIGHT_KG, DEFAULT_BARS, standardBarName } from './seed/plates'
 import type {
   Bar,
   Exercise,
@@ -96,7 +96,10 @@ export class GymmyDB extends Dexie {
             const existingWeight = settings.barWeightKg ?? DEFAULT_BAR_WEIGHT_KG
             const theirBar: Bar = {
               id: 'bar_default',
-              name: 'Your bar',
+              // Name it for what it almost certainly is. A 20 kg bar is a
+              // men's Olympic bar and a 15 kg one is the women's; anything
+              // else gets a neutral name because guessing would be worse.
+              name: standardBarName(existingWeight),
               weightKg: existingWeight,
             }
 
