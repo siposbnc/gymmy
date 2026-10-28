@@ -12,6 +12,7 @@ import { AboutSection } from './AboutSection'
 import { BackupSection } from './BackupSection'
 import { BarsSection } from './BarsSection'
 import { RestSection } from './RestSection'
+import { SetTargetsSection } from './SetTargetsSection'
 
 function Segmented<T extends string>({
   value,
@@ -136,6 +137,8 @@ export function SettingsScreen() {
         </Card>
 
         <RestSection settings={settings} />
+
+        <SetTargetsSection settings={settings} />
 
         <BarsSection settings={settings} />
 

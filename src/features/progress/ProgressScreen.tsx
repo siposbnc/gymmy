@@ -2,6 +2,8 @@ import { ChevronRight, Flame } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
 import { useProgressOverview, useSettings } from '~/db/hooks'
+import type { MuscleSetProgress } from '~/domain/goals'
+import { MUSCLE_LABEL } from '~/domain/muscles'
 import { formatVolume, formatWeight } from '~/domain/units'
 import { Card } from '~/ui/Card'
 import { InfoAffordance } from '~/ui/InfoAffordance'
@@ -9,6 +11,56 @@ import { ScreenHeader } from '~/ui/ScreenHeader'
 
 import { CategoryBars } from './charts/CategoryBars'
 import { TrendBars } from './charts/TrendBars'
+
+/**
+ * This week's set counts, against targets where there are any.
+ *
+ * Under-target is marked by a visibly unfilled bar and the "of N" label, not by
+ * a colour: the same palette has to work for a colourblind reader, and "behind
+ * on back" is information rather than an alarm. A muscle with no target gets a
+ * count and no bar — there is nothing to be short of.
+ */
+function WeeklySetList({ progress }: { progress: readonly MuscleSetProgress[] }) {
+  if (progress.length === 0) {
+    return (
+      <p className="text-[0.82rem] leading-relaxed text-ink-muted">
+        No working sets logged this week yet.
+      </p>
+    )
+  }
+
+  return (
+    <ul className="grid gap-2">
+      {progress.map((row) => (
+        <li key={row.muscle} className="grid gap-1">
+          <div className="flex items-baseline gap-2">
+            <span className="min-w-0 flex-1 truncate text-[0.85rem] font-medium">
+              {MUSCLE_LABEL[row.muscle]}
+            </span>
+            <span className="num shrink-0 text-[0.85rem] font-bold">
+              {row.sets}
+              {row.target == null ? null : (
+                <span className="font-medium text-ink-muted"> of {row.target}</span>
+              )}
+            </span>
+          </div>
+          {row.target == null ? null : (
+            <div
+              className="h-1.5 overflow-hidden rounded-full bg-sunken"
+              role="img"
+              aria-label={`${row.sets} of ${row.target} sets`}
+            >
+              <span
+                className="block h-full rounded-full bg-accent"
+                style={{ width: `${Math.min(1, row.sets / row.target) * 100}%` }}
+              />
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 export function ProgressScreen() {
   const navigate = useNavigate()
@@ -19,7 +71,16 @@ export function ProgressScreen() {
     return <p className="p-8 text-center text-[0.85rem] text-ink-faint">Loading…</p>
   }
 
-  const { streak, weeks, thisWeekByMuscle, records, exerciseNames, sessionCount } = overview
+  const {
+    streak,
+    weeks,
+    thisWeekByMuscle,
+    thisWeekSets,
+    hasSetTargets,
+    records,
+    exerciseNames,
+    sessionCount,
+  } = overview
 
   if (sessionCount === 0) {
     return (
@@ -102,6 +163,19 @@ export function ProgressScreen() {
             unit={settings.units}
             data={thisWeekByMuscle}
           />
+        </Card>
+
+        <Card>
+          <h2 className="label-caps mb-0.5 flex items-center gap-1.5 text-ink-faint">
+            Hard sets this week
+            <InfoAffordance explainerId="weekly_sets" />
+          </h2>
+          <p className="mb-2.5 text-[0.72rem] leading-relaxed text-ink-muted">
+            {hasSetTargets
+              ? 'Working sets per muscle, against your targets. Anything short of target is listed first.'
+              : 'Working sets per muscle. Set targets in Settings and they show up here as a bar.'}
+          </p>
+          <WeeklySetList progress={thisWeekSets} />
         </Card>
 
         <div>

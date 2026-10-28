@@ -1,8 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 
+import { muscleSetProgress, type MuscleSetProgress } from '~/domain/goals'
+import { muscleLabel } from '~/domain/muscles'
 import {
   computeStreak,
   exerciseSeries,
+  startOfWeek,
+  weeklySets,
   weeklyVolume,
   type ExercisePoint,
   type HistorySet,
@@ -27,6 +31,7 @@ import {
   listHeadlineRecords,
   listRecordsForExercise,
   listRecordsFromSession,
+  previousRoutineVolume,
 } from './repositories/history'
 import { listRoutineExercises, listRoutines } from './repositories/routines'
 import { db } from './schema'
@@ -89,6 +94,10 @@ export interface ProgressOverview {
   weeks: WeeklyVolume[]
   /** The most recent week's split by primary muscle. */
   thisWeekByMuscle: { key: string; label: string; value: number }[]
+  /** This week's hard sets per muscle, lined up against any targets set. */
+  thisWeekSets: MuscleSetProgress[]
+  /** True once at least one muscle has a target, which is what reveals the UI. */
+  hasSetTargets: boolean
   records: PersonalRecord[]
   exerciseNames: Map<string, string>
   sessionCount: number
@@ -97,6 +106,9 @@ export interface ProgressOverview {
 export function useProgressOverview(): ProgressOverview | undefined {
   const settings = useSettings()
   const { weekStartsOn, weeklySessionGoal } = settings
+  // Serialised for the dependency array: a fresh object literal every render
+  // would re-run the query forever.
+  const targetKey = JSON.stringify(settings.weeklySetTargets ?? {})
 
   return useLiveQuery(async () => {
     const [sessions, exercises, records, sets] = await Promise.all([
@@ -116,19 +128,28 @@ export function useProgressOverview(): ProgressOverview | undefined {
     const weeks = weeklyVolume(sets, primaryMuscle, weekStartsOn)
     const latest = weeks.at(-1)
 
+    // The week we are in, not the last week that has data — a muscle you have
+    // not trained yet this week should read zero, not inherit last week's count.
+    const currentWeek = startOfWeek(Date.now(), weekStartsOn)
+    const setWeeks = weeklySets(sets, primaryMuscle, weekStartsOn)
+    const thisWeek = setWeeks.find((week) => week.weekStart === currentWeek)
+    const targets = settings.weeklySetTargets ?? {}
+
     return {
       streak: computeStreak(completed, weeklySessionGoal, weekStartsOn),
       weeks,
       thisWeekByMuscle: Object.entries(latest?.byMuscle ?? {}).map(([muscle, value]) => ({
         key: muscle,
-        label: muscle,
+        label: muscleLabel(muscle),
         value: value ?? 0,
       })),
+      thisWeekSets: muscleSetProgress(thisWeek?.byMuscle ?? {}, targets),
+      hasSetTargets: Object.values(targets).some((target) => (target ?? 0) > 0),
       records,
       exerciseNames: new Map(exercises.map((exercise) => [exercise.id, exercise.name])),
       sessionCount: completed.length,
     }
-  }, [weekStartsOn, weeklySessionGoal])
+  }, [weekStartsOn, weeklySessionGoal, targetKey])
 }
 
 export interface ExerciseProgress {
@@ -167,7 +188,17 @@ export function useSessionDetail(sessionId: string | undefined) {
       getSessionDetail(sessionId),
       listRecordsFromSession(sessionId),
     ])
-    return detail == null ? null : { ...detail, records }
+    if (detail == null) return null
+
+    // The goal comes from the session's own snapshot, so editing the routine
+    // later cannot change what a past session was aiming at.
+    const { session } = detail
+    const previousKg =
+      session.volumeGoalSnapshot?.kind === 'beat_last' && session.routineId
+        ? await previousRoutineVolume(session.routineId, session.startedAt)
+        : undefined
+
+    return { ...detail, records, previousKg }
   }, [sessionId])
 }
 

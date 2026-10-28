@@ -1,4 +1,4 @@
-import type { Routine, RoutineExercise, TargetWeight } from '~/domain/types'
+import type { Routine, RoutineExercise, TargetWeight, VolumeGoal } from '~/domain/types'
 import { newId } from '~/lib/uuid'
 
 import { db } from '../schema'
@@ -44,6 +44,21 @@ export async function renameRoutine(routineId: string, name: string): Promise<vo
 
 export async function setRoutineNotes(routineId: string, notes: string): Promise<void> {
   await db.routines.update(routineId, { notes, updatedAt: Date.now() })
+}
+
+export async function setRoutineVolumeGoal(routineId: string, goal: VolumeGoal): Promise<void> {
+  await db.routines.update(routineId, { volumeGoal: goal, updatedAt: Date.now() })
+}
+
+/** Removes the goal rather than storing a zero, so "no goal" stays one state. */
+export async function clearRoutineVolumeGoal(routineId: string): Promise<void> {
+  await db.routines
+    .where('id')
+    .equals(routineId)
+    .modify((routine) => {
+      delete routine.volumeGoal
+      routine.updatedAt = Date.now()
+    })
 }
 
 /**
@@ -108,10 +123,7 @@ export async function duplicateRoutine(routineId: string): Promise<string> {
 // Exercises within a routine
 // ---------------------------------------------------------------------------
 
-export async function addExerciseToRoutine(
-  routineId: string,
-  exerciseId: string,
-): Promise<string> {
+export async function addExerciseToRoutine(routineId: string, exerciseId: string): Promise<string> {
   const id = newId('rex')
 
   await db.transaction('rw', db.routineExercises, db.exercises, db.routines, async () => {
@@ -126,9 +138,7 @@ export async function addExerciseToRoutine(
       targetSets: 3,
       targetRepsMin: 8,
       isAmrap: false,
-      ...(exercise?.defaultRestSeconds == null
-        ? {}
-        : { restSeconds: exercise.defaultRestSeconds }),
+      ...(exercise?.defaultRestSeconds == null ? {} : { restSeconds: exercise.defaultRestSeconds }),
     })
     await touch(routineId)
   })
@@ -287,6 +297,7 @@ export async function startSessionFromRoutine(routineId: string): Promise<string
       name: routine.name,
       startedAt: Date.now(),
       status: 'active',
+      ...(routine.volumeGoal == null ? {} : { volumeGoalSnapshot: routine.volumeGoal }),
     })
 
     const planned = await listRoutineExercises(routineId)

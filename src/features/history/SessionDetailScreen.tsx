@@ -18,10 +18,18 @@ import {
   updateSet,
 } from '~/db/repositories/sessions'
 import { ExercisePickerSheet } from '~/features/exercises/ExercisePickerSheet'
+import { describeVolumeGoal, resolveVolumeGoal, type VolumeGoalResult } from '~/domain/goals'
 import { totalVolume } from '~/domain/metrics'
 import { describeRecordKind } from '~/domain/records'
 import type { SetEntry } from '~/domain/types'
-import { formatVolume, formatWeight, fromDisplayUnit, INCREMENT, toDisplayUnit } from '~/domain/units'
+import {
+  formatVolume,
+  formatWeight,
+  fromDisplayUnit,
+  INCREMENT,
+  toDisplayUnit,
+  type WeightUnit,
+} from '~/domain/units'
 import { SetActionsSheet } from '~/features/session/SetActionsSheet'
 import { SetRow } from '~/features/session/SetRow'
 import { formatDuration } from '~/lib/time'
@@ -92,11 +100,17 @@ export function SessionDetailScreen() {
     )
   }
 
-  const { session, exercises, records } = detail
+  const { session, exercises, records, previousKg } = detail
   const allSets = exercises.flatMap((entry) => entry.sets)
   const workingSets = allSets.filter((set) => set.type !== 'warmup')
   const volume = totalVolume({ sets: allSets })
   const duration = session.endedAt ? (session.endedAt - session.startedAt) / 1000 : null
+
+  const goal = resolveVolumeGoal({
+    goal: session.volumeGoalSnapshot,
+    actualKg: volume,
+    previousKg,
+  })
 
   /**
    * Any edit can change what the records are, so re-settle them.
@@ -172,6 +186,8 @@ export function SessionDetailScreen() {
             />
           </dl>
         </Card>
+
+        {goal.kind === 'none' ? null : <VolumeGoalRow goal={goal} unit={settings.units} />}
 
         {records.length > 0 ? (
           <div className="rounded-lg bg-pr-fill p-3.5">
@@ -449,6 +465,63 @@ export function SessionDetailScreen() {
         </p>
       </Sheet>
     </>
+  )
+}
+
+/**
+ * How the session measured against its volume goal.
+ *
+ * Deliberately not scored. There is no green tick and no red cross: going
+ * lighter for a deload, or heavier for fewer reps, both read as "less volume"
+ * and neither is a failure. It states the two numbers and lets you decide what
+ * they mean, which is the same stance records take.
+ *
+ * The bar is scaled so the target notch stays visible when you overshoot —
+ * a fill pinned at 100% would throw away the interesting part.
+ */
+function VolumeGoalRow({ goal, unit }: { goal: VolumeGoalResult; unit: WeightUnit }) {
+  const ratio = goal.ratio
+  const scale = Math.max(ratio ?? 1, 1)
+
+  return (
+    <Card>
+      <p className="label-caps flex items-center gap-1.5 text-ink-faint">
+        Volume goal
+        <InfoAffordance explainerId="volume_goal" />
+      </p>
+
+      <p className="num mt-1 text-[1.05rem] font-semibold">
+        {goal.targetKg == null ? (
+          <span className="text-ink-muted">{describeVolumeGoal(goal, unit)}</span>
+        ) : (
+          <>
+            {formatVolume(goal.actualKg, unit)}
+            <span className="ml-1.5 text-[0.8rem] font-medium text-ink-muted">
+              {describeVolumeGoal(goal, unit)}
+            </span>
+          </>
+        )}
+      </p>
+
+      {ratio == null ? null : (
+        <div
+          className="relative mt-2.5 h-2 overflow-hidden rounded-full bg-sunken"
+          role="img"
+          aria-label={describeVolumeGoal(goal, unit)}
+        >
+          <span
+            className="absolute inset-y-0 left-0 rounded-full bg-accent"
+            style={{ width: `${(ratio / scale) * 100}%` }}
+          />
+          {/* The target, marked rather than coloured — the line is the fact. */}
+          <span
+            aria-hidden
+            className="absolute inset-y-0 w-0.5 bg-ink"
+            style={{ left: `calc(${(1 / scale) * 100}% - 1px)` }}
+          />
+        </div>
+      )}
+    </Card>
   )
 }
 

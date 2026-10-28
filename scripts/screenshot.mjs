@@ -51,8 +51,7 @@ async function shoot(name, { theme = 'light', steps = async () => {} } = {}) {
   return real
 }
 
-const tap = (page, name, exact = false) =>
-  page.getByRole('button', { name, exact }).click()
+const tap = (page, name, exact = false) => page.getByRole('button', { name, exact }).click()
 
 /** Fill the pending row via the numeric pad and log it. */
 async function logSet(page, weight, reps) {
@@ -91,7 +90,10 @@ async function buildRoutine(page) {
 
   // Group the SECOND exercise with the first, so the connector shows. The
   // first exercise's button is correctly disabled — nothing sits above it.
-  await page.getByRole('button', { name: /superset with the exercise above/i }).nth(1).click()
+  await page
+    .getByRole('button', { name: /superset with the exercise above/i })
+    .nth(1)
+    .click()
   await page.waitForTimeout(250)
 }
 
@@ -130,9 +132,16 @@ async function seedHistory(page) {
     for (const { weeksAgo, squat, bench } of plan) {
       const startedAt = Date.now() - weeksAgo * 7 * DAY - 2 * DAY
       const sessionId = `seed_ses_${n}`
+      const lower = weeksAgo % 2 === 0
+      const name = lower ? 'Lower A' : 'Upper A'
       await put('sessions', {
         id: sessionId,
-        name: weeksAgo % 2 === 0 ? 'Lower A' : 'Upper A',
+        // Routine-backed with a goal snapshot, so the session summary has a
+        // volume goal to render and a previous run to measure it against.
+        routineId: lower ? 'seed_rtn_lower' : 'seed_rtn_upper',
+        routineNameSnapshot: name,
+        volumeGoalSnapshot: { kind: 'beat_last' },
+        name,
         startedAt,
         endedAt: startedAt + 3_900_000,
         status: 'completed',
@@ -165,6 +174,24 @@ async function seedHistory(page) {
       }
       n += 1
     }
+
+    // A couple of weekly set targets, so Progress has bars rather than bare
+    // counts. Read-modify-write: the settings row already exists.
+    const existing = await new Promise((resolve, reject) => {
+      const request = db
+        .transaction('settings', 'readonly')
+        .objectStore('settings')
+        .get('singleton')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    if (existing) {
+      await put('settings', {
+        ...existing,
+        weeklySetTargets: { chest: 12, quads: 10, hamstrings: 10, back: 14 },
+      })
+    }
+
     db.close()
   })
 
@@ -281,7 +308,10 @@ for (const theme of ['light', 'dark']) {
         await seedHistory(page)
         await page.getByRole('link', { name: 'History' }).click()
         await page.waitForTimeout(300)
-        await page.getByRole('button', { name: /Lower A/ }).first().click()
+        await page
+          .getByRole('button', { name: /Lower A/ })
+          .first()
+          .click()
         await page.waitForTimeout(400)
       },
     })),
@@ -316,6 +346,41 @@ for (const theme of ['light', 'dark']) {
         await page.goto(`${BASE}/more/settings`, { waitUntil: 'networkidle' })
         await page.getByText('Bars', { exact: true }).scrollIntoViewIfNeeded()
         await page.waitForTimeout(350)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('settings-set-targets', {
+      theme,
+      steps: async (page) => {
+        await page.goto(`${BASE}/more/settings`, { waitUntil: 'networkidle' })
+        await tap(page, /add a muscle/i)
+        await page.waitForTimeout(300)
+        await page.getByRole('button', { name: 'Chest', exact: true }).click()
+        await page.waitForTimeout(300)
+        // Not exact: the heading carries an ⓘ button, so its text node is not
+        // the whole accessible name.
+        await page
+          .getByText(/weekly set targets/i)
+          .first()
+          .scrollIntoViewIfNeeded()
+        await page.waitForTimeout(300)
+      },
+    })),
+  )
+
+  allErrors.push(
+    ...(await shoot('routine-goal', {
+      theme,
+      steps: async (page) => {
+        await buildRoutine(page)
+        await page.getByRole('radio', { name: 'Beat last time' }).click()
+        await page
+          .getByText(/session goal/i)
+          .first()
+          .scrollIntoViewIfNeeded()
+        await page.waitForTimeout(300)
       },
     })),
   )
@@ -455,7 +520,10 @@ for (const theme of ['light', 'dark']) {
     check('cap is position:fixed', cap.fixed)
     check(`cap is within 4px of the top (${cap.top})`, cap.top <= 4)
     check(`cap is at least 6px tall (${cap.height})`, cap.height >= 6)
-    check(`cap spans at least 80% width (${Math.round(cap.widthRatio * 100)}%)`, cap.widthRatio >= 0.8)
+    check(
+      `cap spans at least 80% width (${Math.round(cap.widthRatio * 100)}%)`,
+      cap.widthRatio >= 0.8,
+    )
     check('cap has an opaque background', cap.opaque)
   }
 
@@ -507,7 +575,10 @@ for (const theme of ['light', 'dark']) {
     `sheet lifts clear of the keyboard (${after.bottom} vs ${852 - KEYBOARD})`,
     Math.abs(after.bottom - (852 - KEYBOARD)) <= 2,
   )
-  check('sheet still fits on screen rather than running off the top', after.height <= 852 - KEYBOARD)
+  check(
+    'sheet still fits on screen rather than running off the top',
+    after.height <= 852 - KEYBOARD,
+  )
   check('tab bar gets out of the way while typing', !after.navVisible)
 
   await context.close()

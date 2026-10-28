@@ -163,6 +163,50 @@ export function weeklyVolume(
     .sort((a, b) => a.weekStart - b.weekStart)
 }
 
+export interface WeeklySets {
+  readonly weekStart: number
+  readonly byMuscle: Readonly<Partial<Record<MuscleGroup, number>>>
+  readonly total: number
+}
+
+/**
+ * Hard sets per muscle per week.
+ *
+ * Counted rather than weighed, deliberately. Volume in kilograms can be run up
+ * by adding light sets, so a volume target quietly rewards junk work; a set is
+ * a set regardless of the load on the bar, which makes it the sturdier thing
+ * to aim at.
+ *
+ * "Hard" means a working set — warm-ups are excluded, dropsets and sets taken
+ * to failure count. Credited to the exercise's primary mover only, matching
+ * how {@link weeklyVolume} attributes.
+ */
+export function weeklySets(
+  sets: readonly HistorySet[],
+  primaryMuscleByExercise: ReadonlyMap<string, MuscleGroup>,
+  weekStartsOn: 0 | 1,
+): WeeklySets[] {
+  const weeks = new Map<number, { byMuscle: Partial<Record<MuscleGroup, number>>; total: number }>()
+
+  for (const set of sets) {
+    if (set.type === 'warmup') continue
+    if ((set.reps ?? 0) <= 0) continue
+
+    const weekStart = startOfWeek(set.completedAt, weekStartsOn)
+    const week = weeks.get(weekStart) ?? { byMuscle: {}, total: 0 }
+
+    week.total += 1
+    const muscle = primaryMuscleByExercise.get(set.exerciseId)
+    if (muscle) week.byMuscle[muscle] = (week.byMuscle[muscle] ?? 0) + 1
+
+    weeks.set(weekStart, week)
+  }
+
+  return [...weeks.entries()]
+    .map(([weekStart, week]) => ({ weekStart, byMuscle: week.byMuscle, total: week.total }))
+    .sort((a, b) => a.weekStart - b.weekStart)
+}
+
 // ---------------------------------------------------------------------------
 // Streak
 // ---------------------------------------------------------------------------

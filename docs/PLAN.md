@@ -15,7 +15,7 @@
 
 **Gymmy is a gym buddy you hold in one sweaty hand.**
 
-The whole app is judged on one interaction: *you finish a set, and you tell Gymmy about it.* If that takes
+The whole app is judged on one interaction: _you finish a set, and you tell Gymmy about it._ If that takes
 more than one tap when nothing changed from last time, the app has failed — people stop logging, and every
 other feature (charts, PRs, plans) becomes worthless because the data dries up.
 
@@ -27,11 +27,13 @@ So the design priority order is:
 4. **Planning serves logging.** A routine exists to pre-fill a session, not to be admired.
 
 ### Who it's for
+
 A lifter who trains with a repeating plan (PPL, upper/lower, 5/3/1, their own thing) and wants a fast
 log plus honest progress data. Not a beginner's guided-program app, not a social network, not a nutrition
 tracker.
 
-### Explicitly *not* building
+### Explicitly _not_ building
+
 Social feed · friend following · nutrition/macros · gamified badge economy · AI coach chat · in-app
 purchases. Each one dilutes the core loop and adds a lot of surface area. PRs are the only dopamine
 mechanic, and that one is earned.
@@ -41,7 +43,7 @@ mechanic, and that one is earned.
 ## 2. Core user journeys
 
 **A. Train from a plan** (the 90% case)
-Home → "Push A" → session opens with every exercise and target pre-filled from the routine *and* last
+Home → "Push A" → session opens with every exercise and target pre-filled from the routine _and_ last
 week's actual numbers → log sets, rest timer auto-runs → finish → PRs and session summary.
 
 **B. Train off the cuff**
@@ -50,7 +52,7 @@ a routine is a common app mistake.)
 
 **C. Build / tune a plan**
 Routines → new or duplicate → add exercises, set target sets/reps/weight/rest, group supersets, reorder.
-Tuning usually happens *right after* a session, so the session summary links straight into the routine.
+Tuning usually happens _right after_ a session, so the session summary links straight into the routine.
 
 **D. Check progress**
 Progress → pick an exercise → chart of top set / estimated 1RM / weekly volume → "when did I last squat
@@ -66,13 +68,13 @@ to log; if history is read-only the data becomes a lie they stop trusting.
 
 Bottom tab bar (mobile-first, thumb-reachable), 5 destinations:
 
-| Tab | Purpose |
-| --- | --- |
-| **Today** | Active session card *or* start-workout entry points · recent sessions · week-at-a-glance |
-| **Routines** | Training plan list → routine builder/editor |
-| **History** | Calendar + chronological list → session detail (editable) |
-| **Progress** | Per-exercise charts, PR board, weekly volume by muscle group, streak |
-| **More** | Exercise library · settings · units/theme · export/import |
+| Tab          | Purpose                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| **Today**    | Active session card _or_ start-workout entry points · recent sessions · week-at-a-glance |
+| **Routines** | Training plan list → routine builder/editor                                              |
+| **History**  | Calendar + chronological list → session detail (editable)                                |
+| **Progress** | Per-exercise charts, PR board, weekly volume by muscle group, streak                     |
+| **More**     | Exercise library · settings · units/theme · export/import                                |
 
 Plus one full-screen, out-of-tab surface:
 
@@ -104,6 +106,7 @@ Plus one full-screen, out-of-tab surface:
 ```
 
 Rules baked into this screen:
+
 - The next set row is **always pre-filled** from (a) the routine target, else (b) the same set index last
   time, else (c) the last set logged for that exercise.
 - Numbers are edited with **steppers + a numeric pad sheet**, never the OS keyboard.
@@ -184,7 +187,7 @@ UI. v1 ships `weight_reps` and `reps_only` fully; `time` is supported in the mod
 isn't a migration.
 
 **A record is something you did, never something a formula inferred.** All three `PersonalRecord` kinds are
-*observations* of logged work: you put 140 kg on the bar, you got 9 reps at 100 kg, you moved 8,400 kg in a
+_observations_ of logged work: you put 140 kg on the bar, you got 9 reps at 100 kg, you moved 8,400 kg in a
 session. An estimated 1RM is a model output, so it can never trigger a PR, never appear on the PR board,
 and never fire a celebration. It exists purely as an analysis number on charts and set rows, always
 labelled as an estimate. See [§4.1](#41-prs-are-observed-estimates-are-not) and
@@ -197,12 +200,11 @@ like any other — because you actually lifted it.
 
 ```ts
 type TargetWeight =
-  | { kind: 'absolute'; kg: number }
-  | { kind: 'percent'; pct: number; basis: 'training_max' }   // declared now, future update
+  { kind: 'absolute'; kg: number } | { kind: 'percent'; pct: number; basis: 'training_max' } // declared now, future update
 ```
 
 **v1 implements `absolute` only.** The `percent` variant is deferred to a future update, but the union is
-declared immediately because the *shape* is the expensive part, not the feature. Retrofitting it later
+declared immediately because the _shape_ is the expensive part, not the feature. Retrofitting it later
 would mean a migration across every saved routine, a new branch in prefill resolution, a mode toggle in
 the builder, and a snapshot-time computation in the session. Declaring it today costs one line and makes
 the future update pure code.
@@ -211,14 +213,14 @@ the future update pure code.
 
 ### 4.1 PRs are observed; estimates are not
 
-| | Source | PR? | Where it shows |
-| --- | --- | --- | --- |
-| **Max weight** | logged set | ✅ | set row badge, PR board, session summary |
-| **Max reps at a weight** | logged set | ✅ | set row badge, PR board, session summary |
-| **Max session volume** | logged session | ✅ | session summary, PR board |
-| **Estimated 1RM** | Epley formula | ❌ **never** | progress chart line, exercise detail — always prefixed `est.` |
+|                          | Source         | PR?          | Where it shows                                                |
+| ------------------------ | -------------- | ------------ | ------------------------------------------------------------- |
+| **Max weight**           | logged set     | ✅           | set row badge, PR board, session summary                      |
+| **Max reps at a weight** | logged set     | ✅           | set row badge, PR board, session summary                      |
+| **Max session volume**   | logged session | ✅           | session summary, PR board                                     |
+| **Estimated 1RM**        | Epley formula  | ❌ **never** | progress chart line, exercise detail — always prefixed `est.` |
 
-This resolves a question the previous draft got wrong. It also makes the 12-rep cap on e1RM a *chart*
+This resolves a question the previous draft got wrong. It also makes the 12-rep cap on e1RM a _chart_
 concern rather than a data-integrity one: a junk estimate can no longer fabricate a permanent record, it
 can only put a spike in a trend line. The cap stays — the spike is still misleading — but the blast radius
 is now small, which is the right place for a formula's uncertainty to live.
@@ -232,22 +234,22 @@ congratulates you for work you actually did.**
 
 ### Stack
 
-| Concern | Choice | Why |
-| --- | --- | --- |
-| Framework | **React + TypeScript (strict)** | Known quantity, best ecosystem for the chart/animation needs |
-| Build | **Vite** | Fast, first-class PWA plugin |
-| Routing | **React Router** | File-light, nested layouts for the tab shell |
-| Persistence | **Dexie (IndexedDB)** + `useLiveQuery` | Reactive queries straight off the DB — the DB *is* the state store, so no cache-invalidation layer |
-| UI state | **Zustand** | Only for genuinely ephemeral state: rest timer, open sheets, numeric-pad target |
-| Styling | **Tailwind CSS** + CSS custom properties | Tokens in CSS vars so light/dark is a variable swap, not a class fork |
-| Primitives | **Radix UI** (sheet, dialog, tabs, popover) | Accessibility for free; styling stays ours so the app doesn't look like a template |
-| Animation | **Framer Motion** | Spring layout animations on set rows, shared-element session transitions |
-| Charts | **Recharts** | Fast to build, enough control for the handful of charts needed |
-| Dates | **date-fns** | Tree-shakeable, no timezone surprises |
-| Schemas | **Zod** | Guards the import path and versions the export format |
-| Icons | **lucide-react** | |
-| PWA | **vite-plugin-pwa** (Workbox) | Precache the shell, update prompt |
-| Tests | **Vitest** + RTL, **Playwright** | |
+| Concern     | Choice                                      | Why                                                                                                |
+| ----------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Framework   | **React + TypeScript (strict)**             | Known quantity, best ecosystem for the chart/animation needs                                       |
+| Build       | **Vite**                                    | Fast, first-class PWA plugin                                                                       |
+| Routing     | **React Router**                            | File-light, nested layouts for the tab shell                                                       |
+| Persistence | **Dexie (IndexedDB)** + `useLiveQuery`      | Reactive queries straight off the DB — the DB _is_ the state store, so no cache-invalidation layer |
+| UI state    | **Zustand**                                 | Only for genuinely ephemeral state: rest timer, open sheets, numeric-pad target                    |
+| Styling     | **Tailwind CSS** + CSS custom properties    | Tokens in CSS vars so light/dark is a variable swap, not a class fork                              |
+| Primitives  | **Radix UI** (sheet, dialog, tabs, popover) | Accessibility for free; styling stays ours so the app doesn't look like a template                 |
+| Animation   | **Framer Motion**                           | Spring layout animations on set rows, shared-element session transitions                           |
+| Charts      | **Recharts**                                | Fast to build, enough control for the handful of charts needed                                     |
+| Dates       | **date-fns**                                | Tree-shakeable, no timezone surprises                                                              |
+| Schemas     | **Zod**                                     | Guards the import path and versions the export format                                              |
+| Icons       | **lucide-react**                            |                                                                                                    |
+| PWA         | **vite-plugin-pwa** (Workbox)               | Precache the shell, update prompt                                                                  |
+| Tests       | **Vitest** + RTL, **Playwright**            |                                                                                                    |
 
 ### Layering
 
@@ -283,7 +285,7 @@ An eventual store presence doesn't change v1, but it does set two rules now.
 **The intended path is Capacitor**, not a React Native rewrite. Capacitor wraps this exact codebase into
 iOS/Android binaries and keeps 100% of the UI, the DB layer, and the design system. A React Native port
 would mean rewriting every view (Tailwind classes don't cross over) for no user-visible gain. Capacitor
-also *fixes* the plan's weakest point: it gives real OS-level local notifications on iOS, so the rest
+also _fixes_ the plan's weakest point: it gives real OS-level local notifications on iOS, so the rest
 timer stops depending on PWA notification support.
 
 **The cost today is one rule:** no component calls a web-only API directly. Notifications, vibration,
@@ -318,7 +320,7 @@ Both themes are first-class from day one; the token layer makes that nearly free
 **Color.** Semantic CSS variables only — components never name a raw color.
 `--surface`, `--surface-raised`, `--surface-sunken`, `--border`, `--text`, `--text-muted`,
 `--accent` / `--accent-fg`, `--success` (a logged set), `--pr` (a record), `--danger`.
-One vivid accent carries the brand (indigo/violet direction), with a distinct green reserved *exclusively*
+One vivid accent carries the brand (indigo/violet direction), with a distinct green reserved _exclusively_
 for "set completed" so the screen reads at a glance as "how much is done". Light theme is warm off-white
 rather than pure `#fff`; dark theme is a soft near-black with raised surfaces, never pure `#000`.
 
@@ -334,6 +336,7 @@ scale-and-check on log. A brief flare — not a 3-second confetti cannon — on 
 `prefers-reduced-motion`.
 
 **Touch ergonomics (gym-specific).**
+
 - 44×44px minimum targets; the primary action sits in the bottom third of the screen.
 - Bottom sheets instead of centre modals — reachable one-handed.
 - Destructive actions need a swipe or a confirm; a fat-finger tap must never delete a set.
@@ -350,25 +353,25 @@ visible focus rings, labelled icon buttons, live-region announcements for timer 
 
 **The four pillars**
 
-| Feature | Notes |
-| --- | --- |
-| **Set/rep logging** | The spine. Weight × reps in kg, steppers + custom numeric pad, immediate persistence |
-| **Training plan builder** | Routines with target sets/reps/weight/rest per exercise, superset grouping, duplicate, reorder |
-| **Rest timer** | Per-exercise defaults, auto-start on log, +30s / skip, background-safe, notification + vibration |
-| **History & progress** | Calendar + list, editable session detail, per-exercise charts (top set, est. 1RM, volume), weekly volume by muscle group, streak |
-| **Exercise library** | ~80 seeded exercises with muscle group / equipment / movement type, filters, custom exercises, per-exercise history and PR board |
+| Feature                   | Notes                                                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Set/rep logging**       | The spine. Weight × reps in kg, steppers + custom numeric pad, immediate persistence                                             |
+| **Training plan builder** | Routines with target sets/reps/weight/rest per exercise, superset grouping, duplicate, reorder                                   |
+| **Rest timer**            | Per-exercise defaults, auto-start on log, +30s / skip, background-safe, notification + vibration                                 |
+| **History & progress**    | Calendar + list, editable session detail, per-exercise charts (top set, est. 1RM, volume), weekly volume by muscle group, streak |
+| **Exercise library**      | ~80 seeded exercises with muscle group / equipment / movement type, filters, custom exercises, per-exercise history and PR board |
 
 **The five that decide whether the app actually gets used** — all confirmed in v1:
 
 1. **Previous-performance prefill + one-tap logging.** The next set row resolves its values through a
    fallback chain: routine target → same set index last session → last set logged for that exercise →
    empty. `last time · 77.5kg × 8,8,7` sits permanently under the exercise header, no tap required.
-   This is *the* feature; everything else is secondary. Lives in `domain/prefill.ts` as a pure function
+   This is _the_ feature; everything else is secondary. Lives in `domain/prefill.ts` as a pure function
    over the exercise's set history, so the chain is directly testable.
 
 2. **Plate calculator.** Given a target weight, the bar weight and the plate inventory, show the plates
    per side (`140kg → 25 + 20 + 2.5`). Greedy decomposition in `domain/plates.ts`, and it must handle an
-   *incomplete* inventory honestly — if 140 isn't loadable it says so and offers the nearest loadable
+   _incomplete_ inventory honestly — if 140 isn't loadable it says so and offers the nearest loadable
    weight rather than lying. Doubles as the rounding function for percent-based targets in v1.5.
 
 3. **Warm-up set marking.** One tap on a set row to flag it as warm-up. Rendered greyed and un-numbered,
@@ -408,22 +411,22 @@ limits rather than marketing the formula.
 **Pattern.** Each derived value carries a small ⓘ affordance opening a bottom sheet with four parts, in
 this order:
 
-1. **What it is** — one plain sentence, no jargon. *"An estimate of the heaviest weight you could lift
-   once, worked out from a set you actually did."*
+1. **What it is** — one plain sentence, no jargon. _"An estimate of the heaviest weight you could lift
+   once, worked out from a set you actually did."_
 2. **How it's worked out** — the formula, written readably, plus a worked example **using the user's own
    set**: `100 kg × 5 → 100 × (1 + 5 ÷ 30) = 117 kg`. Their numbers, not invented ones.
-3. **Why it's useful** — what decision it helps with. *"It's the only way to compare sets with different
-   weights and reps: it says 100 kg × 5 beat 90 kg × 8."*
-4. **Where it breaks down** — the caveats, stated plainly. *"Above 12 reps it stops being meaningful, so
+3. **Why it's useful** — what decision it helps with. _"It's the only way to compare sets with different
+   weights and reps: it says 100 kg × 5 beat 90 kg × 8."_
+4. **Where it breaks down** — the caveats, stated plainly. _"Above 12 reps it stops being meaningful, so
    Gymmy shows nothing. And it never counts as a personal record — records are only for weight you
-   actually lifted."*
+   actually lifted."_
 
-**Plus a reference page** under More → *"How Gymmy works out your numbers"*, listing every metric with
+**Plus a reference page** under More → _"How Gymmy works out your numbers"_, listing every metric with
 the same four-part treatment. Reachable directly, not only through contextual sheets, so it can be read
 once out of curiosity rather than discovered one tooltip at a time.
 
 **Architecture — the explanation ships with the function.** Each module in `domain/metrics/` exports its
-calculation *and* its explainer metadata together:
+calculation _and_ its explainer metadata together:
 
 ```ts
 export const estimatedOneRepMax: Metric<{ weightKg: number; reps: number }> = {
@@ -454,10 +457,42 @@ because a user who doesn't know their warm-ups are excluded will think the volum
 **Restraint:** no first-run tutorial, no modal wall. The affordance is a quiet ⓘ, with a single subtle
 one-time hint the first time a derived number appears. Explanations are pulled, not pushed.
 
+### 12. Goals — shipped post-v1
+
+Two goals, deliberately only two, and neither of them scores you.
+
+**Session volume goal — per routine.** A tagged union on `Routine`, same shape as `TargetWeight`:
+`beat_last` (the default offered) or `absolute`. `beat_last` leads because it self-calibrates — it needs
+no number from the user and cannot go stale as they get stronger; `absolute` exists for a deload or a
+programme that names a figure.
+
+Three constraints make it honest:
+
+- **Snapshotted onto the session at start**, exactly like the name and the targets. Raising the goal in
+  November must not retroactively turn a session beaten in March into a miss.
+- **"Previous" means the session before this one**, not the latest — scoped by `startedAt`, so an old
+  summary reads the same next year as it does today.
+- **The first run of a routine has no target.** Not a zero, not an invented figure: the summary says so
+  in words. Same stance as a 1RM estimate above 12 reps showing a dash.
+
+Shown on the **session summary only** — not during the workout, where a volume counter would invite
+padding the session to make a number move. Neutral on hit or miss: a deload week _should_ come in lower.
+
+**Weekly hard sets per muscle.** Counted rather than weighed, because volume in kilograms is gameable —
+ten light sets beat five hard ones on the total while doing less. A set is a set whatever is on the bar,
+and it is also the unit most training research uses. Working sets only, credited to the exercise's
+primary mover, matching how weekly volume attributes.
+
+Targets live in `Settings.weeklySetTargets` and **start empty**. Seeding fourteen muscles with a default
+would be Gymmy asserting what someone's training ought to look like. Ten sets is _offered_ when a muscle
+is added and nowhere else; the explainer says plainly that it is a heuristic.
+
+Neither field needed a migration: absent is the correct value for every row written before they existed.
+
 ### v1.5 — next, once the loop is proven
 
 - **Weekly program scheduler** — assign routines to weekdays, "what's today?" on the Today tab.
-- **Percent-of-max targets** *(deferred by decision — v1 is absolute weights only)* — implement the
+- **Percent-of-max targets** _(deferred by decision — v1 is absolute weights only)_ — implement the
   `percent` variant of `TargetWeight` plus `ExerciseMax`, unlocking 5/3/1-style programming: edit one
   training max, the whole cycle re-weights itself and rounds to loadable plates. The union is declared in
   v1, so this is code-only with no migration. Note the basis is a user-entered **training max**, not an
@@ -466,7 +501,9 @@ one-time hint the first time a derived number appears. Explanations are pulled, 
   the model; this is the UI plus the set-row variants.
 - **Progressive overload suggestions** — "you hit 3×8 @ 80kg; try 82.5kg" from a configurable rule
   (double progression / linear / RPE-based). Suggestion only, never forced.
-- **Volume targets per muscle group** with a weekly under/over indicator.
+- ~~**Volume targets per muscle group** with a weekly under/over indicator.~~ **Shipped post-v1**, as
+  _hard sets_ per muscle rather than volume in kilograms — see §7.12. Set counts cannot be run up with
+  light junk sets the way a kilogram total can.
 - **Body weight & measurements** with a weight trend line, local-only progress photos.
 - **Rest-day and session reminders** via scheduled notifications.
 - **Workout templates gallery** — a few starter plans (PPL, upper/lower, 5/3/1) as seed routines.
@@ -498,10 +535,10 @@ seeded plate inventory + bar weight, settings (units/theme/rest/plates), `lib/pl
 interfaces, the `Metric` type + generic explainer sheet, base UI kit (Button, Card, Sheet, Stepper, Stat,
 NumericPad, InfoAffordance).
 
-**M1 — Core logging.** *Shippable: you can log a real workout.* Empty workout, add/reorder exercises, set
+**M1 — Core logging.** _Shippable: you can log a real workout._ Empty workout, add/reorder exercises, set
 rows, **prefill resolution (#1)**, complete/edit/delete sets, **warm-up flag (#3)**, **RPE field (#4)**,
 finish session, active-session recovery, persistent session bar, **JSON export/import (#8)**. Explainers
-for every metric introduced here (prefill, volume, warm-up exclusion, RPE) ship *with* their functions —
+for every metric introduced here (prefill, volume, warm-up exclusion, RPE) ship _with_ their functions —
 a metric without its explainer is not done.
 
 **M2 — Rest timer.** Timestamp-driven state, per-exercise defaults, auto-start, +30s/skip, sticky bar,
@@ -521,6 +558,7 @@ accessibility audit, CSV export, backup-age nudge, the **"How Gymmy works out yo
 page (#11)**, Playwright coverage of "log a full workout offline", performance pass on long histories.
 
 ### Test focus
+
 Unit tests concentrate on `domain/`:
 
 - **e1RM** — Epley across 1–12, the `reps === 1` special case, and `null` above 12.
@@ -540,57 +578,59 @@ set, trigger a rest timer, hit a PR, finish, confirm it lands in history after a
 
 ## 9. Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| **iOS PWA notification limits** — background notifications need iOS 16.4+ *and* the app installed; the Vibration API doesn't exist in Safari | Install prompt, in-app countdown that's correct on resume, audio + visual fallback; never make the timer depend on notifications. Permanently solved by the Capacitor build |
-| **IndexedDB eviction** on iOS when uninstalled / low storage | Push install, ship export in M1, backup-age nudge, `navigator.storage.persist()`. Also solved by the Capacitor build |
-| **Single user per device has no device-migration path** | Export/import *is* the migration path — so it must be complete (every table, round-trip tested), not a partial dump |
-| **Explainer copy drifting from the math** it describes | Explainer text lives in the same module as the function (§7); a registry test fails the build if any metric lacks copy or an example |
-| **Explanations becoming clutter** on a screen used between sets | Pull, not push: a quiet ⓘ and one first-time hint. No tutorials, no modals, nothing that must be dismissed mid-workout |
-| **Schema churn** as features land | Dexie versioned migrations from day one; `schemaVersion` in every export; migration tests |
-| **Unit-conversion drift** | Canonical kg, conversion only at the display boundary |
-| **Over-modelling programs in v1** | Routines only in v1; the weekly scheduler is v1.5 and sits *on top* of routines |
-| **Session screen complexity creep** | Hard rule: nothing enters that screen unless it's needed between two sets |
-| **Chart performance** on a multi-year history | Pre-aggregate per session on write; charts read summaries, not raw sets |
+| Risk                                                                                                                                         | Mitigation                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **iOS PWA notification limits** — background notifications need iOS 16.4+ _and_ the app installed; the Vibration API doesn't exist in Safari | Install prompt, in-app countdown that's correct on resume, audio + visual fallback; never make the timer depend on notifications. Permanently solved by the Capacitor build |
+| **IndexedDB eviction** on iOS when uninstalled / low storage                                                                                 | Push install, ship export in M1, backup-age nudge, `navigator.storage.persist()`. Also solved by the Capacitor build                                                        |
+| **Single user per device has no device-migration path**                                                                                      | Export/import _is_ the migration path — so it must be complete (every table, round-trip tested), not a partial dump                                                         |
+| **Explainer copy drifting from the math** it describes                                                                                       | Explainer text lives in the same module as the function (§7); a registry test fails the build if any metric lacks copy or an example                                        |
+| **Explanations becoming clutter** on a screen used between sets                                                                              | Pull, not push: a quiet ⓘ and one first-time hint. No tutorials, no modals, nothing that must be dismissed mid-workout                                                      |
+| **Schema churn** as features land                                                                                                            | Dexie versioned migrations from day one; `schemaVersion` in every export; migration tests                                                                                   |
+| **Unit-conversion drift**                                                                                                                    | Canonical kg, conversion only at the display boundary                                                                                                                       |
+| **Over-modelling programs in v1**                                                                                                            | Routines only in v1; the weekly scheduler is v1.5 and sits _on top_ of routines                                                                                             |
+| **Session screen complexity creep**                                                                                                          | Hard rule: nothing enters that screen unless it's needed between two sets                                                                                                   |
+| **Chart performance** on a multi-year history                                                                                                | Pre-aggregate per session on write; charts read summaries, not raw sets                                                                                                     |
 
 ---
 
 ## 10. Locked decisions
 
-| # | Decision | Consequences |
-| --- | --- | --- |
-| 1 | **Kilograms by default** | `kg` is both the canonical storage unit and the default display unit. Steppers increment 2.5 kg (weight) / 1 rep. `lb` stays available in settings as a display conversion, rounded to 1 lb. Plate calculator uses metric plates. |
-| 2 | **Plate inventory seeded, fully editable** | Seed a standard metric gym: 20 kg bar; pairs of 25, 20, 15, 10, 5, 2.5, 1.25 kg. Settings exposes bar weight and per-plate counts, so a home gym with three plate pairs gets correct math. Decomposition must handle an incomplete set — it reports the nearest loadable weight rather than inventing plates. |
-| 3 | **Weight-based training only in v1** | Ship `weight_reps` and `reps_only` tracking fully. `trackingType` keeps `time` and `distance_time` in the model and the DB schema so adding them in v1.5 is UI work, not a migration. No cardio, no distance, no interval timers in v1. |
-| 4 | **Absolute target weights only; percentages are a future update** | `TargetWeight` is declared as a tagged union from day one (§4), but v1 implements and exposes `absolute` only — no percent UI, no training-max concept, no `ExerciseMax` table. `isAmrap` ships in v1 since it's one boolean. The union declaration is the entire hedge: the future update becomes code with no data migration. |
-| 5 | **One user per device, no profiles** | No `userId` on any record; `Settings` is a single row. Simplifies every query and the whole UI. The cost: **export/import is the only device-migration path**, so it must cover every table and be round-trip tested (see §9). |
-| 6 | **App store eventually, via Capacitor** | Doesn't change v1 features, but it sets the architectural rule in §5: every platform capability goes behind a `lib/platform/*` adapter. No React Native port — Capacitor reuses the entire UI, and it eliminates both the iOS notification and IndexedDB-eviction risks when it lands. |
-| 7 | **Estimates never produce records** | `PersonalRecord` has three kinds, all observations of logged work (§4.1). Estimated 1RM is analysis-only: chart line and labelled `est.` value, excluded from the PR path by construction and by a guard test. A logged 1-rep set still sets a normal `max_weight` record. |
-| 8 | **Every derived number is explainable in-app** | A `Metric` carries its calculation *and* its explainer copy, formula and worked-example function in one module (§7). Contextual ⓘ sheets plus a reference page under More. A registry test fails the build if a metric ships without copy. |
+| #   | Decision                                                          | Consequences                                                                                                                                                                                                                                                                                                                    |
+| --- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Kilograms by default**                                          | `kg` is both the canonical storage unit and the default display unit. Steppers increment 2.5 kg (weight) / 1 rep. `lb` stays available in settings as a display conversion, rounded to 1 lb. Plate calculator uses metric plates.                                                                                               |
+| 2   | **Plate inventory seeded, fully editable**                        | Seed a standard metric gym: 20 kg bar; pairs of 25, 20, 15, 10, 5, 2.5, 1.25 kg. Settings exposes bar weight and per-plate counts, so a home gym with three plate pairs gets correct math. Decomposition must handle an incomplete set — it reports the nearest loadable weight rather than inventing plates.                   |
+| 3   | **Weight-based training only in v1**                              | Ship `weight_reps` and `reps_only` tracking fully. `trackingType` keeps `time` and `distance_time` in the model and the DB schema so adding them in v1.5 is UI work, not a migration. No cardio, no distance, no interval timers in v1.                                                                                         |
+| 4   | **Absolute target weights only; percentages are a future update** | `TargetWeight` is declared as a tagged union from day one (§4), but v1 implements and exposes `absolute` only — no percent UI, no training-max concept, no `ExerciseMax` table. `isAmrap` ships in v1 since it's one boolean. The union declaration is the entire hedge: the future update becomes code with no data migration. |
+| 5   | **One user per device, no profiles**                              | No `userId` on any record; `Settings` is a single row. Simplifies every query and the whole UI. The cost: **export/import is the only device-migration path**, so it must cover every table and be round-trip tested (see §9).                                                                                                  |
+| 6   | **App store eventually, via Capacitor**                           | Doesn't change v1 features, but it sets the architectural rule in §5: every platform capability goes behind a `lib/platform/*` adapter. No React Native port — Capacitor reuses the entire UI, and it eliminates both the iOS notification and IndexedDB-eviction risks when it lands.                                          |
+| 7   | **Estimates never produce records**                               | `PersonalRecord` has three kinds, all observations of logged work (§4.1). Estimated 1RM is analysis-only: chart line and labelled `est.` value, excluded from the PR path by construction and by a guard test. A logged 1-rep set still sets a normal `max_weight` record.                                                      |
+| 8   | **Every derived number is explainable in-app**                    | A `Metric` carries its calculation _and_ its explainer copy, formula and worked-example function in one module (§7). Contextual ⓘ sheets plus a reference page under More. A registry test fails the build if a metric ships without copy.                                                                                      |
+| 9   | **Goals report, they never score**                                | A missed volume goal is a number beside another number — no red state, no failure copy, no broken streak (§7.12). Hitting an `absolute` target exactly counts; `beat_last` requires strictly beating it, because that is what the words say. And a goal is never invented: no previous session means no target, said in words.  |
+| 10  | **Weekly targets are counted in sets, not kilograms**             | Volume totals are gameable by adding light sets; a set counts once whatever the load. Credited to the primary mover, warm-ups excluded. Targets start unset — ten is offered as a heuristic when a muscle is added, never seeded across the board.                                                                              |
 
 ---
 
 ## Appendix A — Estimated 1RM
 
 **What it is.** The 1RM is the heaviest weight you could lift for exactly one rep. Nobody tests it often —
-it's risky and it wrecks the rest of the session — so it's *estimated* from an ordinary working set. That
+it's risky and it wrecks the rest of the session — so it's _estimated_ from an ordinary working set. That
 estimate is the best single progress metric available, because it's the only way to compare sets with
 different weights and reps: it answers "was 100 kg × 5 better than 90 kg × 8?" (yes — 117 vs 114).
 
 **Formula.** Epley: `e1RM = weight × (1 + reps / 30)`, with two rules.
 
 **Rule 1 — `reps === 1` returns the weight unchanged.** Plain Epley gives `w × 1.033` at one rep, so a
-100 kg single would "prove" a 103 kg max. An actual single *is* the measurement; don't inflate it.
+100 kg single would "prove" a 103 kg max. An actual single _is_ the measurement; don't inflate it.
 
 **Rule 2 — no estimate above 12 reps.** Return `null`, display `—`.
 
-| Set | Epley says | Reality |
-| --- | --- | --- |
-| 100 kg × 3 | 110 kg | sound |
-| 100 kg × 5 | 117 kg | sound |
-| 100 kg × 10 | 133 kg | borderline |
-| 100 kg × 20 | **167 kg** | fantasy |
-| 100 kg × 30 | **200 kg** | fantasy |
+| Set         | Epley says | Reality    |
+| ----------- | ---------- | ---------- |
+| 100 kg × 3  | 110 kg     | sound      |
+| 100 kg × 5  | 117 kg     | sound      |
+| 100 kg × 10 | 133 kg     | borderline |
+| 100 kg × 20 | **167 kg** | fantasy    |
+| 100 kg × 30 | **200 kg** | fantasy    |
 
 The formula is a straight line fitted to data in roughly the 1–10 rep range. Past ~12 reps the limiting
 factor stops being maximal strength and becomes muscular endurance, breathing and pain tolerance — and
@@ -613,7 +653,7 @@ session and weekly volume, and the volume series on the chart. It just doesn't g
 attached, and it was never going to claim a record.
 
 **On alternative formulas.** Brzycki (`w × 36 / (37 − reps)`) has the nicer property of returning exactly
-`w` at one rep, but degrades *worse* at high reps — 2.1× the weight at 20 reps, 5.1× at 30, and a division
+`w` at one rep, but degrades _worse_ at high reps — 2.1× the weight at 20 reps, 5.1× at 30, and a division
 by zero at 37. Capping is required whichever formula is chosen, so Gymmy uses Epley with the special case.
 It lives in `domain/metrics/one-rep-max.ts` as a pure function bundled with its explainer, so swapping or
 blending formulas later is a single-file change with the test suite already in place — and the user-facing
@@ -653,7 +693,7 @@ short sentences, no jargon, caveats included rather than buried. `{…}` interpo
 > interpretation.
 >
 > **Where it breaks down** — Records come only from work you logged. Gymmy won't award you a record based
-> on an estimate of what you *could* lift, so your estimated 1RM going up is not a PR. If you forgot to
+> on an estimate of what you _could_ lift, so your estimated 1RM going up is not a PR. If you forgot to
 > log something, add it from History and records recalculate.
 
 ### Volume
@@ -667,7 +707,7 @@ short sentences, no jargon, caveats included rather than buried. `{…}` interpo
 > set misses: same weights, more sets, more total work.
 >
 > **Where it breaks down** — It treats all weight as equal, so it says a heavy squat session and a long
-> dumbbell session are comparable when they aren't really. Use it to compare a lift against *itself* over
+> dumbbell session are comparable when they aren't really. Use it to compare a lift against _itself_ over
 > time, not across different exercises. Warm-up sets are excluded.
 
 ### Why warm-up sets don't count
@@ -702,7 +742,7 @@ short sentences, no jargon, caveats included rather than buried. `{…}` interpo
 > **Why it's useful** — Saves doing arithmetic with a loaded bar waiting and your heart rate up.
 >
 > **Where it breaks down** — Only uses plates you've told Gymmy you have, in Settings. If a weight can't
-> be made exactly, Gymmy says so and offers the nearest weight you *can* load instead of guessing.
+> be made exactly, Gymmy says so and offers the nearest weight you _can_ load instead of guessing.
 
 ### Pre-filled weights and reps
 

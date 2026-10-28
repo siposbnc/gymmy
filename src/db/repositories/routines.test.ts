@@ -6,14 +6,17 @@ import {
   addExerciseToRoutine,
   archiveRoutine,
   clearRoutineTargetWeight,
+  clearRoutineVolumeGoal,
   createRoutine,
   deleteRoutine,
   duplicateRoutine,
+  getRoutine,
   listRoutineExercises,
   listRoutines,
   moveRoutineExercise,
   removeRoutineExercise,
   renameRoutine,
+  setRoutineVolumeGoal,
   startSessionFromRoutine,
   toggleSupersetWithPrevious,
   unarchiveRoutine,
@@ -85,10 +88,7 @@ describe('routines', () => {
 
       const entries = await listRoutineExercises(id)
       expect(entries.map((entry) => entry.order)).toEqual([0, 1])
-      expect(entries.map((entry) => entry.exerciseId)).toEqual([
-        'ex_bench-press',
-        'ex_cable-fly',
-      ])
+      expect(entries.map((entry) => entry.exerciseId)).toEqual(['ex_bench-press', 'ex_cable-fly'])
     })
 
     it('clears a target weight rather than storing a zero', async () => {
@@ -182,6 +182,72 @@ describe('routines', () => {
       // The name was snapshotted, so history still reads correctly.
       expect(session?.name).toBe('Push A')
       expect(await listSessionExercises(sessionId)).toHaveLength(3)
+    })
+  })
+
+  describe('volume goals', () => {
+    it('stores a relative goal without asking for a number', async () => {
+      const { id } = await buildPushA()
+      await setRoutineVolumeGoal(id, { kind: 'beat_last' })
+      expect((await getRoutine(id))?.volumeGoal).toEqual({ kind: 'beat_last' })
+    })
+
+    it('replaces one goal with the other rather than keeping both', async () => {
+      const { id } = await buildPushA()
+      await setRoutineVolumeGoal(id, { kind: 'beat_last' })
+      await setRoutineVolumeGoal(id, { kind: 'absolute', kg: 8000 })
+      expect((await getRoutine(id))?.volumeGoal).toEqual({ kind: 'absolute', kg: 8000 })
+    })
+
+    it('removes the field entirely when cleared', async () => {
+      // Not a zero, and not a kind of 'none' — absent is the one way to mean
+      // "no goal", so nothing downstream has to handle a second one.
+      const { id } = await buildPushA()
+      await setRoutineVolumeGoal(id, { kind: 'absolute', kg: 8000 })
+      await clearRoutineVolumeGoal(id)
+
+      const routine = await getRoutine(id)
+      expect(routine?.volumeGoal).toBeUndefined()
+      expect('volumeGoal' in routine!).toBe(false)
+    })
+
+    it('snapshots the goal onto the session at start', async () => {
+      const { id } = await buildPushA()
+      await setRoutineVolumeGoal(id, { kind: 'absolute', kg: 8000 })
+      const sessionId = await startSessionFromRoutine(id)
+
+      expect((await db.sessions.get(sessionId))?.volumeGoalSnapshot).toEqual({
+        kind: 'absolute',
+        kg: 8000,
+      })
+    })
+
+    it('does not retroactively change what a past session was aiming at', async () => {
+      const { id } = await buildPushA()
+      await setRoutineVolumeGoal(id, { kind: 'absolute', kg: 8000 })
+      const sessionId = await startSessionFromRoutine(id)
+      await finishSession(sessionId)
+
+      // Raise the bar for next time. March must not become a miss.
+      await setRoutineVolumeGoal(id, { kind: 'absolute', kg: 12_000 })
+
+      expect((await db.sessions.get(sessionId))?.volumeGoalSnapshot).toEqual({
+        kind: 'absolute',
+        kg: 8000,
+      })
+    })
+
+    it('leaves the snapshot off a session from a routine with no goal', async () => {
+      const { id } = await buildPushA()
+      const sessionId = await startSessionFromRoutine(id)
+      expect((await db.sessions.get(sessionId))?.volumeGoalSnapshot).toBeUndefined()
+    })
+
+    it('carries the goal into a duplicated routine', async () => {
+      const { id } = await buildPushA()
+      await setRoutineVolumeGoal(id, { kind: 'beat_last' })
+      const copyId = await duplicateRoutine(id)
+      expect((await getRoutine(copyId))?.volumeGoal).toEqual({ kind: 'beat_last' })
     })
   })
 

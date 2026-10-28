@@ -45,8 +45,13 @@ user-facing explanation cannot drift from the maths.
 - **Records are observations.** Only three kinds, all from logged work.
   An estimated 1RM can never produce a record — there are tests asserting this
   specifically, and they are not incidental.
-- **Sessions snapshot their routine.** Name, order, rest and targets are copied
-  at start. Editing a routine must never rewrite training history.
+- **Sessions snapshot their routine.** Name, order, rest, targets and the volume
+  goal are copied at start. Editing a routine must never rewrite training
+  history — including turning a session you beat into one you missed.
+- **Goals report, they do not score.** A missed volume goal is a number beside
+  another number: no red state, no failure copy, no broken streak. And a goal is
+  never invented — the first run of a routine has nothing to beat, so it shows
+  no target rather than a guess.
 - **Weight is stored in kilograms, always.** Pounds are a display concern,
   converted at the boundary and nowhere else.
 - **Every write lands immediately.** There is no save step that can be lost.
@@ -66,11 +71,11 @@ npm run build
 npx vite preview --port 4317 --strictPort &
 ```
 
-| Command | What it catches |
-| --- | --- |
-| `npm run shots` | Every screen in both themes into `.shots/`, plus console errors. Also asserts at iPhone dimensions that the document does not scroll and the tab bar is pinned — a bug that shipped once. |
-| `npm run a11y` | axe-core across 9 screens × 2 themes. Found four genuine contrast failures the first time it ran. `--verbose` for the failing nodes. |
-| `npm run e2e:offline` | The whole critical path with the network off: log a workout, kill the app, recover, finish, see records. This is the claim the architecture exists to support. |
+| Command               | What it catches                                                                                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run shots`       | Every screen in both themes into `.shots/`, plus console errors. Also asserts at iPhone dimensions that the document does not scroll and the tab bar is pinned — a bug that shipped once. |
+| `npm run a11y`        | axe-core across 9 screens × 2 themes. Found four genuine contrast failures the first time it ran. `--verbose` for the failing nodes.                                                      |
+| `npm run e2e:offline` | The whole critical path with the network off: log a workout, kill the app, recover, finish, see records. This is the claim the architecture exists to support.                            |
 
 Look at the screenshots. The scripts catch mechanical faults; they cannot tell
 you a layout reads badly.

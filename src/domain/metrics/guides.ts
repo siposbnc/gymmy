@@ -116,8 +116,7 @@ export const streakGuide: Explainable = {
   shortLabel: 'streak',
   formula: 'consecutive weeks that met your session goal',
   explainer: {
-    whatItIs:
-      'How many weeks in a row you have hit the number of sessions you set as your goal.',
+    whatItIs: 'How many weeks in a row you have hit the number of sessions you set as your goal.',
     whyUseful:
       'Consistency over months beats any single session, and weeks are the honest unit — rest days are part of training, not a failure.',
     caveats: [
@@ -133,8 +132,7 @@ export const muscleVolumeGuide: Explainable = {
   shortLabel: 'by muscle',
   formula: "each set's volume counts toward its exercise's main muscle",
   explainer: {
-    whatItIs:
-      'Your weekly training volume split by the muscle each exercise mainly works.',
+    whatItIs: 'Your weekly training volume split by the muscle each exercise mainly works.',
     whyUseful:
       'It shows where your effort is actually going, which is often not where you think — most people train what they enjoy and under-train the rest.',
     caveats: [
@@ -157,6 +155,44 @@ export const unitsGuide: Explainable = {
     caveats: [
       `Displayed weights round to the nearest 0.5 kg or 1 lb, so a converted value can look slightly different from the number you originally typed. The stored value is unchanged.`,
       `Stepper increments follow the unit: 2.5 kg or 5 lb.`,
+    ],
+  },
+}
+
+export const volumeGoalGuide: Explainable = {
+  id: 'volume_goal',
+  label: 'Session volume goal',
+  shortLabel: 'volume goal',
+  formula: "this session's working volume ÷ the target",
+  explainer: {
+    whatItIs:
+      'A volume target you can attach to a routine. "Beat last time" compares the session you just finished against the last time you ran the same routine. You can set a fixed number instead.',
+    whyUseful:
+      'Volume going up over months is roughly what drives growth, and "beat last time" works out the target for you — it never goes stale as you get stronger, and you never have to guess the right number.',
+    caveats: [
+      'Volume is easy to game. Ten sloppy sets at half your working weight will beat five hard ones, and your body will know the difference even though the number does not. Treat it as a rough check, not a score.',
+      'Warm-ups do not count, so the figure is your working volume.',
+      'The first time you run a routine there is nothing to compare against, so there is no target. Gymmy will not invent one.',
+      'Missing it is not a failure. A deload week should come in lower, and so should a session where you went heavier for fewer reps.',
+    ],
+  },
+}
+
+export const weeklySetsGuide: Explainable = {
+  id: 'weekly_sets',
+  label: 'Hard sets per week',
+  shortLabel: 'weekly sets',
+  formula: 'working sets counted toward each exercise’s main muscle',
+  explainer: {
+    whatItIs:
+      'How many working sets each muscle got this week, optionally against a target you set. A "hard set" is any real set taken somewhere near failure — warm-ups are not counted.',
+    whyUseful:
+      'Counting sets is harder to fool than totalling kilograms: adding light sets runs your volume up without adding real work, but a set only counts once no matter what is on the bar. It is also the unit most training research uses, so the numbers mean something outside this app.',
+    caveats: [
+      'A set counts toward one muscle — the exercise’s main mover — not split across every muscle involved, the same way volume is credited.',
+      'Research most often lands somewhere around ten or more sets per muscle per week for growth, with plenty of individual variation. Gymmy offers ten as a starting point and nothing more; it is a heuristic, not a prescription.',
+      'It assumes your sets are genuinely hard. Ten easy sets are not ten hard sets, and Gymmy has no way to tell them apart.',
+      'Targets start unset, and a muscle without one is simply shown without a target rather than marked as behind.',
     ],
   },
 }

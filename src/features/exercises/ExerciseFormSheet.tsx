@@ -1,40 +1,16 @@
 import { useEffect, useState } from 'react'
 
 import { useSettings } from '~/db/hooks'
-import {
-  clearExerciseBar,
-  createCustomExercise,
-  updateExercise,
-} from '~/db/repositories/exercises'
+import { clearExerciseBar, createCustomExercise, updateExercise } from '~/db/repositories/exercises'
 import { usesBar } from '~/domain/bars'
-import type {
-  Equipment,
-  Exercise,
-  MovementType,
-  MuscleGroup,
-  TrackingType,
-} from '~/domain/types'
+import { MUSCLE_OPTIONS } from '~/domain/muscles'
+import type { Equipment, Exercise, MovementType, MuscleGroup, TrackingType } from '~/domain/types'
 import { formatRestLength } from '~/lib/time'
 import { Button } from '~/ui/Button'
 import { Sheet } from '~/ui/Sheet'
 import { cn } from '~/ui/cn'
 
-const MUSCLES: readonly { value: MuscleGroup; label: string }[] = [
-  { value: 'chest', label: 'Chest' },
-  { value: 'back', label: 'Back' },
-  { value: 'lats', label: 'Lats' },
-  { value: 'traps', label: 'Traps' },
-  { value: 'shoulders', label: 'Shoulders' },
-  { value: 'biceps', label: 'Biceps' },
-  { value: 'triceps', label: 'Triceps' },
-  { value: 'forearms', label: 'Forearms' },
-  { value: 'quads', label: 'Quads' },
-  { value: 'hamstrings', label: 'Hamstrings' },
-  { value: 'glutes', label: 'Glutes' },
-  { value: 'calves', label: 'Calves' },
-  { value: 'core', label: 'Core' },
-  { value: 'full_body', label: 'Full body' },
-]
+const MUSCLES = MUSCLE_OPTIONS
 
 const EQUIPMENT: readonly { value: Equipment; label: string }[] = [
   { value: 'barbell', label: 'Barbell' },
@@ -268,10 +244,7 @@ function Field({
 }) {
   return (
     <div>
-      <label
-        htmlFor={htmlFor}
-        className="label-caps mb-1.5 block text-ink-muted"
-      >
+      <label htmlFor={htmlFor} className="label-caps mb-1.5 block text-ink-muted">
         {label}
       </label>
       {hint ? <p className="mb-2 text-[0.75rem] leading-relaxed text-ink-muted">{hint}</p> : null}

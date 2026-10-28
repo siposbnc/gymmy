@@ -95,14 +95,27 @@ export interface Exercise {
  * estimated 1RM. Program weights should not be driven by a formula's guess.
  */
 export type TargetWeight =
-  | { kind: 'absolute'; kg: number }
-  | { kind: 'percent'; pct: number; basis: 'training_max' }
+  { kind: 'absolute'; kg: number } | { kind: 'percent'; pct: number; basis: 'training_max' }
+
+/**
+ * A volume target for a session of this routine.
+ *
+ * Same relative-or-absolute shape as {@link TargetWeight}, and declared whole
+ * for the same reason: the shape is the expensive part to retrofit.
+ *
+ * `beat_last` is the default because it self-calibrates — you never have to
+ * guess the right number, and it cannot go stale as you get stronger.
+ * `absolute` exists for a deliberate deload or a specific programme.
+ */
+export type VolumeGoal = { kind: 'beat_last' } | { kind: 'absolute'; kg: number }
 
 export interface Routine {
   id: Id
   name: string
   notes?: string
   accentColor?: string
+  /** Absent means no volume goal for this routine. */
+  volumeGoal?: VolumeGoal
   createdAt: number
   updatedAt: number
   archivedAt?: number
@@ -144,6 +157,15 @@ export interface Session {
   startedAt: number
   endedAt?: number
   status: SessionStatus
+  /**
+   * The routine's volume goal, copied at session start.
+   *
+   * Snapshotted for the same reason the name and the targets are: raising the
+   * goal in November must not retroactively turn a session you beat in March
+   * into one you missed. Absent means there was no goal — which is the correct
+   * value for every session logged before goals existed, so no migration.
+   */
+  volumeGoalSnapshot?: VolumeGoal
   notes?: string
   bodyweightKg?: number
   perceivedEffort?: number
@@ -266,6 +288,15 @@ export interface Settings {
   weeklySessionGoal: number
   showStreak: boolean
   showRpe: boolean
+
+  /**
+   * Target hard sets per muscle per week.
+   *
+   * Deliberately empty until you set one: Gymmy will show what you actually
+   * did either way, and asserting that you *should* do ten sets of chest is
+   * not its place. Absent muscles simply have no target.
+   */
+  weeklySetTargets?: Partial<Record<MuscleGroup, number>>
 
   /** Rest timer behaviour. Added in schema v2. */
   autoStartRest: boolean

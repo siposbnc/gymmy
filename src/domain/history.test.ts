@@ -7,6 +7,7 @@ import {
   startOfDay,
   startOfWeek,
   trainingDays,
+  weeklySets,
   weeklyVolume,
   type HistorySession,
   type HistorySet,
@@ -147,6 +148,84 @@ describe('weeklyVolume', () => {
     const weeks = weeklyVolume([set('s1', 'ex_mystery', MONDAY, 50, 10)], muscles, 1)
     expect(weeks[0]?.totalKg).toBe(500)
     expect(weeks[0]?.byMuscle).toEqual({})
+  })
+})
+
+describe('weeklySets', () => {
+  const muscles = new Map<string, MuscleGroup>([
+    ['ex_squat', 'quads'],
+    ['ex_bench-press', 'chest'],
+  ])
+
+  it('counts sets per muscle per week', () => {
+    const sets = [
+      set('s1', 'ex_squat', MONDAY, 100, 5),
+      set('s1', 'ex_squat', MONDAY + 1000, 100, 5),
+      set('s1', 'ex_bench-press', MONDAY, 80, 8),
+      set('s2', 'ex_squat', MONDAY + WEEK, 110, 5),
+    ]
+
+    const weeks = weeklySets(sets, muscles, 1)
+    expect(weeks).toHaveLength(2)
+    expect(weeks[0]?.byMuscle.quads).toBe(2)
+    expect(weeks[0]?.byMuscle.chest).toBe(1)
+    expect(weeks[0]?.total).toBe(3)
+    expect(weeks[1]?.byMuscle.quads).toBe(1)
+  })
+
+  it('counts a set once however heavy it was', () => {
+    // The whole point of counting sets rather than kilograms: a light set and a
+    // heavy one are one set each, so the number cannot be run up with junk.
+    const weeks = weeklySets(
+      [set('s1', 'ex_squat', MONDAY, 20, 5), set('s1', 'ex_squat', MONDAY + 1000, 200, 5)],
+      muscles,
+      1,
+    )
+    expect(weeks[0]?.byMuscle.quads).toBe(2)
+  })
+
+  it('excludes warm-ups', () => {
+    const weeks = weeklySets(
+      [set('s1', 'ex_squat', MONDAY, 60, 10, 'warmup'), set('s1', 'ex_squat', MONDAY, 100, 5)],
+      muscles,
+      1,
+    )
+    expect(weeks[0]?.byMuscle.quads).toBe(1)
+    expect(weeks[0]?.total).toBe(1)
+  })
+
+  it('counts dropsets and sets to failure as real work', () => {
+    const weeks = weeklySets(
+      [
+        set('s1', 'ex_squat', MONDAY, 100, 5, 'failure'),
+        set('s1', 'ex_squat', MONDAY + 1000, 70, 8, 'dropset'),
+      ],
+      muscles,
+      1,
+    )
+    expect(weeks[0]?.byMuscle.quads).toBe(2)
+  })
+
+  it('ignores a logged set with no reps in it', () => {
+    const weeks = weeklySets([set('s1', 'ex_squat', MONDAY, 100, 0)], muscles, 1)
+    expect(weeks).toEqual([])
+  })
+
+  it('keeps the total when the exercise has no known muscle', () => {
+    const weeks = weeklySets([set('s1', 'ex_mystery', MONDAY, 50, 10)], muscles, 1)
+    expect(weeks[0]?.total).toBe(1)
+    expect(weeks[0]?.byMuscle).toEqual({})
+  })
+
+  it('counts bodyweight sets, which carry no volume at all', () => {
+    // A pull-up logged with no weight contributes zero kilograms, so volume
+    // misses it entirely. Set counts are the only place it shows up.
+    const weeks = weeklySets(
+      [{ sessionId: 's1', exerciseId: 'ex_squat', completedAt: MONDAY, type: 'normal', reps: 10 }],
+      muscles,
+      1,
+    )
+    expect(weeks[0]?.byMuscle.quads).toBe(1)
   })
 })
 

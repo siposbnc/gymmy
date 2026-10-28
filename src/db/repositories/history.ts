@@ -1,4 +1,5 @@
 import type { CsvSetRow } from '~/domain/csv'
+import { totalVolume } from '~/domain/metrics'
 import { computeRecords, recordId, type RecordSet } from '~/domain/records'
 import type { PersonalRecord, Session, SetEntry } from '~/domain/types'
 
@@ -60,13 +61,42 @@ export async function deleteSession(sessionId: string): Promise<void> {
   const exerciseIds = [...new Set(links.map((link) => link.exerciseId))]
 
   await db.transaction('rw', db.sessions, db.sessionExercises, db.sets, async () => {
-    await Promise.all(links.map((link) => db.sets.where('sessionExerciseId').equals(link.id).delete()))
+    await Promise.all(
+      links.map((link) => db.sets.where('sessionExerciseId').equals(link.id).delete()),
+    )
     await db.sessionExercises.where('sessionId').equals(sessionId).delete()
     await db.sessions.delete(sessionId)
   })
 
   // A deleted session may have held records; recompute so none are orphaned.
   await recomputeRecordsFor(exerciseIds)
+}
+
+/** Working-set volume of one session. Warm-ups excluded, as everywhere else. */
+export async function sessionVolume(sessionId: string): Promise<number> {
+  const links = await db.sessionExercises.where('sessionId').equals(sessionId).toArray()
+  const perLink = await Promise.all(links.map((link) => listSets(link.id)))
+  return totalVolume({ sets: perLink.flat() })
+}
+
+/**
+ * What the last run of this routine came to, for a "beat last time" goal.
+ *
+ * Scoped to sessions that STARTED before this one rather than to "the latest",
+ * so an old session's summary reads the same next year as it does today — the
+ * comparison is to the session before it, which never changes.
+ */
+export async function previousRoutineVolume(
+  routineId: string,
+  beforeStartedAt: number,
+): Promise<number | undefined> {
+  const candidates = await db.sessions.where('routineId').equals(routineId).toArray()
+  const previous = candidates
+    .filter((session) => session.status === 'completed' && session.startedAt < beforeStartedAt)
+    .sort((a, b) => b.startedAt - a.startedAt)[0]
+
+  if (!previous) return undefined
+  return sessionVolume(previous.id)
 }
 
 // ---------------------------------------------------------------------------
@@ -86,16 +116,14 @@ async function recordSetsFor(exerciseId: string): Promise<RecordSet[]> {
   const perLink = await Promise.all(
     eligible.map(async (link) => {
       const sets = await listSets(link.id)
-      return sets.map(
-        (set): RecordSet => ({
-          id: set.id,
-          sessionId: link.sessionId,
-          completedAt: set.completedAt,
-          type: set.type,
-          weightKg: set.weightKg,
-          reps: set.reps,
-        }),
-      )
+      return sets.map((set): RecordSet => ({
+        id: set.id,
+        sessionId: link.sessionId,
+        completedAt: set.completedAt,
+        type: set.type,
+        weightKg: set.weightKg,
+        reps: set.reps,
+      }))
     }),
   )
 
@@ -197,7 +225,10 @@ export async function allSetsForExport(): Promise<CsvSetRow[]> {
 
   // Chronological, so the file reads like a training log.
   return rows.sort(
-    (a, b) => a.startedAt - b.startedAt || a.exerciseName.localeCompare(b.exerciseName) || a.setIndex - b.setIndex,
+    (a, b) =>
+      a.startedAt - b.startedAt ||
+      a.exerciseName.localeCompare(b.exerciseName) ||
+      a.setIndex - b.setIndex,
   )
 }
 
@@ -209,10 +240,7 @@ export async function allSetsForExport(): Promise<CsvSetRow[]> {
  * the wrong end time. Keeps `startedAt` fixed and moves `endedAt`, so the
  * session stays on the day it happened and the calendar does not shift.
  */
-export async function setSessionDuration(
-  sessionId: string,
-  seconds: number,
-): Promise<void> {
+export async function setSessionDuration(sessionId: string, seconds: number): Promise<void> {
   const session = await db.sessions.get(sessionId)
   if (!session) return
   const safe = Math.max(0, Math.round(seconds))

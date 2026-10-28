@@ -6,14 +6,22 @@ import { useRoutine, useSettings } from '~/db/hooks'
 import {
   addExerciseToRoutine,
   clearRoutineTargetWeight,
+  clearRoutineVolumeGoal,
   moveRoutineExercise,
   removeRoutineExercise,
   renameRoutine,
+  setRoutineVolumeGoal,
   toggleSupersetWithPrevious,
   updateRoutineExercise,
 } from '~/db/repositories/routines'
-import type { Exercise, RoutineExercise, Settings } from '~/domain/types'
-import { formatWeight, fromDisplayUnit, INCREMENT, toDisplayUnit } from '~/domain/units'
+import type { Exercise, Routine, RoutineExercise, Settings } from '~/domain/types'
+import {
+  formatVolume,
+  formatWeight,
+  fromDisplayUnit,
+  INCREMENT,
+  toDisplayUnit,
+} from '~/domain/units'
 import { ExercisePickerSheet } from '~/features/exercises/ExercisePickerSheet'
 import { formatRestLength } from '~/lib/time'
 import { Button } from '~/ui/Button'
@@ -28,6 +36,12 @@ type PadTarget =
   | { kind: 'reps-min'; entryId: string }
   | { kind: 'reps-max'; entryId: string }
 
+type GoalMode = 'none' | 'beat_last' | 'absolute'
+
+function goalMode(goal: Routine['volumeGoal']): GoalMode {
+  return goal?.kind ?? 'none'
+}
+
 export function RoutineEditorScreen() {
   const { routineId } = useParams<{ routineId: string }>()
   const navigate = useNavigate()
@@ -37,6 +51,7 @@ export function RoutineEditorScreen() {
   const [picking, setPicking] = useState(false)
   const [pad, setPad] = useState<PadTarget | null>(null)
   const [editingName, setEditingName] = useState(false)
+  const [editingGoalKg, setEditingGoalKg] = useState(false)
 
   if (detail === undefined) {
     return <p className="p-8 text-center text-[0.85rem] text-ink-faint">Loading…</p>
@@ -114,7 +129,15 @@ export function RoutineEditorScreen() {
             Add the exercises you do in this session, in the order you do them. Targets are a
             starting point — you can change any weight while training.
           </p>
-        ) : null}
+        ) : (
+          /* After the exercises, not before: the goal is a footnote on a plan,
+             and nobody builds a routine by deciding its volume first. */
+          <VolumeGoalCard
+            routine={routine}
+            settings={settings}
+            onEditTarget={() => setEditingGoalKg(true)}
+          />
+        )}
       </div>
 
       <ExercisePickerSheet
@@ -136,6 +159,35 @@ export function RoutineEditorScreen() {
           setEditingName(false)
         }}
       />
+
+      {editingGoalKg ? (
+        <NumericPad
+          open
+          onOpenChange={(open) => !open && setEditingGoalKg(false)}
+          value={toDisplayUnit(
+            routine.volumeGoal?.kind === 'absolute' ? routine.volumeGoal.kg : 0,
+            settings.units,
+          )}
+          onCommit={(value) => {
+            if (!routineId) return
+            // Zero is "no goal", not "lift nothing" — the same rule as a
+            // target weight, so there is only ever one way to mean nothing.
+            if (value <= 0) {
+              void clearRoutineVolumeGoal(routineId)
+              return
+            }
+            void setRoutineVolumeGoal(routineId, {
+              kind: 'absolute',
+              kg: fromDisplayUnit(value, settings.units),
+            })
+          }}
+          unit={settings.units}
+          eyebrow={`${routine.name} · volume goal`}
+          // Volume is in the thousands, so a 2.5 kg step would be absurd.
+          increment={settings.units === 'kg' ? 250 : 500}
+          allowDecimal={false}
+        />
+      ) : null}
 
       {pad && padEntry ? (
         <NumericPad
@@ -191,15 +243,97 @@ function commitPad(
     void updateRoutineExercise(entry.id, {
       targetRepsMin: reps,
       // Keep the range coherent rather than letting min overtake max.
-      ...(entry.targetRepsMax != null && entry.targetRepsMax < reps
-        ? { targetRepsMax: reps }
-        : {}),
+      ...(entry.targetRepsMax != null && entry.targetRepsMax < reps ? { targetRepsMax: reps } : {}),
     })
   } else {
     void updateRoutineExercise(entry.id, {
       targetRepsMax: Math.max(reps, entry.targetRepsMin),
     })
   }
+}
+
+/**
+ * The session volume goal for a routine.
+ *
+ * "Beat last time" leads because it is the one that keeps working: it needs no
+ * number from you and it cannot go stale as you get stronger. A fixed figure is
+ * offered for the cases where beating last time is the wrong aim — a deload, or
+ * a programme that names a number.
+ */
+function VolumeGoalCard({
+  routine,
+  settings,
+  onEditTarget,
+}: {
+  routine: Routine
+  settings: Settings
+  onEditTarget: () => void
+}) {
+  const mode = goalMode(routine.volumeGoal)
+
+  const options: readonly { value: GoalMode; label: string }[] = [
+    { value: 'none', label: 'Off' },
+    { value: 'beat_last', label: 'Beat last time' },
+    { value: 'absolute', label: 'Fixed' },
+  ]
+
+  return (
+    <div className="mt-1.5">
+      <p className="label-caps mb-2 flex items-center gap-1.5 px-1 text-ink-faint">
+        Session goal
+        <InfoAffordance explainerId="volume_goal" />
+      </p>
+
+      <Card>
+        <div role="radiogroup" aria-label="Session volume goal" className="flex gap-1.5">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={mode === option.value}
+              onClick={() => {
+                if (option.value === 'none') {
+                  void clearRoutineVolumeGoal(routine.id)
+                } else if (option.value === 'beat_last') {
+                  void setRoutineVolumeGoal(routine.id, { kind: 'beat_last' })
+                } else {
+                  onEditTarget()
+                }
+              }}
+              className={cn(
+                'touch-min flex-1 cursor-pointer rounded-md px-2 text-[0.75rem] font-bold',
+                mode === option.value ? 'bg-accent text-on-accent' : 'bg-sunken text-ink-muted',
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        {routine.volumeGoal?.kind === 'absolute' ? (
+          <button
+            type="button"
+            onClick={onEditTarget}
+            className="mt-2 w-full cursor-pointer rounded-md bg-sunken px-3 py-2.5 text-left"
+          >
+            <span className="label-caps block text-ink-faint">Target volume</span>
+            <span className="num mt-0.5 block text-title font-semibold">
+              {formatVolume(routine.volumeGoal.kg, settings.units)}
+            </span>
+          </button>
+        ) : null}
+
+        <p className="mt-2 text-[0.75rem] leading-relaxed text-ink-muted">
+          {mode === 'none'
+            ? 'No goal. The summary will still show what the session came to.'
+            : mode === 'beat_last'
+              ? 'Each session is measured against the last time you ran this routine. Shown on the summary when you finish — warm-ups do not count.'
+              : 'Measured against this figure every session, whatever you did last time.'}
+        </p>
+      </Card>
+    </div>
+  )
 }
 
 function RoutineEntryCard({

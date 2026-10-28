@@ -10,7 +10,9 @@ import {
   listHeadlineRecords,
   listRecordsForExercise,
   listRecordsFromSession,
+  previousRoutineVolume,
   recomputeRecordsForSession,
+  sessionVolume,
   setSessionDuration,
 } from './history'
 import {
@@ -236,15 +238,22 @@ describe('history and records', () => {
 
       const detail = await getSessionDetail(sessionId)
       expect(detail?.session.name).toBe('Push A')
-      expect(detail?.exercises.map((entry) => entry.name)).toEqual([
-        'Bench Press',
-        'Cable Fly',
-      ])
+      expect(detail?.exercises.map((entry) => entry.name)).toEqual(['Bench Press', 'Cable Fly'])
       expect(detail?.exercises[0]?.sets.map((set) => set.type)).toEqual(['warmup', 'normal'])
     })
 
     it('is null for a session that does not exist', async () => {
       expect(await getSessionDetail('nope')).toBeNull()
+    })
+
+    it('totals a session volume excluding warm-ups', async () => {
+      const sessionId = await startEmptySession('Push A')
+      const bench = await addExerciseToSession(sessionId, 'ex_bench-press')
+      await logSet(bench, { weightKg: 20, reps: 10, type: 'warmup' })
+      await logSet(bench, { weightKg: 80, reps: 10 })
+      await completeSession(sessionId)
+
+      expect(await sessionVolume(sessionId)).toBe(800)
     })
 
     it('builds a PR board of heaviest lifts across exercises', async () => {
@@ -262,6 +271,62 @@ describe('history and records', () => {
         'ex_bench-press',
         'ex_squat',
       ])
+    })
+  })
+
+  describe('the previous run of a routine', () => {
+    /** A finished squat session, dated, belonging to a routine. */
+    async function routineSession(startedAt: number, sets: [number, number][]) {
+      const sessionId = await startEmptySession('Legs')
+      await db.sessions.update(sessionId, { routineId: 'rtn_legs', startedAt })
+      const link = await addExerciseToSession(sessionId, 'ex_squat')
+      for (const [weightKg, reps] of sets) {
+        await logSet(link, { weightKg, reps })
+      }
+      await completeSession(sessionId)
+      return sessionId
+    }
+
+    const DAY = 24 * 60 * 60 * 1000
+    const T = new Date(2026, 9, 26, 10, 0, 0).getTime()
+
+    it('finds the run before the one asked about', async () => {
+      await routineSession(T - 7 * DAY, [[100, 5]]) // 500
+      await routineSession(T, [[110, 5]]) // 550
+
+      expect(await previousRoutineVolume('rtn_legs', T)).toBe(500)
+    })
+
+    it('is undefined the first time a routine is run', async () => {
+      expect(await previousRoutineVolume('rtn_legs', T)).toBeUndefined()
+    })
+
+    it('looks backwards only, so an old session reads the same forever', async () => {
+      // Asked about the middle session, the answer is the first one — not the
+      // latest, which did not exist when that session was finished.
+      await routineSession(T - 14 * DAY, [[90, 5]]) // 450
+      await routineSession(T - 7 * DAY, [[100, 5]]) // 500
+      await routineSession(T, [[110, 5]]) // 550
+
+      expect(await previousRoutineVolume('rtn_legs', T - 7 * DAY)).toBe(450)
+      expect(await previousRoutineVolume('rtn_legs', T)).toBe(500)
+    })
+
+    it('ignores a session still in progress', async () => {
+      await routineSession(T - 7 * DAY, [[100, 5]])
+
+      const active = await startEmptySession('Legs')
+      await db.sessions.update(active, { routineId: 'rtn_legs', startedAt: T - DAY })
+      const link = await addExerciseToSession(active, 'ex_squat')
+      await logSet(link, { weightKg: 200, reps: 10 })
+
+      // An unfinished workout is not a session you beat.
+      expect(await previousRoutineVolume('rtn_legs', T)).toBe(500)
+    })
+
+    it('ignores sessions from a different routine', async () => {
+      await routineSession(T - 7 * DAY, [[100, 5]])
+      expect(await previousRoutineVolume('rtn_push', T)).toBeUndefined()
     })
   })
 })
