@@ -77,6 +77,14 @@ export interface Exercise {
   description?: string
   /** The user's own notes — never overwritten by a seed update. */
   notes?: string
+  /**
+   * When this exercise was pinned to the top of the picker.
+   *
+   * A timestamp rather than a boolean so pins keep a stable order: the block
+   * is sorted oldest-first, which means adding a pin never reshuffles the ones
+   * your thumb already knows the position of.
+   */
+  pinnedAt?: number
   isCustom: boolean
   archivedAt?: number
 }

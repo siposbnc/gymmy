@@ -489,6 +489,30 @@ is added and nowhere else; the explainer says plainly that it is a heuristic.
 
 Neither field needed a migration: absent is the correct value for every row written before they existed.
 
+### 13. The picker, ordered — shipped post-v1
+
+The exercise picker holds over a hundred exercises and anyone uses perhaps fifteen of them. Alphabetical
+order serves the ninety you never touch. Two mechanisms put the rest on top, in that order.
+
+**Pinned**, from a star beside each row. `Exercise.pinnedAt` is a timestamp rather than a flag so the
+block sorts oldest-pin-first: adding a pin never moves the ones a thumb has already learned the position
+of. No index and no migration — absent means unpinned, which is what every row written before this says.
+
+**Your usual**, derived and never stored. Every completed session already records what was trained, so
+the ranking cannot drift from the training the way a hand-kept list does. The order is recency-weighted
+frequency — each appearance counts for half as much after two months — because the two obvious
+alternatives are both wrong in practice: a raw count ranks the programme you abandoned above the one you
+are running, and pure recency floats one curious attempt above a year of benching.
+
+Three exclusions keep the count beside each row honest, since it reads "12 sessions" and must mean it:
+unfinished sessions do not count, the workout in progress does not count — it would re-rank the list
+underneath you while you are using it — and an exercise added to a session but never logged against does
+not count either.
+
+Headings appear only when there is something above the main list to separate it from. A search with
+three hits gets a plain list in the same priority order, because three headings explaining three rows is
+noise.
+
 ### v1.5 — next, once the loop is proven
 
 - **Weekly program scheduler** — assign routines to weekdays, "what's today?" on the Today tab.

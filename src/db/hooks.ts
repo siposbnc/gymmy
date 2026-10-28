@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 
+import { rankExerciseUsage, type ExerciseUsage } from '~/domain/exercise-usage'
 import { muscleSetProgress, type MuscleSetProgress } from '~/domain/goals'
 import { muscleLabel } from '~/domain/muscles'
 import {
@@ -24,7 +25,11 @@ import type {
   Settings,
 } from '~/domain/types'
 
-import { listExercises, type ExerciseFilter } from './repositories/exercises'
+import {
+  listExerciseAppearances,
+  listExercises,
+  type ExerciseFilter,
+} from './repositories/exercises'
 import {
   getSessionDetail,
   listCompletedSessions,
@@ -61,6 +66,20 @@ export function useExercises(filter: ExerciseFilter = {}): Exercise[] | undefine
   return useLiveQuery(
     () => listExercises({ search, muscleGroup, includeArchived }),
     [search, muscleGroup, includeArchived],
+  )
+}
+
+/**
+ * How much each exercise is trained, ranked.
+ *
+ * Gated on `enabled` because the picker that needs this stays mounted for the
+ * whole workout while closed, and every set you log touches the tables this
+ * reads. Nobody should pay for a ranking of a list that is not on screen.
+ */
+export function useExerciseUsage(enabled = true): ExerciseUsage[] | undefined {
+  return useLiveQuery(
+    async () => (enabled ? rankExerciseUsage(await listExerciseAppearances()) : []),
+    [enabled],
   )
 }
 

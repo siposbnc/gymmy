@@ -237,6 +237,20 @@ for (const theme of ['light', 'dark']) {
     })),
   )
 
+  // The picker with history behind it: the sections only exist once there is
+  // something to rank, and an empty install cannot show that.
+  allErrors.push(
+    ...(await shoot('exercise-picker', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await tap(page, /empty workout/i)
+        await tap(page, /add exercise/i)
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
   allErrors.push(
     ...(await shoot('routines-empty', {
       theme,
