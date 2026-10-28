@@ -3,19 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <!--
-      NO `viewport-fit=cover`, deliberately.
+      `viewport-fit=cover` is back, and it is required rather than optional.
 
-      `cover` extends the web view underneath the status bar and home
-      indicator. On iOS 26 the system then paints its glass treatment over
-      that region, and its blur reaches *below* the status bar onto real
-      content — which showed up as a smeared title with a ghost above it.
-      Padding the content down did not help, because the blurred band is
-      taller than the safe-area inset.
+      iOS 26+ renders an installed PWA fullscreen regardless, so content goes
+      under the status bar either way. Without `cover`, `env(safe-area-inset-*)`
+      reports 0 — which silently disables every inset we rely on. Removing it
+      made things worse, not better.
 
-      Without `cover`, iOS keeps the web view inside the safe area and owns
-      the status bar region itself, filling it from `theme-color`. Since that
-      matches the app background exactly, the result still reads edge to edge
-      — with nothing of ours underneath the glass to smear.
+      The top blur itself cannot be switched off; see #status-bar-cap below.
 
       `interactive-widget=resizes-content` asks the browser to shrink the
       layout viewport when the keyboard opens, which fixes keyboard overlap at
@@ -24,7 +19,7 @@
     -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -69,6 +64,24 @@
     </script>
   </head>
   <body>
+    <!--
+      The status bar cap.
+
+      iOS 26+ paints a blur across the top of an installed web app that cannot
+      be disabled, and it reaches well below the status bar onto real content.
+      `theme-color`, `apple-mobile-web-app-status-bar-style` and a background
+      on `<body>` all fail to stop it.
+
+      What does work is an actual `position: fixed` element with a background
+      at the very top — WebKit then treats that as the bar it blurs, and
+      blurring a flat colour produces that same flat colour. Padding could
+      never do this: it merely let the body background show through, and a
+      background is not an element.
+
+      Lives in the HTML rather than in React so it is painted before the app
+      mounts, and never unmounts with a route change.
+    -->
+    <div id="status-bar-cap" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

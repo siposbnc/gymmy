@@ -431,6 +431,33 @@ for (const theme of ['light', 'dark']) {
   await tap(page, 'New', true)
   await page.waitForTimeout(400)
 
+  // The status bar cap only suppresses the iOS top blur if it keeps WebKit's
+  // exact shape: fixed, backed, >=6px tall, >=80% wide, within 4px of the top.
+  const cap = await page.evaluate(() => {
+    const element = document.querySelector('#status-bar-cap')
+    if (!element) return null
+    const box = element.getBoundingClientRect()
+    const style = getComputedStyle(element)
+    return {
+      fixed: style.position === 'fixed',
+      top: Math.round(box.top),
+      height: Math.round(box.height),
+      widthRatio: box.width / window.innerWidth,
+      opaque:
+        style.backgroundColor !== 'transparent' &&
+        !style.backgroundColor.includes('rgba(0, 0, 0, 0)'),
+    }
+  })
+
+  check('status bar cap exists', cap !== null)
+  if (cap) {
+    check('cap is position:fixed', cap.fixed)
+    check(`cap is within 4px of the top (${cap.top})`, cap.top <= 4)
+    check(`cap is at least 6px tall (${cap.height})`, cap.height >= 6)
+    check(`cap spans at least 80% width (${Math.round(cap.widthRatio * 100)}%)`, cap.widthRatio >= 0.8)
+    check('cap has an opaque background', cap.opaque)
+  }
+
   const before = await page.evaluate(() => {
     const sheet = document.querySelector('[role="dialog"]')
     return sheet ? Math.round(sheet.getBoundingClientRect().bottom) : -1
