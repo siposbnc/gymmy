@@ -7,6 +7,7 @@ import { startSessionFromRoutine } from '~/db/repositories/routines'
 import { discardSession, isStale, startEmptySession } from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
 import { formatVolume } from '~/domain/units'
+import { useRestTimer } from '~/features/rest/restTimer'
 import { Button } from '~/ui/Button'
 import { Card } from '~/ui/Card'
 import { ScreenHeader } from '~/ui/ScreenHeader'
@@ -21,6 +22,7 @@ export function TodayScreen() {
   const settings = useSettings()
   const routines = useRoutines()
   const [confirmStale, setConfirmStale] = useState(false)
+  const stopRest = useRestTimer((state) => state.skip)
 
   const session = active?.session ?? null
   const stale = session ? isStale(session) : false
@@ -128,6 +130,8 @@ export function TodayScreen() {
               className="flex-1"
               onClick={() => {
                 if (session) void discardSession(session.id)
+                // Same reasoning as finishing: no session, no rest.
+                stopRest()
                 setConfirmStale(false)
               }}
             >

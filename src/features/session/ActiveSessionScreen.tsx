@@ -7,6 +7,7 @@ import { completeSession } from '~/db/repositories/history'
 import { addExerciseToSession, discardSession } from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
 import { formatVolume } from '~/domain/units'
+import { useRestTimer } from '~/features/rest/restTimer'
 import { Button } from '~/ui/Button'
 import { Sheet } from '~/ui/Sheet'
 
@@ -23,6 +24,10 @@ export function ActiveSessionScreen() {
 
   const [picking, setPicking] = useState(false)
   const [finishing, setFinishing] = useState(false)
+
+  // The rest bar lives in the app shell, so an unstopped timer follows you out
+  // of the workout and chimes at you on the history screen.
+  const stopRest = useRestTimer((state) => state.skip)
 
   // `undefined` is "still loading"; `null` is "there genuinely isn't one".
   if (active === undefined) {
@@ -117,6 +122,9 @@ export function ActiveSessionScreen() {
               className="flex-1"
               onClick={() => {
                 setFinishing(false)
+                // Rest belongs to the set you just did. The workout is over,
+                // so the countdown and its scheduled notification go with it.
+                stopRest()
                 if (workingSets.length === 0) {
                   void discardSession(session.id).then(() => navigate('/'))
                   return

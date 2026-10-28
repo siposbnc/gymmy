@@ -15,6 +15,11 @@ interface NumericPadProps {
   /** Quick-adjust buttons; follows the unit (±2.5 kg, ±5 lb). */
   increment?: number
   allowDecimal?: boolean
+  /**
+   * Refuse to commit zero or a blank entry. Set for a weight that the exercise
+   * actually tracks — a zero there is a lost set, not a light one.
+   */
+  requirePositive?: boolean
 }
 
 const KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3'] as const
@@ -39,6 +44,7 @@ export function NumericPad({
   eyebrow,
   increment = 2.5,
   allowDecimal = true,
+  requirePositive = false,
 }: NumericPadProps) {
   const [draft, setDraft] = useState(() => String(value))
   /**
@@ -59,8 +65,11 @@ export function NumericPad({
     }
   }, [open, value])
 
+  const parsed = Number.parseFloat(draft)
+  const isValid = !requirePositive || (Number.isFinite(parsed) && parsed > 0)
+
   const commit = () => {
-    const parsed = Number.parseFloat(draft)
+    if (!isValid) return
     onCommit(Number.isFinite(parsed) ? parsed : value)
     onOpenChange(false)
   }
@@ -124,6 +133,13 @@ export function NumericPad({
               </span>
             ) : null}
           </p>
+          {requirePositive ? (
+            // Reserved whether or not it reads, so the keys never jump under a
+            // thumb that is already moving towards them.
+            <p className="relative mt-1 h-4 text-[0.72rem] text-ink-muted">
+              {isValid ? '' : 'This exercise tracks weight — enter more than zero.'}
+            </p>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-4 gap-[0.4375rem]">
@@ -149,9 +165,11 @@ export function NumericPad({
           <button
             type="button"
             onClick={commit}
+            disabled={!isValid}
             className={cn(
               'row-span-2 h-auto cursor-pointer rounded-[0.8125rem] bg-accent text-[0.9rem]',
               'font-extrabold text-on-accent active:scale-95',
+              'disabled:pointer-events-none disabled:opacity-40',
             )}
           >
             Done

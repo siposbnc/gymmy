@@ -135,6 +135,10 @@ export function ExerciseCard({
 
   // --- numeric pad plumbing ------------------------------------------------
 
+  // Only reps-only work may be logged weightless; everywhere else a zero is a
+  // set that silently vanishes from volume and records.
+  const weightRequired = (exercise?.trackingType ?? 'weight_reps') !== 'reps_only'
+
   const padConfig = (() => {
     if (!pad) return null
 
@@ -144,6 +148,7 @@ export function ExerciseCard({
         unit,
         increment: INCREMENT[unit],
         allowDecimal: true,
+        requirePositive: weightRequired,
         eyebrow: `${exercise?.name ?? 'Exercise'} · set ${nextIndex} · weight`,
         commit: (value: number) => setDraftWeight(fromDisplayUnit(value, unit)),
       }
@@ -167,6 +172,7 @@ export function ExerciseCard({
         unit,
         increment: INCREMENT[unit],
         allowDecimal: true,
+        requirePositive: weightRequired,
         eyebrow: `${exercise?.name ?? 'Exercise'} · edit weight`,
         commit: (value: number) =>
           void updateSet(target.id, { weightKg: fromDisplayUnit(value, unit) }),
@@ -291,6 +297,7 @@ export function ExerciseCard({
             eyebrow={padConfig.eyebrow}
             increment={padConfig.increment}
             allowDecimal={padConfig.allowDecimal}
+            requirePositive={padConfig.requirePositive ?? false}
           />
         ) : null}
 

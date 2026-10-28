@@ -209,6 +209,67 @@ describe('logging a set', () => {
     })
   })
 
+  it('refuses to log a weight-tracked set with no weight', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Push A')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_bench-press')
+
+    renderSession()
+    await screen.findByText('Bench Press')
+
+    // Reps alone are not a set here — the weight is the thing being tracked.
+    await user.click(screen.getByRole('button', { name: /reps: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '8' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    const log = await screen.findByRole('button', { name: 'Log. Enter a weight first.' })
+    expect(log).toBeDisabled()
+    expect(screen.getByText(/enter a weight to log this set/i)).toBeInTheDocument()
+
+    // And zero is not a weight: the pad will not commit it.
+    await user.click(screen.getByRole('button', { name: /weight: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '0' }))
+    expect(screen.getByRole('button', { name: 'Done' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: '6' }))
+    await user.click(screen.getByRole('button', { name: '0' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await user.click(await screen.findByRole('button', { name: /^log$/i }))
+
+    await waitFor(async () => {
+      const sets = await listSets(sessionExerciseId)
+      expect(sets).toHaveLength(1)
+      expect(sets[0]?.weightKg).toBe(60)
+    })
+  })
+
+  it('logs bodyweight work with reps alone', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Pull')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_pull-up')
+
+    renderSession()
+    await screen.findByText('Pull-up')
+
+    // No weight field at all on a reps-only exercise, so nothing to require.
+    expect(screen.queryByRole('button', { name: /weight:/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /reps: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '9' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await user.click(await screen.findByRole('button', { name: /^log$/i }))
+
+    await waitFor(async () => {
+      const sets = await listSets(sessionExerciseId)
+      expect(sets).toHaveLength(1)
+      expect(sets[0]?.reps).toBe(9)
+    })
+  })
+
   it('auto-starts rest using the exercise own default', async () => {
     const user = userEvent.setup()
 
@@ -239,5 +300,30 @@ describe('logging a set', () => {
       expect(label).toBe('Squat')
       expect(endsAt).toBeGreaterThan(Date.now())
     })
+  })
+
+  it('stops the rest timer when the workout is finished', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Legs')
+    await addExerciseToSession(sessionId, 'ex_squat')
+
+    renderSession()
+    await screen.findByText('Squat')
+
+    await user.click(screen.getByRole('button', { name: /weight: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '6' }))
+    await user.click(screen.getByRole('button', { name: '0' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(await screen.findByRole('button', { name: /^log$/i }))
+
+    await waitFor(() => expect(useRestTimer.getState().endsAt).not.toBeNull())
+
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+    await user.click(await screen.findByRole('button', { name: 'Finish workout' }))
+
+    // The rest bar lives in the app shell — left running it would count down
+    // over the session summary and then chime for a workout that is over.
+    await waitFor(() => expect(useRestTimer.getState().endsAt).toBeNull())
   })
 })
