@@ -537,6 +537,37 @@ It is also the one place in the app that advises rather than reports, which is e
 `Settings.suggestProgression` exists and why accepting a suggestion changes a draft value and nothing
 else — not the routine, not a target, not a record.
 
+### 15. Backup, prompted — shipped post-v1
+
+The export has existed since M1. What was missing was anything that noticed nobody was using it.
+
+**Measured in unsaved workouts, not elapsed days.** Days are the wrong unit — a fortnight off costs
+nothing, three sessions in four days costs three sessions. Counting what a lost phone would actually take
+makes the reminder proportional to the risk and, more importantly, makes it **silent when nothing has
+changed**. A prompt that fires when it is not needed is what teaches someone to dismiss the one that is.
+Three unsaved sessions, or one that has been unsaved a fortnight, is the threshold.
+
+**Offered when a workout ends**, on the session summary, below the records — what you earned is why you
+opened that screen; a chore does not go first. It is the only place in the app that interrupts
+unprompted, and it is reached by finishing a session, never by opening an old one from History.
+
+**Why prompted and not automatic.** The decision is automatic; the write cannot be. Writing to a file the
+user picked once needs the File System Access API, which Safari does not implement, and there is no
+background execution on iOS — so on the device Gymmy is actually used on, "scheduled" can only mean
+"checked when the app is open", and the write costs one tap through the share sheet. Automating it
+properly means OAuth against Dropbox or Drive, or running a server; both were considered and declined
+rather than overlooked.
+
+**One honest limit, stated in Settings.** The share sheet reports nothing back — not success, not
+cancellation — so `lastExportAt` records that Gymmy produced a file and the OS took it. The copy says
+"backup created", never "saved", and tells the user to check where it landed.
+
+**This is backup and handoff, not sync.** Snapshot on one device, restore on the next, train on the next.
+Logging on both diverges, and a restore resolves that by replacing wholesale. Row-level sync — tombstones
+on five tables, `updatedAt` everywhere, a merge rule for the settings singleton, and an owner for the
+active session — remains deferred, and is a decision to take before, not after, there is history worth
+merging.
+
 ### v1.5 — next, once the loop is proven
 
 - **Weekly program scheduler** — assign routines to weekdays, "what's today?" on the Today tab.

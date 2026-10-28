@@ -130,8 +130,12 @@ export function ActiveSessionScreen() {
                   return
                 }
                 // completeSession settles records, then the detail screen shows
-                // the summary and anything newly earned.
-                void completeSession(session.id).then(() => navigate(`/history/${session.id}`))
+                // the summary and anything newly earned. `justFinished` marks
+                // this as the post-workout arrival rather than a visit from
+                // History, which is the only moment a backup prompt belongs.
+                void completeSession(session.id).then(() =>
+                  navigate(`/history/${session.id}`, { state: { justFinished: true } }),
+                )
               }}
             >
               {workingSets.length === 0 ? 'Discard workout' : 'Finish workout'}

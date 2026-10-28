@@ -331,6 +331,21 @@ for (const theme of ['light', 'dark']) {
     })),
   )
 
+  // The post-workout summary as it actually arrives: finished just now, so
+  // the backup prompt is on it. Reached by finishing, never from History.
+  allErrors.push(
+    ...(await shoot('session-finished', {
+      theme,
+      steps: async (page) => {
+        await intoSession(page)
+        await logSet(page, 80, 8)
+        await tap(page, 'Finish', true)
+        await tap(page, 'Finish workout', true)
+        await page.waitForTimeout(500)
+      },
+    })),
+  )
+
   allErrors.push(
     ...(await shoot('session-detail', {
       theme,
