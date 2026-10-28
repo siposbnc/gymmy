@@ -202,6 +202,24 @@ export async function allSetsForExport(): Promise<CsvSetRow[]> {
 }
 
 /**
+ * Correct how long a session took.
+ *
+ * Needed because duration is recorded rather than entered: you might forget to
+ * hit finish until the drive home, or — as happened — an app bug could stamp
+ * the wrong end time. Keeps `startedAt` fixed and moves `endedAt`, so the
+ * session stays on the day it happened and the calendar does not shift.
+ */
+export async function setSessionDuration(
+  sessionId: string,
+  seconds: number,
+): Promise<void> {
+  const session = await db.sessions.get(sessionId)
+  if (!session) return
+  const safe = Math.max(0, Math.round(seconds))
+  await db.sessions.update(sessionId, { endedAt: session.startedAt + safe * 1000 })
+}
+
+/**
  * Finish a workout and settle its records.
  *
  * Lives here rather than in `sessions.ts` because record detection reads the

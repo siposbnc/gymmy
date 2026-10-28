@@ -3,7 +3,11 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 
 import { useSessionDetail, useSettings } from '~/db/hooks'
-import { deleteSession, recomputeRecordsForSession } from '~/db/repositories/history'
+import {
+  deleteSession,
+  recomputeRecordsForSession,
+  setSessionDuration,
+} from '~/db/repositories/history'
 import {
   addExerciseToSession,
   deleteSet,
@@ -50,6 +54,7 @@ export function SessionDetailScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [picking, setPicking] = useState(false)
   const [movingSet, setMovingSet] = useState<SetEntry | null>(null)
+  const [editingDuration, setEditingDuration] = useState(false)
 
   /**
    * Append a set, seeded from the last one logged for that exercise.
@@ -102,7 +107,7 @@ export function SessionDetailScreen() {
 
   return (
     <>
-      <header className="flex items-center gap-3 border-b border-line bg-canvas px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+      <header className="flex items-center gap-3 border-b border-line bg-canvas px-4 pt-3 pb-3">
         <button
           type="button"
           onClick={() => void navigate('/history')}
@@ -134,7 +139,23 @@ export function SessionDetailScreen() {
       <div className="grid gap-3 px-4 pt-3.5 pb-6">
         <Card>
           <dl className="grid grid-cols-3 gap-3">
-            <Stat label="Duration" value={duration == null ? '—' : formatDuration(duration)} />
+            {/* Tappable: duration is recorded rather than entered, so it can
+                be wrong — a forgotten finish, or an app bug that once stamped
+                the wrong end time. */}
+            <button
+              type="button"
+              onClick={() => setEditingDuration(true)}
+              className="cursor-pointer text-left"
+            >
+              <Stat
+                label="Duration"
+                value={
+                  <span className="border-b-2 border-accent">
+                    {duration == null ? '—' : formatDuration(duration)}
+                  </span>
+                }
+              />
+            </button>
             <Stat label="Sets" value={String(workingSets.length)} />
             <Stat
               label="Volume"
@@ -231,6 +252,23 @@ export function SessionDetailScreen() {
           setPicking(false)
         }}
       />
+
+      {editingDuration ? (
+        <NumericPad
+          open
+          onOpenChange={(open) => !open && setEditingDuration(false)}
+          // Minutes, not seconds: nobody remembers a workout to the second,
+          // and a four-digit second count would be absurd to type.
+          value={duration == null ? 0 : Math.round(duration / 60)}
+          onCommit={(minutes) => {
+            if (sessionId) void setSessionDuration(sessionId, Math.max(0, minutes) * 60)
+          }}
+          unit="min"
+          eyebrow={`${session.name} · how long it took`}
+          increment={5}
+          allowDecimal={false}
+        />
+      ) : null}
 
       <Sheet
         open={movingSet !== null}
@@ -361,7 +399,7 @@ function Stat({
   exampleInput,
 }: {
   label: string
-  value: string
+  value: React.ReactNode
   explainerId?: string
   exampleInput?: unknown
 }) {

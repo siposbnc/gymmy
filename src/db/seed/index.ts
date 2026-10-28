@@ -8,6 +8,7 @@ import {
   DEFAULT_BAR_WEIGHT_KG,
   DEFAULT_BARS,
   DEFAULT_PLATE_INVENTORY,
+  standardBarName,
 } from './plates'
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -39,7 +40,41 @@ export const DEFAULT_SETTINGS: Settings = {
 export async function bootstrapDatabase(): Promise<void> {
   await seedStaticData()
   await backfillBuiltInMetadata()
+  await nameTheMigratedBar()
   await rebuildRecordsIfMissing()
+}
+
+/**
+ * Give the bar created by the v3 migration its proper name.
+ *
+ * That migration labelled it "Your bar" regardless of weight, which is
+ * uninformative when the weight makes the answer obvious — a 20 kg bar is an
+ * Olympic bar. The migration itself now names it correctly, but devices that
+ * already upgraded need this.
+ *
+ * Deliberately narrow: it only touches the exact id and exact placeholder
+ * name the migration wrote, and only when the weight is one it recognises. A
+ * bar you have renamed yourself is never touched.
+ */
+export async function nameTheMigratedBar(): Promise<void> {
+  const settings = await db.settings.get('singleton')
+  if (!settings?.bars?.length) return
+
+  const needsName = settings.bars.some(
+    (bar) =>
+      bar.id === 'bar_default' &&
+      bar.name === 'Your bar' &&
+      standardBarName(bar.weightKg) !== 'Your bar',
+  )
+  if (!needsName) return
+
+  await db.settings.update('singleton', {
+    bars: settings.bars.map((bar) =>
+      bar.id === 'bar_default' && bar.name === 'Your bar'
+        ? { ...bar, name: standardBarName(bar.weightKg) }
+        : bar,
+    ),
+  })
 }
 
 /**

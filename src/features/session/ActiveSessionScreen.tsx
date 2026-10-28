@@ -179,7 +179,7 @@ function SessionHeader({
   const elapsed = useElapsed(startedAt)
 
   return (
-    <header className="flex items-center gap-3 border-b border-line bg-canvas px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+    <header className="flex items-center gap-3 border-b border-line bg-canvas px-4 pt-3 pb-3">
       <button
         type="button"
         onClick={onBack}
