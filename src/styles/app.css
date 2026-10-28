@@ -305,18 +305,8 @@
     line-height: 1.15;
   }
 
-  /*
-   * iOS zooms the page whenever a focused input is under 16px, which throws
-   * the whole layout off just as you start typing. Pinning text controls to
-   * 16px is the only reliable way to stop it — `maximum-scale=1` works but
-   * also disables pinch-zoom for everyone, which is an accessibility
-   * regression.
-   */
-  input,
-  textarea,
-  select {
-    font-size: 16px;
-  }
+  /* Text controls are pinned to 16px below, OUTSIDE any layer — see the end
+     of this file for why it cannot live here. */
 
   button {
     font-family: inherit;
@@ -340,4 +330,27 @@
   [data-selectable] {
     user-select: text;
   }
+}
+
+/* ============================================================================
+   Unlayered — deliberately outside @layer
+   ----------------------------------------------------------------------------
+   iOS zooms the page whenever a focused text control renders below 16px, which
+   throws the layout around the moment you start typing. `maximum-scale=1` also
+   stops it but disables pinch-zoom for everyone, which is a real accessibility
+   regression, so pinning the font size is the right lever.
+
+   This CANNOT live in `@layer base`: every cascade layer loses to unlayered
+   CSS, but more to the point, utilities also beat base — so a `text-[0.95rem]`
+   on an input won, kept it at 15.2px, and the zoom carried on happening. That
+   is exactly the bug this failed to fix the first time.
+
+   Checkboxes and radios are excluded: they have no text, and forcing a size on
+   them would change their rendered dimensions.
+   ========================================================================= */
+
+input:not([type='checkbox']):not([type='radio']),
+textarea,
+select {
+  font-size: 16px;
 }

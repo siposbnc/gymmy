@@ -335,7 +335,8 @@ for (const theme of ['light', 'dark']) {
     ...(await shoot('explainer', {
       theme,
       steps: async (page) => {
-        await tap(page, /how gymmy works out your numbers/i)
+        // Reached from More now — Today is for starting a session, not reading.
+        await page.goto(`${BASE}/more/maths`, { waitUntil: 'networkidle' })
         // The warm-up card's body text also mentions estimated 1RM, so target
         // the card button by its accessible name rather than loose text.
         await page.getByRole('button', { name: /^Estimated 1RM/ }).click()
@@ -457,6 +458,27 @@ for (const theme of ['light', 'dark']) {
     check(`cap spans at least 80% width (${Math.round(cap.widthRatio * 100)}%)`, cap.widthRatio >= 0.8)
     check('cap has an opaque background', cap.opaque)
   }
+
+  // iOS zooms the page whenever a focused text control renders under 16px.
+  // The first fix for this lived in @layer base and lost to utility classes,
+  // so measure the computed value rather than trusting the stylesheet.
+  const smallInputs = await page.evaluate(() => {
+    const controls = [...document.querySelectorAll('input, textarea, select')]
+    return controls
+      .filter((element) => {
+        const type = element.getAttribute('type')
+        if (type === 'checkbox' || type === 'radio') return false
+        return Number.parseFloat(getComputedStyle(element).fontSize) < 16
+      })
+      .map((element) => {
+        const label = element.getAttribute('aria-label') ?? element.tagName.toLowerCase()
+        return `${label} @ ${getComputedStyle(element).fontSize}`
+      })
+  })
+  check(
+    `every text control is at least 16px${smallInputs.length ? ` — ${smallInputs.join(', ')}` : ''}`,
+    smallInputs.length === 0,
+  )
 
   const before = await page.evaluate(() => {
     const sheet = document.querySelector('[role="dialog"]')

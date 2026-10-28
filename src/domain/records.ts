@@ -62,10 +62,29 @@ export function computeRecords(
   const drafts: RecordDraft[] = []
 
   // --- Heaviest weight lifted ---------------------------------------------
+  //
+  // Ranked on weight FIRST, then reps. At equal weight more reps is strictly
+  // the better performance, so 60 kg × 3 supersedes 60 kg × 2 and the record
+  // points at the set you would actually want to see. Comparing on weight
+  // alone left it stuck on whichever set came first, which was usually the
+  // weakest one — you work up to your best set, not down from it.
+  //
+  // Reps only break a tie on weight; they never let a lighter set win. And a
+  // tie on both still goes to the earlier set, because you have to beat a
+  // record to take it.
   let heaviest: RecordSet | undefined
   for (const set of chronological) {
     const weight = set.weightKg ?? 0
-    if (weight > 0 && weight > (heaviest?.weightKg ?? 0)) heaviest = set
+    if (weight <= 0) continue
+    if (heaviest === undefined) {
+      heaviest = set
+      continue
+    }
+    const bestWeight = heaviest.weightKg ?? 0
+    const better =
+      weight > bestWeight ||
+      (weight === bestWeight && (set.reps ?? 0) > (heaviest.reps ?? 0))
+    if (better) heaviest = set
   }
   if (heaviest) {
     drafts.push({
