@@ -1,4 +1,4 @@
-import { Archive, Copy, Pencil, Play, Plus } from 'lucide-react'
+import { Archive, ClipboardPaste, Copy, Pencil, Play, Plus, Share2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
@@ -14,11 +14,16 @@ import { Card } from '~/ui/Card'
 import { ScreenHeader } from '~/ui/ScreenHeader'
 import { Sheet } from '~/ui/Sheet'
 
+import { ImportRoutineSheet } from './ImportRoutineSheet'
+import { ShareRoutineSheet } from './ShareRoutineSheet'
+
 export function RoutinesScreen() {
   const navigate = useNavigate()
   const routines = useRoutines()
   const active = useActiveSession()
   const [menuFor, setMenuFor] = useState<RoutineSummary | null>(null)
+  const [sharing, setSharing] = useState<RoutineSummary | null>(null)
+  const [importing, setImporting] = useState(false)
 
   const hasActiveSession = active != null
 
@@ -48,7 +53,7 @@ export function RoutinesScreen() {
         {routines === undefined ? (
           <p className="py-8 text-center text-[0.85rem] text-ink-faint">Loading…</p>
         ) : routines.length === 0 ? (
-          <EmptyState onCreate={() => void create()} />
+          <EmptyState onCreate={() => void create()} onImport={() => setImporting(true)} />
         ) : (
           routines.map((summary) => (
             <RoutineCard
@@ -66,6 +71,19 @@ export function RoutinesScreen() {
           <p className="px-2 text-center text-[0.78rem] leading-relaxed text-ink-muted">
             A workout is already in progress. Finish or discard it before starting another.
           </p>
+        ) : null}
+
+        {/* Below the list rather than in the header: importing is a once-in-a-
+            while thing, and the header already holds the action you came for. */}
+        {routines && routines.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setImporting(true)}
+            className="w-full cursor-pointer rounded-lg border-[1.5px] border-dashed border-line-strong p-3.5 text-[0.85rem] font-bold text-ink-muted"
+          >
+            <ClipboardPaste size={15} className="mr-1.5 inline align-[-2px]" aria-hidden />
+            Import a shared routine
+          </button>
         ) : null}
       </div>
 
@@ -97,6 +115,15 @@ export function RoutinesScreen() {
             }}
           />
           <MenuAction
+            icon={<Share2 size={18} />}
+            label="Share"
+            hint="A code you can send to anyone else using Gymmy"
+            onClick={() => {
+              setSharing(menuFor)
+              setMenuFor(null)
+            }}
+          />
+          <MenuAction
             icon={<Archive size={18} />}
             label="Archive"
             hint="Hidden from this list. Past workouts keep their names."
@@ -108,6 +135,24 @@ export function RoutinesScreen() {
           />
         </div>
       </Sheet>
+
+      <ShareRoutineSheet
+        routineId={sharing?.routine.id}
+        routineName={sharing?.routine.name}
+        open={sharing !== null}
+        onOpenChange={(open) => !open && setSharing(null)}
+      />
+
+      <ImportRoutineSheet
+        open={importing}
+        onOpenChange={setImporting}
+        onImported={(routineId) => {
+          setImporting(false)
+          // Into the builder, not back to the list: the first thing anyone
+          // does with someone else's plan is change the weights.
+          void navigate(`/routines/${routineId}`)
+        }}
+      />
     </>
   )
 }
@@ -192,7 +237,7 @@ function MenuAction({
   )
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState({ onCreate, onImport }: { onCreate: () => void; onImport: () => void }) {
   return (
     <div className="px-4 py-10 text-center">
       {/* The editorial serif earns its keep on empty states. */}
@@ -206,6 +251,18 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         <Plus size={17} aria-hidden />
         Build a routine
       </Button>
+      {/* Offered here because arriving with a friend's code is a perfectly
+          normal way to end up on this screen with nothing on it. */}
+      <p className="mt-4 text-[0.8rem] text-ink-muted">
+        Been sent a code?{' '}
+        <button
+          type="button"
+          onClick={onImport}
+          className="cursor-pointer font-semibold text-accent-ink underline underline-offset-2"
+        >
+          Import a shared routine
+        </button>
+      </p>
     </div>
   )
 }

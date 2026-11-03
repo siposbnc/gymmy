@@ -568,6 +568,58 @@ on five tables, `updatedAt` everywhere, a merge rule for the settings singleton,
 active session — remains deferred, and is a decision to take before, not after, there is history worth
 merging.
 
+### 16. A session becomes a routine — shipped post-v1
+
+Plenty of good plans start as a workout you made up on the day and want again.
+
+**Derived from what was logged, not from what was planned.** Sets are the working sets you actually
+completed, the rep range is the range you actually hit, and the weight is **the one most of your sets
+used**, ties going to the heavier. The mode rather than the top set: a back-off or a drop set at the end
+must not become a plan asking for the top set five times, and a pyramid should land on its middle.
+Warm-ups are excluded, as everywhere else.
+
+**The preview is the feature.** Because the targets are derived, the sheet shows every number before
+anything is written, and the write is exactly what was shown — the repository exposes
+`draftRoutineFromSession` precisely so the preview and the write cannot drift. Exercises with nothing
+logged against them are dropped and **named**, because a plan quietly missing an exercise is a surprise
+you only get mid-workout.
+
+**It always creates a new routine.** Updating the routine the session came from was considered and
+declined: history is safe either way thanks to snapshotting, but rewriting a plan from a history screen
+is too much destruction for one tap, and the builder is one navigation away. No volume goal is invented
+either — a new routine has nothing to beat.
+
+### 17. Shareable routines — shipped post-v1
+
+A routine is the one thing in Gymmy worth handing to another person: it is a plan, not a history.
+
+**A code, not a file.** `GYMMY-R1.<base64url>` — deflate-compressed JSON, around 600 characters for a
+six-exercise routine. A file on iOS means the share sheet, which reports nothing back and lands somewhere
+nobody can find; a string goes into any message and comes back with a paste. The marker is readable so a
+wrong paste fails with a sentence, and versioned so a future format can be told apart rather than guessed
+at. base64 is hand-rolled over bytes because `btoa` throws above U+00FF — the first routine named "Láb
+nap" would have broken it.
+
+**The hard part is exercise identity, not encoding.** Built-ins travel as stable slug ids. A custom
+exercise does not exist on the recipient's device, so the code carries a full definition for **every**
+exercise it references, built-ins included — the recipient may be on an older build, and an installed PWA
+can sit on a cached version for weeks. Import resolves each one by id, then by name (so your renamed
+"Bench Press" matches, and a repeat import is not a duplicate), and only then creates it, keeping the
+sender's id so the next import recognises it.
+
+**Narrow by construction.** Carried: the routine, its order, targets, rest, supersets, notes and volume
+goal. Not carried: sets, records, body weight, settings, the sender's `barId` (bar ids are device-local)
+or their private exercise notes. Seeded descriptions are left out too, for size — they were two thirds of
+a compressed code.
+
+**Degrades rather than rejects.** The only hard gate is the version. An unfamiliar equipment kind, muscle
+group or target-weight variant is normalised toward something sensible instead of failing the import:
+losing "this is a kettlebell" is a scratch, losing the routine is the feature not working.
+
+**Nothing is written until it is shown.** `planRoutineImport` is a read; the preview lists the plan, its
+targets, and exactly which exercises would be added to your library; `importRoutinePlan` writes the plan
+that was shown, in one transaction. Importing blind is how a picker fills up with near-duplicates.
+
 ### v1.5 — next, once the loop is proven
 
 - **Weekly program scheduler** — assign routines to weekdays, "what's today?" on the Today tab.

@@ -362,6 +362,65 @@ for (const theme of ['light', 'dark']) {
     })),
   )
 
+  // Turning a logged workout into a plan. The numbers in the preview are
+  // derived, so this is the shot that proves the derived line reads sensibly.
+  allErrors.push(
+    ...(await shoot('save-as-routine', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await page.getByRole('link', { name: 'History' }).click()
+        await page.waitForTimeout(300)
+        await page
+          .getByRole('button', { name: /Lower A/ })
+          .first()
+          .click()
+        await page.waitForTimeout(350)
+        await tap(page, /session options/i)
+        await tap(page, /save as routine/i)
+        await page.waitForTimeout(400)
+      },
+    })),
+  )
+
+  // A share code on screen: long, monospace, and wrapped inside its own box.
+  allErrors.push(
+    ...(await shoot('routine-share', {
+      theme,
+      steps: async (page) => {
+        await buildRoutine(page)
+        await page.getByRole('button', { name: /back to routines/i }).click()
+        await page.waitForTimeout(250)
+        await tap(page, /options$/i)
+        await tap(page, /^Share/)
+        await page.waitForTimeout(500)
+      },
+    })),
+  )
+
+  // The import preview, reached the way a recipient reaches it: a code in the
+  // field, checked, with an exercise that has to be added to the library.
+  allErrors.push(
+    ...(await shoot('routine-import', {
+      theme,
+      steps: async (page) => {
+        await buildRoutine(page)
+        await page.getByRole('button', { name: /back to routines/i }).click()
+        await page.waitForTimeout(250)
+        await tap(page, /options$/i)
+        await tap(page, /^Share/)
+        const code = await page.locator('code').first().innerText()
+        await page.keyboard.press('Escape')
+        await page.waitForTimeout(250)
+
+        await tap(page, /import a shared routine/i)
+        await page.getByLabel(/routine code/i).fill(code)
+        await tap(page, /check the code/i)
+        await page.waitForTimeout(450)
+      },
+    })),
+  )
+
   allErrors.push(
     ...(await shoot('exercise-detail', {
       theme,

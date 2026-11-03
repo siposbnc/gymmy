@@ -81,6 +81,45 @@ const SCREENS = [
   ['Exercises', '/more/exercises'],
   ['Maths reference', '/more/maths'],
   ['Settings', '/more/settings'],
+  // Sheets have no URL, so they are reached by driving the UI. The share code
+  // block and the import preview are both dense, low-contrast-prone surfaces,
+  // which is exactly what axe is good at checking.
+  [
+    'Share routine',
+    '/routines',
+    async (page) => {
+      await page.getByRole('button', { name: 'New', exact: true }).click()
+      await page.waitForTimeout(250)
+      await page.getByRole('button', { name: /add exercise/i }).click()
+      await page.waitForTimeout(300)
+      await page.getByRole('button', { name: /^Bench Press/ }).click()
+      await page.waitForTimeout(250)
+      await page.getByRole('button', { name: /back to routines/i }).click()
+      await page.waitForTimeout(300)
+      await page.getByRole('button', { name: /options$/i }).click()
+      await page.getByRole('button', { name: /^Share/ }).click()
+      await page.waitForTimeout(450)
+    },
+  ],
+  // Depends on the routine built above still being there — same context, and
+  // the entries run in order.
+  [
+    'Import routine',
+    '/routines',
+    async (page) => {
+      await page.getByRole('button', { name: /options$/i }).click()
+      await page.getByRole('button', { name: /^Share/ }).click()
+      await page.waitForTimeout(450)
+      const code = await page.locator('code').first().innerText()
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(250)
+
+      await page.getByRole('button', { name: /import a shared routine/i }).click()
+      await page.getByLabel(/routine code/i).fill(code)
+      await page.getByRole('button', { name: /check the code/i }).click()
+      await page.waitForTimeout(400)
+    },
+  ],
   // Last, because it starts a workout and the others would then be looking at
   // an app with a session in progress. The third element is optional setup:
   // this one is a sheet, so there is no URL that reaches it.

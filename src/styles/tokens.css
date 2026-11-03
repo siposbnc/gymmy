@@ -76,8 +76,11 @@
 
   --text: #f5f0e9; /* 16.6:1 on --bg */
   --text-muted: #a79c91; /*  7.0:1 on --bg */
-  /* Lightened from #7C7268 (4.0:1) for the same reason. */
-  --text-faint: #8a8075; /*  4.9:1 on --bg, 4.5:1 on --surface */
+  /* Lightened from #7C7268 (4.0:1) for the same reason, and again from
+     #8A8075: that cleared --bg and --surface but only managed 4.1:1 on
+     --surface-raised, which is every sheet in the app — including the eyebrow
+     the Sheet component renders itself. The third figure is the binding one. */
+  --text-faint: #958b7f; /* 5.6:1 on --bg, 5.2:1 on --surface, 4.75:1 on --surface-raised */
 
   --accent: #ff6a33; /*  6.6:1 with --on-accent */
   /* Already clears AA as text on dark, so no separate step is needed. */

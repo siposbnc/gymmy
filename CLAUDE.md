@@ -54,6 +54,14 @@ user-facing explanation cannot drift from the maths.
   no target rather than a guess.
 - **Weight is stored in kilograms, always.** Pounds are a display concern,
   converted at the boundary and nowhere else.
+- **A share code carries a plan, never history.** Routine, targets, rest,
+  supersets, notes — and nothing else, ever. No sets, no records, no body
+  weight, no settings, and nothing device-local such as a `barId`. Adding a
+  field to the payload is a decision about what leaves someone's phone.
+- **Derived targets are previewed before they are written.** Saving a session
+  as a routine and importing a code both show the exact rows they will write,
+  which is why the repositories expose a draft/plan step separately from the
+  write. Keep them that way rather than deriving twice.
 - **Every write lands immediately.** There is no save step that can be lost.
 - **Records are recomputed, never incrementally patched**, and their ids are
   derived from (exercise, kind, weight) so rebuilds are stable.
