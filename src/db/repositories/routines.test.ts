@@ -8,7 +8,9 @@ import {
   clearRoutineTargetWeight,
   clearRoutineVolumeGoal,
   createRoutine,
+  createRoutineFromSession,
   deleteRoutine,
+  draftRoutineFromSession,
   duplicateRoutine,
   getRoutine,
   listRoutineExercises,
@@ -26,6 +28,7 @@ import {
   addExerciseToSession,
   finishSession,
   listSessionExercises,
+  logSet,
   startEmptySession,
 } from './sessions'
 
@@ -333,6 +336,109 @@ describe('routines', () => {
       expect(planned?.targetRepsMin).toBeUndefined()
       expect(planned?.targetWeight).toBeUndefined()
       expect(planned?.isAmrap).toBeUndefined()
+    })
+  })
+
+  describe('saving a session as a routine', () => {
+    /** A freestyle workout: three sets of bench, two of flies, one warm-up. */
+    async function logAFreestyleWorkout() {
+      const sessionId = await startEmptySession('Thursday, whatever I felt like')
+      const bench = await addExerciseToSession(sessionId, 'ex_bench-press')
+      const fly = await addExerciseToSession(sessionId, 'ex_cable-fly')
+
+      await logSet(bench, { weightKg: 60, reps: 10, type: 'warmup' })
+      await logSet(bench, { weightKg: 80, reps: 8 })
+      await logSet(bench, { weightKg: 80, reps: 8 })
+      await logSet(bench, { weightKg: 80, reps: 6 })
+      await logSet(fly, { weightKg: 15, reps: 15 })
+      await logSet(fly, { weightKg: 15, reps: 12 })
+      await finishSession(sessionId)
+
+      return { sessionId, bench, fly }
+    }
+
+    it('builds a plan out of the work that was logged', async () => {
+      const { sessionId } = await logAFreestyleWorkout()
+      const routineId = await createRoutineFromSession(sessionId)
+
+      const routine = await getRoutine(routineId)
+      const entries = await listRoutineExercises(routineId)
+
+      expect(routine?.name).toBe('Thursday, whatever I felt like')
+      expect(entries.map((entry) => entry.exerciseId)).toEqual(['ex_bench-press', 'ex_cable-fly'])
+      expect(entries[0]).toMatchObject({
+        order: 0,
+        targetSets: 3,
+        targetRepsMin: 6,
+        targetRepsMax: 8,
+        targetWeight: { kind: 'absolute', kg: 80 },
+      })
+      expect(entries[1]).toMatchObject({ targetSets: 2, targetRepsMin: 12, targetRepsMax: 15 })
+    })
+
+    it('takes the name you give it', async () => {
+      const { sessionId } = await logAFreestyleWorkout()
+      const routineId = await createRoutineFromSession(sessionId, '  Push B  ')
+      expect((await getRoutine(routineId))?.name).toBe('Push B')
+    })
+
+    it('leaves the session it came from completely untouched', async () => {
+      const { sessionId } = await logAFreestyleWorkout()
+      const before = await db.sessions.get(sessionId)
+      const setsBefore = await db.sets.count()
+
+      await createRoutineFromSession(sessionId, 'Push B')
+
+      expect(await db.sessions.get(sessionId)).toEqual(before)
+      expect(await db.sets.count()).toBe(setsBefore)
+    })
+
+    it('creates a new routine rather than editing the one the session came from', async () => {
+      const { id } = await buildPushA()
+      const sessionId = await startSessionFromRoutine(id)
+      const [bench] = await listSessionExercises(sessionId)
+      await logSet(bench!.id, { weightKg: 105, reps: 5 })
+      await finishSession(sessionId)
+
+      const routineId = await createRoutineFromSession(sessionId)
+      expect(routineId).not.toBe(id)
+
+      // The original plan still asks for what it always asked for.
+      const original = await listRoutineExercises(id)
+      expect(original).toHaveLength(3)
+      expect(original[0]?.targetWeight).toEqual({ kind: 'absolute', kg: 100 })
+    })
+
+    it('does not invent a volume goal, even from a routine that had one', async () => {
+      const { id } = await buildPushA()
+      await setRoutineVolumeGoal(id, { kind: 'beat_last' })
+      const sessionId = await startSessionFromRoutine(id)
+      const [bench] = await listSessionExercises(sessionId)
+      await logSet(bench!.id, { weightKg: 100, reps: 5 })
+      await finishSession(sessionId)
+
+      const routineId = await createRoutineFromSession(sessionId)
+      expect(await getRoutine(routineId)).not.toHaveProperty('volumeGoal')
+    })
+
+    it('refuses a session with no logged work', async () => {
+      const sessionId = await startEmptySession('Walked in, walked out')
+      await addExerciseToSession(sessionId, 'ex_bench-press')
+      await finishSession(sessionId)
+
+      await expect(createRoutineFromSession(sessionId)).rejects.toThrow(/no logged work/i)
+      expect(await listRoutines()).toHaveLength(0)
+    })
+
+    it('previews exactly what it would write', async () => {
+      const { sessionId } = await logAFreestyleWorkout()
+      const draft = await draftRoutineFromSession(sessionId)
+      const routineId = await createRoutineFromSession(sessionId)
+
+      const written = await listRoutineExercises(routineId)
+      expect(written.map(({ id: _id, routineId: _routineId, ...rest }) => rest)).toEqual(
+        draft?.exercises,
+      )
     })
   })
 })

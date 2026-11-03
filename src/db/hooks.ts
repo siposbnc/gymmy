@@ -4,6 +4,7 @@ import { backupStatus, type BackupStatus } from '~/domain/backup-reminder'
 import { rankExerciseUsage, type ExerciseUsage } from '~/domain/exercise-usage'
 import { muscleSetProgress, type MuscleSetProgress } from '~/domain/goals'
 import { muscleLabel } from '~/domain/muscles'
+import type { RoutineDraft } from '~/domain/routine-draft'
 import {
   computeStreak,
   exerciseSeries,
@@ -39,7 +40,11 @@ import {
   listRecordsFromSession,
   previousRoutineVolume,
 } from './repositories/history'
-import { listRoutineExercises, listRoutines } from './repositories/routines'
+import {
+  draftRoutineFromSession,
+  listRoutineExercises,
+  listRoutines,
+} from './repositories/routines'
 import { db } from './schema'
 import { getSettings } from './repositories/settings'
 import {
@@ -242,6 +247,21 @@ export function useSessionDetail(sessionId: string | undefined) {
 
     return { ...detail, records, previousKg }
   }, [sessionId])
+}
+
+/**
+ * What saving a past session as a routine would produce.
+ *
+ * Pass `undefined` to skip the work entirely — the sheet that shows this is
+ * closed most of the time, and the draft costs three table reads.
+ */
+export function useSessionRoutineDraft(
+  sessionId: string | undefined,
+): RoutineDraft | null | undefined {
+  return useLiveQuery(
+    async () => (sessionId ? await draftRoutineFromSession(sessionId) : null),
+    [sessionId],
+  )
 }
 
 /** A routine plus the number of exercises in it, for the list screen. */

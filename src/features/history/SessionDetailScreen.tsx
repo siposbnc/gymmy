@@ -1,4 +1,4 @@
-import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, ListPlus, MoreVertical, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 
@@ -19,6 +19,7 @@ import {
 } from '~/db/repositories/sessions'
 import { BackupPrompt } from '~/features/backup/BackupPrompt'
 import { ExercisePickerSheet } from '~/features/exercises/ExercisePickerSheet'
+import { SaveAsRoutineSheet } from '~/features/history/SaveAsRoutineSheet'
 import { describeVolumeGoal, resolveVolumeGoal, type VolumeGoalResult } from '~/domain/goals'
 import { totalVolume } from '~/domain/metrics'
 import { describeRecordKind } from '~/domain/records'
@@ -65,6 +66,8 @@ export function SessionDetailScreen() {
   const [pad, setPad] = useState<PadTarget | null>(null)
   const [actionsFor, setActionsFor] = useState<SetEntry | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [savingAsRoutine, setSavingAsRoutine] = useState(false)
   const [picking, setPicking] = useState(false)
   const [movingSet, setMovingSet] = useState<SetEntry | null>(null)
   const [editingDuration, setEditingDuration] = useState(false)
@@ -151,13 +154,16 @@ export function SessionDetailScreen() {
           </p>
           <h1 className="truncate font-display text-[1.375rem] leading-tight">{session.name}</h1>
         </div>
+        {/* A menu rather than a bare delete icon: there are two things you can
+            do to a past session now, and a destructive one does not deserve
+            the only button in the header. */}
         <button
           type="button"
-          onClick={() => setConfirmDelete(true)}
-          aria-label="Delete this session"
-          className="grid size-[2.375rem] shrink-0 cursor-pointer place-items-center rounded-full text-danger"
+          onClick={() => setMenuOpen(true)}
+          aria-label="Session options"
+          className="grid size-[2.375rem] shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-surface"
         >
-          <Trash2 size={17} aria-hidden />
+          <MoreVertical size={17} aria-hidden />
         </button>
       </header>
 
@@ -292,6 +298,64 @@ export function SessionDetailScreen() {
           </p>
         ) : null}
       </div>
+
+      <Sheet
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        eyebrow={session.name}
+        title="Session options"
+      >
+        <div className="divide-y divide-line pb-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false)
+              setSavingAsRoutine(true)
+            }}
+            className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
+          >
+            <span className="text-accent-ink">
+              <ListPlus size={18} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.95rem] font-medium">Save as routine</span>
+              <span className="block text-[0.75rem] leading-relaxed text-ink-muted">
+                Turn what you logged into a plan you can start again
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false)
+              setConfirmDelete(true)
+            }}
+            className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
+          >
+            <span className="text-danger">
+              <Trash2 size={18} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.95rem] font-medium text-danger">Delete session</span>
+              <span className="block text-[0.75rem] leading-relaxed text-ink-muted">
+                Removes the sets logged here and re-settles any records
+              </span>
+            </span>
+          </button>
+        </div>
+      </Sheet>
+
+      <SaveAsRoutineSheet
+        sessionId={sessionId}
+        open={savingAsRoutine}
+        onOpenChange={setSavingAsRoutine}
+        onSaved={(routineId) => {
+          setSavingAsRoutine(false)
+          // Straight into the builder: the derived targets are a starting
+          // point, and this is the moment you know what you want to change.
+          void navigate(`/routines/${routineId}`)
+        }}
+      />
 
       <ExercisePickerSheet
         open={picking}

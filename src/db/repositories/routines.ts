@@ -1,8 +1,14 @@
+import {
+  deriveRoutineDraft,
+  type DraftSource,
+  type RoutineDraft,
+  type RoutineExerciseDraft,
+} from '~/domain/routine-draft'
 import type { Routine, RoutineExercise, TargetWeight, VolumeGoal } from '~/domain/types'
 import { newId } from '~/lib/uuid'
 
 import { db } from '../schema'
-import { getActiveSession } from './sessions'
+import { getActiveSession, listSessionExercises, listSets } from './sessions'
 
 /**
  * Routines — reusable training plans.
@@ -117,6 +123,104 @@ export async function duplicateRoutine(routineId: string): Promise<string> {
   })
 
   return id
+}
+
+/**
+ * Write a whole routine in one go.
+ *
+ * Shared by "save this session as a routine" and by importing a shared code —
+ * both of which arrive with every exercise already decided, which is exactly
+ * what `createRoutine` plus a dozen `addExerciseToRoutine` calls is bad at.
+ * One transaction, so a half-built routine cannot exist.
+ */
+export async function createRoutineFromDraft(input: {
+  name: string
+  notes?: string | undefined
+  accentColor?: string | undefined
+  volumeGoal?: VolumeGoal | undefined
+  exercises: readonly RoutineExerciseDraft[]
+}): Promise<string> {
+  const id = newId('rtn')
+  const now = Date.now()
+
+  await db.transaction('rw', db.routines, db.routineExercises, async () => {
+    await db.routines.add({
+      id,
+      name: input.name,
+      ...(input.notes ? { notes: input.notes } : {}),
+      ...(input.accentColor ? { accentColor: input.accentColor } : {}),
+      ...(input.volumeGoal == null ? {} : { volumeGoal: input.volumeGoal }),
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    if (input.exercises.length > 0) {
+      await db.routineExercises.bulkAdd(
+        input.exercises.map((exercise) => ({ ...exercise, id: newId('rex'), routineId: id })),
+      )
+    }
+  })
+
+  return id
+}
+
+/**
+ * What saving a past session as a routine would produce.
+ *
+ * Read-only on purpose: the sheet shows this, and saving writes exactly what
+ * was shown. A preview computed one way and a write computed another is how
+ * you end up with a routine nobody agreed to.
+ *
+ * The rules live in `domain/routine-draft` — this function's whole job is
+ * fetching the three tables they need.
+ */
+export async function draftRoutineFromSession(sessionId: string): Promise<RoutineDraft | null> {
+  const session = await db.sessions.get(sessionId)
+  if (!session) return null
+
+  const links = await listSessionExercises(sessionId)
+  const sources = await Promise.all(
+    links.map(async (link): Promise<DraftSource> => {
+      const [exercise, sets] = await Promise.all([
+        db.exercises.get(link.exerciseId),
+        listSets(link.id),
+      ])
+      return {
+        exerciseId: link.exerciseId,
+        name: exercise?.name ?? 'Unknown exercise',
+        sets,
+        restSeconds: link.restSeconds,
+        supersetGroup: link.supersetGroup,
+        targetSets: link.targetSets,
+        targetRepsMin: link.targetRepsMin,
+        targetRepsMax: link.targetRepsMax,
+        isAmrap: link.isAmrap,
+      }
+    }),
+  )
+
+  return deriveRoutineDraft({ name: session.name, exercises: sources })
+}
+
+/**
+ * Keep a workout you did as a plan you can repeat.
+ *
+ * Always a new routine, never an edit of the one the session came from. The
+ * session already snapshotted its targets, so history is safe either way —
+ * but silently rewriting a plan from a history screen is a lot of destruction
+ * to hide behind one tap, and the editor is one navigation away.
+ */
+export async function createRoutineFromSession(sessionId: string, name?: string): Promise<string> {
+  const draft = await draftRoutineFromSession(sessionId)
+  if (!draft) throw new Error('Session not found')
+  if (draft.exercises.length === 0) {
+    throw new Error('There is no logged work in this session to build a routine from.')
+  }
+
+  return createRoutineFromDraft({
+    name: name?.trim() || draft.name,
+    exercises: draft.exercises,
+  })
 }
 
 // ---------------------------------------------------------------------------
