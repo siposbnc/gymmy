@@ -4,7 +4,18 @@ import {
   type RoutineDraft,
   type RoutineExerciseDraft,
 } from '~/domain/routine-draft'
-import type { Routine, RoutineExercise, TargetWeight, VolumeGoal } from '~/domain/types'
+import {
+  collapseSetPlan,
+  isUniform,
+  summariseSetPlan,
+} from '~/domain/set-plan'
+import type {
+  PlannedSet,
+  Routine,
+  RoutineExercise,
+  TargetWeight,
+  VolumeGoal,
+} from '~/domain/types'
 import { newId } from '~/lib/uuid'
 
 import { db } from '../schema'
@@ -273,6 +284,82 @@ export async function updateRoutineExercise(
   await touch(row.routineId)
 }
 
+/**
+ * Give an exercise a weight and a rep count per set.
+ *
+ * The flat targets are rewritten from the ladder in the same write, never by a
+ * caller: see `domain/set-plan` for why everything downstream depends on those
+ * two staying in step. A ladder whose rungs are all identical is straight sets
+ * with extra storage, so it collapses rather than being stored — two states
+ * that mean the same thing would leave the editor guessing which mode to open.
+ */
+export async function setRoutineSetPlan(
+  routineExerciseId: string,
+  plan: readonly PlannedSet[],
+): Promise<void> {
+  const row = await db.routineExercises.get(routineExerciseId)
+  if (!row) return
+
+  if (plan.length === 0 || isUniform(plan)) {
+    await clearRoutineSetPlan(routineExerciseId, plan)
+    return
+  }
+
+  const summary = summariseSetPlan(plan)
+
+  await db.routineExercises
+    .where('id')
+    .equals(routineExerciseId)
+    .modify((exercise) => {
+      exercise.setPlan = plan.map((rung) => ({ ...rung }))
+      exercise.targetSets = summary.targetSets
+      exercise.targetRepsMin = summary.targetRepsMin
+      if (summary.targetRepsMax == null) delete exercise.targetRepsMax
+      else exercise.targetRepsMax = summary.targetRepsMax
+      exercise.isAmrap = summary.isAmrap
+      // The ladder owns the weights outright. Leaving the flat target behind
+      // would be a second answer to "what should set 2 be", and a stale one
+      // the moment a rung is edited.
+      delete exercise.targetWeight
+    })
+  await touch(row.routineId)
+}
+
+/**
+ * Back to straight sets.
+ *
+ * Lossy, and the editor says so before calling this. The flat targets are
+ * taken from the ladder being dropped rather than from whatever they happened
+ * to hold, so collapsing leaves the plan describing roughly what it described
+ * a moment ago.
+ */
+export async function clearRoutineSetPlan(
+  routineExerciseId: string,
+  from?: readonly PlannedSet[],
+): Promise<void> {
+  const row = await db.routineExercises.get(routineExerciseId)
+  if (!row) return
+
+  const ladder = from ?? row.setPlan
+  const collapsed = ladder == null ? null : collapseSetPlan(ladder)
+
+  await db.routineExercises
+    .where('id')
+    .equals(routineExerciseId)
+    .modify((exercise) => {
+      delete exercise.setPlan
+      if (!collapsed) return
+
+      exercise.targetSets = collapsed.targetSets
+      exercise.targetRepsMin = collapsed.targetRepsMin
+      delete exercise.targetRepsMax
+      exercise.isAmrap = collapsed.isAmrap
+      if (collapsed.targetWeight == null) delete exercise.targetWeight
+      else exercise.targetWeight = collapsed.targetWeight
+    })
+  await touch(row.routineId)
+}
+
 /** Clears a target weight entirely rather than storing a zero. */
 export async function clearRoutineTargetWeight(routineExerciseId: string): Promise<void> {
   const row = await db.routineExercises.get(routineExerciseId)
@@ -393,36 +480,62 @@ export async function startSessionFromRoutine(routineId: string): Promise<string
 
   const sessionId = newId('ses')
 
-  await db.transaction('rw', db.sessions, db.sessionExercises, db.routineExercises, async () => {
-    await db.sessions.add({
-      id: sessionId,
-      routineId,
-      routineNameSnapshot: routine.name,
-      name: routine.name,
-      startedAt: Date.now(),
-      status: 'active',
-      ...(routine.volumeGoal == null ? {} : { volumeGoalSnapshot: routine.volumeGoal }),
-    })
+  // `db.exercises` is here for the machine weight: it lives on the exercise
+  // rather than the plan, but like everything else below it is copied now so
+  // that re-measuring the machine later cannot rewrite this session.
+  await db.transaction(
+    'rw',
+    db.sessions,
+    db.sessionExercises,
+    db.routineExercises,
+    db.exercises,
+    async () => {
+      await db.sessions.add({
+        id: sessionId,
+        routineId,
+        routineNameSnapshot: routine.name,
+        name: routine.name,
+        startedAt: Date.now(),
+        status: 'active',
+        ...(routine.volumeGoal == null ? {} : { volumeGoalSnapshot: routine.volumeGoal }),
+      })
 
-    const planned = await listRoutineExercises(routineId)
-    if (planned.length === 0) return
+      const planned = await listRoutineExercises(routineId)
+      if (planned.length === 0) return
 
-    await db.sessionExercises.bulkAdd(
-      planned.map((exercise) => ({
-        id: newId('sex'),
-        sessionId,
-        exerciseId: exercise.exerciseId,
-        order: exercise.order,
-        ...(exercise.restSeconds == null ? {} : { restSeconds: exercise.restSeconds }),
-        ...(exercise.supersetGroup == null ? {} : { supersetGroup: exercise.supersetGroup }),
-        ...(exercise.targetSets == null ? {} : { targetSets: exercise.targetSets }),
-        ...(exercise.targetRepsMin == null ? {} : { targetRepsMin: exercise.targetRepsMin }),
-        ...(exercise.targetRepsMax == null ? {} : { targetRepsMax: exercise.targetRepsMax }),
-        ...(exercise.targetWeight == null ? {} : { targetWeight: exercise.targetWeight }),
-        ...(exercise.isAmrap == null ? {} : { isAmrap: exercise.isAmrap }),
-      })),
-    )
-  })
+      const library = await db.exercises.bulkGet(planned.map((exercise) => exercise.exerciseId))
+      const machineWeights = new Map(
+        library.flatMap((exercise) =>
+          exercise?.machineWeightKg == null ? [] : [[exercise.id, exercise.machineWeightKg]],
+        ),
+      )
+
+      await db.sessionExercises.bulkAdd(
+        planned.map((exercise) => {
+          const machineWeightKg = machineWeights.get(exercise.exerciseId)
+          return {
+            id: newId('sex'),
+            sessionId,
+            exerciseId: exercise.exerciseId,
+            order: exercise.order,
+            ...(exercise.restSeconds == null ? {} : { restSeconds: exercise.restSeconds }),
+            ...(exercise.supersetGroup == null ? {} : { supersetGroup: exercise.supersetGroup }),
+            ...(exercise.targetSets == null ? {} : { targetSets: exercise.targetSets }),
+            ...(exercise.targetRepsMin == null ? {} : { targetRepsMin: exercise.targetRepsMin }),
+            ...(exercise.targetRepsMax == null ? {} : { targetRepsMax: exercise.targetRepsMax }),
+            ...(exercise.targetWeight == null ? {} : { targetWeight: exercise.targetWeight }),
+            ...(exercise.isAmrap == null ? {} : { isAmrap: exercise.isAmrap }),
+            // Copied rung by rung, so editing the ladder mid-workout cannot
+            // change what the sets you have not done yet are asking for.
+            ...(exercise.setPlan == null
+              ? {}
+              : { setPlan: exercise.setPlan.map((rung) => ({ ...rung })) }),
+            ...(machineWeightKg == null ? {} : { machineWeightKg }),
+          }
+        }),
+      )
+    },
+  )
 
   return sessionId
 }

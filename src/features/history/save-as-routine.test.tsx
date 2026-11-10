@@ -64,9 +64,10 @@ describe('saving a session as a routine', () => {
     const sessionId = await logAWorkout()
     const onSaved = renderSheet(sessionId)
 
-    // Three working sets of eight at the weight most of them used — the 75 kg
-    // back-off set does not become the plan.
-    expect(await screen.findByText('3 × 8 @ 80 kg')).toBeInTheDocument()
+    // The back-off set is kept where it happened rather than being averaged
+    // away or allowed to drag the whole plan down to 75.
+    expect(await screen.findByText('80 × 8 · 80 × 8 · 75 × 8 kg')).toBeInTheDocument()
+    // One set at one weight is still described the short way.
     expect(screen.getByText('1 × 15 @ 15 kg')).toBeInTheDocument()
     expect(screen.getByText(/left out/i)).toHaveTextContent('Triceps Pushdown')
     expect(await screen.findByLabelText(/name/i)).toHaveValue('Thursday push')
@@ -80,9 +81,15 @@ describe('saving a session as a routine', () => {
       exerciseId: 'ex_bench-press',
       targetSets: 3,
       targetRepsMin: 8,
-      targetWeight: { kind: 'absolute', kg: 80 },
+      setPlan: [
+        { reps: 8, weight: { kind: 'absolute', kg: 80 } },
+        { reps: 8, weight: { kind: 'absolute', kg: 80 } },
+        { reps: 8, weight: { kind: 'absolute', kg: 75 } },
+      ],
     })
     expect(entries[0]).not.toHaveProperty('targetRepsMax')
+    // The ladder owns the weights, so there is no second answer beside it.
+    expect(entries[0]).not.toHaveProperty('targetWeight')
   })
 
   it('takes a name you type over the session name', async () => {

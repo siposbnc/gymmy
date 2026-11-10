@@ -126,6 +126,18 @@ export async function clearExerciseBar(id: string): Promise<void> {
     })
 }
 
+/** Forget what a machine weighs, so its sets are just what you loaded again. */
+export async function clearExerciseMachineWeight(id: string): Promise<void> {
+  // Same `modify`-and-delete as the bar above: `update` to undefined leaves the
+  // key present, and `machineWeightKg == null` would then read as false.
+  await db.exercises
+    .where('id')
+    .equals(id)
+    .modify((exercise) => {
+      delete exercise.machineWeightKg
+    })
+}
+
 /**
  * Whether an exercise can be deleted outright.
  *

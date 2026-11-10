@@ -65,23 +65,51 @@ describe('deriveRoutineDraft', () => {
   })
 
   describe('target weight', () => {
-    it('takes the weight most of the sets used', () => {
+    it('takes the weight when every set used the same one', () => {
       const draft = deriveRoutineDraft({
         name: 'Push A',
-        // A drop set at the end must not drag the plan down to 75.
-        exercises: [source({ sets: [set(80, 8), set(80, 8), set(80, 6), set(75, 8)] })],
+        exercises: [source({ sets: [set(80, 8), set(80, 8), set(80, 6)] })],
       })
 
       expect(draft.exercises[0]?.targetWeight).toEqual({ kind: 'absolute', kg: 80 })
+      // Same weight throughout is straight sets; the dropped rep on the last
+      // one is fatigue, and the rep range already says so.
+      expect(draft.exercises[0]).not.toHaveProperty('setPlan')
     })
 
-    it('breaks a tie toward the heavier weight', () => {
+    it('keeps a climb as a climb instead of collapsing it to one number', () => {
       const draft = deriveRoutineDraft({
         name: 'Push A',
         exercises: [source({ sets: [set(60, 8), set(70, 6), set(80, 4)] })],
       })
 
-      expect(draft.exercises[0]?.targetWeight).toEqual({ kind: 'absolute', kg: 80 })
+      const entry = draft.exercises[0]
+      // Every single answer the old vote could give was wrong here: 60 plans
+      // the warm-up end, 80 asks for your top set three times, 70 is a weight
+      // you did once. The ladder is just what happened.
+      expect(entry).not.toHaveProperty('targetWeight')
+      expect(entry?.setPlan).toEqual([
+        { reps: 8, weight: { kind: 'absolute', kg: 60 } },
+        { reps: 6, weight: { kind: 'absolute', kg: 70 } },
+        { reps: 4, weight: { kind: 'absolute', kg: 80 } },
+      ])
+      // The summary everything else reads still describes it.
+      expect(entry?.targetSets).toBe(3)
+      expect(entry?.targetRepsMin).toBe(4)
+      expect(entry?.targetRepsMax).toBe(8)
+    })
+
+    it('keeps a drop set at the end, rather than planning around it', () => {
+      const draft = deriveRoutineDraft({
+        name: 'Push A',
+        exercises: [source({ sets: [set(80, 8), set(80, 8), set(80, 6), set(75, 8)] })],
+      })
+
+      expect(draft.exercises[0]?.setPlan).toHaveLength(4)
+      expect(draft.exercises[0]?.setPlan?.at(-1)).toEqual({
+        reps: 8,
+        weight: { kind: 'absolute', kg: 75 },
+      })
     })
 
     it('plans no weight at all rather than a zero', () => {

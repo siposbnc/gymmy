@@ -4,7 +4,11 @@ import { useNavigate } from 'react-router'
 
 import { useActiveSession, useSettings } from '~/db/hooks'
 import { completeSession } from '~/db/repositories/history'
-import { addExerciseToSession, discardSession } from '~/db/repositories/sessions'
+import {
+  addExerciseToSession,
+  discardSession,
+  swapSessionExercise,
+} from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
 import { formatVolume } from '~/domain/units'
 import { useRestTimer } from '~/features/rest/restTimer'
@@ -17,12 +21,21 @@ import { ExerciseCard } from './ExerciseCard'
 import { ProgressRibbon } from './ProgressRibbon'
 import { formatDuration, useElapsed } from './useElapsed'
 
+type PickerMode =
+  | null
+  | { kind: 'add' }
+  /** Replacing one exercise: the row being swapped, and its name for the title. */
+  | { kind: 'swap'; sessionExerciseId: string; name: string }
+
 export function ActiveSessionScreen() {
   const navigate = useNavigate()
   const active = useActiveSession()
   const settings = useSettings()
 
-  const [picking, setPicking] = useState(false)
+  // One picker for both jobs. Adding and swapping differ only in what happens
+  // to the exercise that comes back, so the sheet is shared and the mode says
+  // which — see `ExerciseCard`'s note on why no card owns one.
+  const [picking, setPicking] = useState<PickerMode>(null)
   const [finishing, setFinishing] = useState(false)
 
   // The rest bar lives in the app shell, so an unstopped timer follows you out
@@ -75,13 +88,20 @@ export function ActiveSessionScreen() {
               groupedWithPrevious={
                 group != null && group === previous?.sessionExercise.supersetGroup
               }
+              onSwap={() =>
+                setPicking({
+                  kind: 'swap',
+                  sessionExerciseId: view.sessionExercise.id,
+                  name: view.exercise?.name ?? 'this exercise',
+                })
+              }
             />
           )
         })}
 
         <button
           type="button"
-          onClick={() => setPicking(true)}
+          onClick={() => setPicking({ kind: 'add' })}
           className="w-full cursor-pointer rounded-lg border-[1.5px] border-dashed border-line-strong p-3.5 text-[0.85rem] font-bold text-ink-muted"
         >
           <Plus size={15} className="mr-1 inline align-[-2px]" aria-hidden />
@@ -97,12 +117,17 @@ export function ActiveSessionScreen() {
       </div>
 
       <ExercisePickerSheet
-        open={picking}
-        onOpenChange={setPicking}
+        open={picking !== null}
+        onOpenChange={(open) => !open && setPicking(null)}
+        title={picking?.kind === 'swap' ? `Swap ${picking.name} for` : 'Add exercise'}
         alreadyAdded={views.map((view) => view.sessionExercise.exerciseId)}
         onPick={(exerciseId) => {
-          void addExerciseToSession(session.id, exerciseId)
-          setPicking(false)
+          if (picking?.kind === 'swap') {
+            void swapSessionExercise(picking.sessionExerciseId, exerciseId)
+          } else {
+            void addExerciseToSession(session.id, exerciseId)
+          }
+          setPicking(null)
         }}
       />
 

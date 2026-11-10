@@ -40,12 +40,14 @@ import { z } from 'zod'
 
 import { MUSCLE_ORDER } from './muscles'
 import type { RoutineExerciseDraft } from './routine-draft'
+import { isUniform } from './set-plan'
 import type {
   Equipment,
   Exercise,
   Id,
   MovementType,
   MuscleGroup,
+  PlannedSet,
   TrackingType,
   VolumeGoal,
 } from './types'
@@ -95,6 +97,30 @@ export interface SharedEntry {
   restSeconds?: number
   supersetGroup?: number
   notes?: string
+  /**
+   * A weight and a rep count per set, when the plan is a ladder.
+   *
+   * Plan data, so it travels — unlike a bar or a machine weight, a ladder is a
+   * fact about the programme rather than about the sender's gym. It rides
+   * *alongside* the flat targets, which stay correct as a summary, so a
+   * recipient on an older build drops this field in parsing and imports the
+   * same routine as straight sets rather than failing.
+   */
+  setPlan?: SharedPlannedSet[]
+}
+
+/**
+ * Spelled out rather than indexed off {@link SharedEntry} so the optional
+ * properties stay genuinely optional: `exactOptionalPropertyTypes` makes
+ * `SharedEntry['targetWeight']` include `undefined`, which then will not
+ * satisfy the domain's {@link PlannedSet}.
+ */
+export interface SharedPlannedSet {
+  reps: number
+  weight?:
+    | { kind: 'absolute'; kg: number }
+    | { kind: 'percent'; pct: number; basis: 'training_max' }
+  isAmrap?: boolean
 }
 
 export interface SharedRoutine {
@@ -152,6 +178,13 @@ const volumeGoalSchema = z.union([
  * routine, it is a corrupted byte — and importing it would write a row the
  * builder cannot render.
  */
+/** Bounded like everything else here: fifty rungs is absurd, 1e9 is damage. */
+const plannedSetSchema = z.object({
+  reps: z.number().int().min(1).max(500),
+  weight: targetWeightSchema.optional().catch(undefined),
+  isAmrap: z.boolean().optional().catch(undefined),
+})
+
 const entrySchema = z.object({
   exerciseId: z.string().min(1).max(200),
   targetSets: z.number().int().min(1).max(50),
@@ -162,6 +195,9 @@ const entrySchema = z.object({
   restSeconds: z.number().int().min(0).max(3600).optional().catch(undefined),
   supersetGroup: z.number().int().min(0).max(50).optional().catch(undefined),
   notes: z.string().max(2000).optional().catch(undefined),
+  // A damaged ladder degrades to none, leaving the flat targets to describe
+  // the entry — losing the shape is a scratch, losing the routine is not.
+  setPlan: z.array(plannedSetSchema).min(1).max(50).optional().catch(undefined),
 })
 
 const librarySchema = z.object({
@@ -208,9 +244,12 @@ export class ShareCodeError extends Error {
  *
  * Stripped deliberately: `barId` (bar ids are device-local, and a plate
  * calculation pointing at someone else's bar is worse than no bar at all),
- * the exercise's `notes` (documented as the user's own), and `pinnedAt` /
- * `archivedAt` / `isCustom`, which describe the sender's library rather than
- * the exercise. Routine notes *are* carried: they are plan instructions.
+ * `machineWeightKg` for exactly the same reason — it is what the leg press in
+ * *your* gym weighs, and carrying it would quietly add kilograms to every set
+ * the recipient logs — the exercise's `notes` (documented as the user's own),
+ * and `pinnedAt` / `archivedAt` / `isCustom`, which describe the sender's
+ * library rather than the exercise. Routine notes *are* carried: they are plan
+ * instructions.
  *
  * `description` is left out for a different reason — size. The seeded prose is
  * two thirds of a compressed code (1067 characters down to 580 for a
@@ -230,6 +269,7 @@ export function buildSharedRoutine(input: {
     restSeconds?: number | undefined
     supersetGroup?: number | undefined
     notes?: string | undefined
+    setPlan?: readonly PlannedSet[] | undefined
   }[]
   exercises: readonly Exercise[]
 }): SharedRoutine {
@@ -251,6 +291,15 @@ export function buildSharedRoutine(input: {
       ...(entry.restSeconds == null ? {} : { restSeconds: entry.restSeconds }),
       ...(entry.supersetGroup == null ? {} : { supersetGroup: entry.supersetGroup }),
       ...(entry.notes ? { notes: entry.notes } : {}),
+      ...(entry.setPlan == null || entry.setPlan.length === 0
+        ? {}
+        : {
+            setPlan: entry.setPlan.map((rung) => ({
+              reps: rung.reps,
+              ...(rung.weight == null ? {} : { weight: rung.weight }),
+              ...(rung.isAmrap ? { isAmrap: true } : {}),
+            })),
+          }),
     })),
     library: input.exercises
       .filter((exercise) => referenced.has(exercise.id))
@@ -322,6 +371,15 @@ export function bytesToPayload(bytes: Uint8Array): SharedRoutine {
       ...(entry.restSeconds == null ? {} : { restSeconds: entry.restSeconds }),
       ...(entry.supersetGroup == null ? {} : { supersetGroup: entry.supersetGroup }),
       ...(entry.notes ? { notes: entry.notes } : {}),
+      ...(entry.setPlan == null
+        ? {}
+        : {
+            setPlan: entry.setPlan.map((rung) => ({
+              reps: rung.reps,
+              ...(rung.weight == null ? {} : { weight: rung.weight }),
+              ...(rung.isAmrap ? { isAmrap: true } : {}),
+            })),
+          }),
     })),
     library: payload.library.map(normaliseSharedExercise),
   }
@@ -517,14 +575,27 @@ export function planImport(payload: SharedRoutine, existing: readonly Exercise[]
     // row that renders "Unknown exercise" forever.
     if (!match && !shared) continue
 
+    // A ladder of identical rungs is straight sets, and storing it would give
+    // the editor two states meaning the same thing — the same rule the
+    // repository applies to anything written locally.
+    const ladder =
+      entry.setPlan != null && entry.setPlan.length > 0 && !isUniform(entry.setPlan)
+        ? entry.setPlan
+        : undefined
+
     const draft: RoutineExerciseDraft = {
       exerciseId: match?.id ?? entry.exerciseId,
       order: entries.length,
-      targetSets: entry.targetSets,
+      targetSets: ladder ? ladder.length : entry.targetSets,
       targetRepsMin: entry.targetRepsMin,
       ...(entry.targetRepsMax == null ? {} : { targetRepsMax: entry.targetRepsMax }),
       isAmrap: entry.isAmrap,
-      ...(entry.targetWeight == null ? {} : { targetWeight: entry.targetWeight }),
+      // The ladder owns the weights when there is one; see `domain/set-plan`.
+      ...(ladder
+        ? { setPlan: ladder.map((rung) => ({ ...rung })) }
+        : entry.targetWeight == null
+          ? {}
+          : { targetWeight: entry.targetWeight }),
       ...(entry.restSeconds == null ? {} : { restSeconds: entry.restSeconds }),
       ...(entry.supersetGroup == null ? {} : { supersetGroup: entry.supersetGroup }),
       ...(entry.notes ? { notes: entry.notes } : {}),

@@ -15,6 +15,8 @@
  * both at once, and settles down as sessions pile up.
  */
 
+import { describeAge } from './recency'
+
 /** One appearance of an exercise in a finished session. */
 export interface ExerciseAppearance {
   readonly exerciseId: string
@@ -84,19 +86,4 @@ export function rankExerciseUsage(
 export function describeUsage(usage: ExerciseUsage, now: number = Date.now()): string {
   const sessions = `${usage.sessions} session${usage.sessions === 1 ? '' : 's'}`
   return `${sessions} · ${describeAge(usage.lastUsedAt, now)}`
-}
-
-/**
- * How long ago, at the precision that matters here.
- *
- * Days up to a fortnight, then weeks, then months — "today" and "3d" are worth
- * telling apart when choosing what to train; "47d" and "52d" are not.
- */
-function describeAge(at: number, now: number): string {
-  const days = Math.floor(Math.max(0, now - at) / DAY_MS)
-  if (days === 0) return 'today'
-  if (days === 1) return 'yesterday'
-  if (days < 14) return `${days}d`
-  if (days < 60) return `${Math.round(days / 7)}w`
-  return `${Math.round(days / 30)}mo`
 }

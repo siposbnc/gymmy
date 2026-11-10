@@ -129,6 +129,7 @@ describe('routine share codes', () => {
         trackingType: 'weight_reps',
         defaultRestSeconds: 120,
         barId: 'bar_default',
+        machineWeightKg: 25,
         notes: 'Left shoulder prefers this to overhead',
       })
 
@@ -155,8 +156,10 @@ describe('routine share codes', () => {
         equipment: 'barbell',
         isCustom: true,
       })
-      // The sender's bar and private notes are not theirs to share.
+      // The sender's bar, their machine, and their private notes are not
+      // theirs to share — all three describe a gym, not a plan.
       expect(exercise).not.toHaveProperty('barId')
+      expect(exercise).not.toHaveProperty('machineWeightKg')
       expect(exercise).not.toHaveProperty('notes')
 
       const entries = await listRoutineExercises(routineId)

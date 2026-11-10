@@ -1,3 +1,4 @@
+import { isUniform, stripPlanWeights, summariseSetPlan } from '~/domain/set-plan'
 import type { Session, SessionExercise, SetEntry, SetType } from '~/domain/types'
 import { newId } from '~/lib/uuid'
 
@@ -64,6 +65,11 @@ export async function addExerciseToSession(
       ...(exercise?.defaultRestSeconds == null
         ? {}
         : { restSeconds: exercise.defaultRestSeconds }),
+      // Snapshotted like the targets are: re-measuring the machine later must
+      // not change how this session's sets split into added and machine.
+      ...(exercise?.machineWeightKg == null
+        ? {}
+        : { machineWeightKg: exercise.machineWeightKg }),
     })
   })
   return id
@@ -98,6 +104,225 @@ export async function setExerciseRest(
   await db.transaction('rw', db.sessionExercises, db.exercises, async () => {
     await db.sessionExercises.update(sessionExerciseId, { restSeconds: seconds })
     await db.exercises.update(exerciseId, { defaultRestSeconds: seconds })
+  })
+}
+
+/**
+ * Correct what this machine weighs, mid-workout.
+ *
+ * Writes both rows for the same reason `setExerciseRest` does — you are
+ * standing in front of the machine, so this is a correction to a bad value
+ * rather than a one-off — but it matters more here: the session's snapshot is
+ * deliberately immune to later edits of the exercise, so without this there
+ * would be no way to fix a wrong machine weight in the session you noticed it.
+ *
+ * Only the split changes. Sets already logged keep the totals they were logged
+ * with, because that is what you lifted; what moves is how the *next* set
+ * converts what you add.
+ */
+export async function setExerciseMachineWeight(
+  sessionExerciseId: string,
+  exerciseId: string,
+  kg: number,
+): Promise<void> {
+  await db.transaction('rw', db.sessionExercises, db.exercises, async () => {
+    await db.sessionExercises.update(sessionExerciseId, { machineWeightKg: kg })
+    await db.exercises.update(exerciseId, { machineWeightKg: kg })
+  })
+}
+
+/** Which target fields a swap rewrites. Everything else about a row survives. */
+type TargetFields = Partial<
+  Pick<
+    SessionExercise,
+    'targetSets' | 'targetRepsMin' | 'targetRepsMax' | 'isAmrap' | 'setPlan' | 'targetWeight'
+  >
+>
+
+/**
+ * The plan the replacement exercise inherits: what is left to do, minus loads.
+ *
+ * A ladder is sliced from the rung you had reached, so swapping after two rungs
+ * of a 10/8/6 climb leaves the new exercise asking for the 6. Stripping the
+ * weights can turn a climb into straight sets — 60×8/70×8 becomes 8/8 — and a
+ * uniform ladder is never stored, so the summary alone describes it.
+ *
+ * No targets at all is a legitimate answer: a freestyle exercise has none to
+ * carry, and neither does one whose sets were all completed before the swap.
+ */
+function remainingPlan(row: SessionExercise, done: number): TargetFields {
+  if (row.setPlan && row.setPlan.length > 0) {
+    const rungs = stripPlanWeights(row.setPlan.slice(done))
+    if (rungs.length === 0) return {}
+    return {
+      ...summariseSetPlan(rungs),
+      ...(isUniform(rungs) ? {} : { setPlan: rungs }),
+    }
+  }
+
+  if (row.targetSets == null) return {}
+  const remaining = row.targetSets - done
+  if (remaining <= 0) return {}
+
+  return {
+    targetSets: remaining,
+    targetRepsMin: row.targetRepsMin ?? 1,
+    ...(row.targetRepsMax == null ? {} : { targetRepsMax: row.targetRepsMax }),
+    // "Last set to failure" is still the plan; the last set has just moved.
+    isAmrap: row.isAmrap ?? false,
+  }
+}
+
+/**
+ * The plan the original exercise is left holding: only what was done on it.
+ *
+ * Without this the card reads "2 of 4" for the rest of the workout on an
+ * exercise you have finished with, and the progress ribbon keeps counting two
+ * sets nobody is going to do there. Trimming the target to the work that
+ * actually happened keeps the session's total planned sets unchanged, since the
+ * remainder is now asked for by the row below.
+ *
+ * Nothing but warm-ups logged means no plan survives here at all — the whole
+ * prescription moved, and the warm-ups stay where they were performed.
+ */
+function completedPlan(row: SessionExercise, done: number): TargetFields {
+  if (done <= 0) return {}
+
+  if (row.setPlan && row.setPlan.length > 0) {
+    // The loads stay on these rungs: they describe work that was planned and
+    // performed on THIS exercise, which is history rather than a prescription.
+    const rungs = row.setPlan.slice(0, done)
+    return {
+      ...summariseSetPlan(rungs),
+      ...(isUniform(rungs) ? {} : { setPlan: rungs }),
+      ...(row.targetWeight == null ? {} : { targetWeight: row.targetWeight }),
+    }
+  }
+
+  if (row.targetSets == null) return {}
+
+  return {
+    targetSets: done,
+    targetRepsMin: row.targetRepsMin ?? 1,
+    ...(row.targetRepsMax == null ? {} : { targetRepsMax: row.targetRepsMax }),
+    ...(row.targetWeight == null ? {} : { targetWeight: row.targetWeight }),
+    // The set that was to be taken to failure is in the remainder now.
+    isAmrap: false,
+  }
+}
+
+export interface SwapResult {
+  /** The row holding the new exercise — the same row, or a freshly inserted one. */
+  readonly sessionExerciseId: string
+  /**
+   * True when sets had already been logged, so the original exercise kept them
+   * and the replacement was inserted directly below it.
+   */
+  readonly inserted: boolean
+}
+
+/**
+ * Swap an exercise for another one, mid-workout.
+ *
+ * The rack is taken, the machine is broken, your shoulder says no: the
+ * substitution is a normal part of training, and without this the only way out
+ * is to delete the exercise and add another, losing its place, its grouping and
+ * its targets.
+ *
+ * **What travels: the position and the shape of the work.** Order, superset
+ * group, rest and the rep prescription. Not the loads — see
+ * {@link stripPlanWeights} — and not the notes, which described a setup for a
+ * movement you are no longer doing.
+ *
+ * **What never travels: logged sets.** A set logged under Bench Press is a
+ * bench press, and relabelling it would quietly falsify history, the volume
+ * split and the records path. So the swap takes one of two shapes:
+ *
+ * - **Nothing logged yet** — the row itself changes exercise, keeping its
+ *   place. Nothing else in the session can tell the difference.
+ * - **Sets already logged** — the original keeps them, trimmed to the sets it
+ *   actually accounted for, and the replacement is inserted immediately below
+ *   with the remaining ones. "Two sets of bench, then the rack went" is then
+ *   what the session says, because it is what happened.
+ *
+ * Returns null when the row is gone, and a no-op result when the exercise
+ * picked is the one already there.
+ */
+export async function swapSessionExercise(
+  sessionExerciseId: string,
+  exerciseId: string,
+): Promise<SwapResult | null> {
+  return db.transaction('rw', db.sessionExercises, db.sets, db.exercises, async () => {
+    const row = await db.sessionExercises.get(sessionExerciseId)
+    if (!row) return null
+    if (row.exerciseId === exerciseId) return { sessionExerciseId: row.id, inserted: false }
+
+    const [replacement, logged] = await Promise.all([
+      db.exercises.get(exerciseId),
+      listSets(sessionExerciseId),
+    ])
+    const working = logged.filter((set) => set.type !== 'warmup').length
+
+    // Rest belongs to the exercise, so the replacement brings its own default
+    // and only falls back to what this row was carrying. The machine weight is
+    // snapshotted exactly as `addExerciseToSession` does it, and must be
+    // ABSENT rather than stale when the new exercise is not a machine.
+    const shared = {
+      sessionId: row.sessionId,
+      exerciseId,
+      ...(replacement?.defaultRestSeconds != null
+        ? { restSeconds: replacement.defaultRestSeconds }
+        : row.restSeconds == null
+          ? {}
+          : { restSeconds: row.restSeconds }),
+      ...(replacement?.machineWeightKg == null
+        ? {}
+        : { machineWeightKg: replacement.machineWeightKg }),
+      ...(row.supersetGroup == null ? {} : { supersetGroup: row.supersetGroup }),
+    }
+
+    if (logged.length === 0) {
+      // `put` rather than `update`: the fields that must disappear — a stale
+      // machine weight, the old exercise's notes, a target weight for a bar
+      // this movement does not use — only go away if the row is rewritten.
+      await db.sessionExercises.put({
+        ...shared,
+        id: row.id,
+        order: row.order,
+        ...remainingPlan(row, 0),
+      })
+      return { sessionExerciseId: row.id, inserted: false }
+    }
+
+    const siblings = await db.sessionExercises.where('sessionId').equals(row.sessionId).toArray()
+    await Promise.all(
+      siblings
+        .filter((sibling) => sibling.order > row.order)
+        .map((sibling) => db.sessionExercises.update(sibling.id, { order: sibling.order + 1 })),
+    )
+
+    // Destructured away rather than overwritten: `completedPlan` may legitimately
+    // return none of them, and a target left behind would outlive its plan.
+    const {
+      targetSets: _targetSets,
+      targetRepsMin: _targetRepsMin,
+      targetRepsMax: _targetRepsMax,
+      targetWeight: _targetWeight,
+      isAmrap: _isAmrap,
+      setPlan: _setPlan,
+      ...keep
+    } = row
+    await db.sessionExercises.put({ ...keep, ...completedPlan(row, working) })
+
+    const id = newId('sex')
+    await db.sessionExercises.add({
+      ...shared,
+      id,
+      order: row.order + 1,
+      ...remainingPlan(row, working),
+    })
+
+    return { sessionExerciseId: id, inserted: true }
   })
 }
 

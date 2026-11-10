@@ -1,3 +1,4 @@
+import { addedWeightKg, describeMachineLoad } from '~/domain/machines'
 import type { PrefillSource } from '~/domain/metrics'
 import type { TrackingType } from '~/domain/types'
 import { formatWeight, type WeightUnit } from '~/domain/units'
@@ -5,7 +6,15 @@ import { cn } from '~/ui/cn'
 
 interface PendingSetRowProps {
   setIndex: number
+  /** The total load — what gets logged, machine weight included. */
   weightKg: number | undefined
+  /**
+   * What the machine itself weighs, or 0.
+   *
+   * When this is set the row shows what you *added*, because that is the
+   * number you physically change, and states the total underneath.
+   */
+  machineWeightKg: number
   reps: number | undefined
   /** Which prefill tier produced these values — announced, not drawn. */
   source: PrefillSource
@@ -29,6 +38,7 @@ interface PendingSetRowProps {
 export function PendingSetRow({
   setIndex,
   weightKg,
+  machineWeightKg,
   reps,
   source,
   isWarmup,
@@ -40,6 +50,13 @@ export function PendingSetRow({
   onLog,
 }: PendingSetRowProps) {
   const showsWeight = trackingType !== 'reps_only'
+
+  // On a machine with a weight of its own, the figure in the row is what you
+  // put on it; the total is spelled out below. Everywhere else the two are the
+  // same number and the extra line never appears.
+  const shownWeightKg =
+    machineWeightKg > 0 ? addedWeightKg(weightKg, machineWeightKg) : weightKg
+  const machineLine = describeMachineLoad(weightKg, machineWeightKg, unit)
   // A weight-tracked set logged without a weight is not a set: it is a hole in
   // the volume total and in every record derived from it. Reps-only work is
   // the one case where that absence is the truth, and there the field is not
@@ -75,10 +92,16 @@ export function PendingSetRow({
             <button
               type="button"
               onClick={onEditWeight}
-              aria-label={`Weight: ${weightKg == null ? 'not set' : formatWeight(weightKg, unit)}. Edit.`}
+              aria-label={
+                machineWeightKg > 0
+                  ? `Added weight: ${shownWeightKg == null ? 'not set' : formatWeight(shownWeightKg, unit)}${
+                      weightKg == null ? '' : `, ${formatWeight(weightKg, unit)} total`
+                    }. Edit.`
+                  : `Weight: ${weightKg == null ? 'not set' : formatWeight(weightKg, unit)}. Edit.`
+              }
               className="num cursor-pointer rounded-sm border-b-2 border-accent bg-sunken px-2 py-0.5 text-title font-semibold"
             >
-              {weightKg == null ? '—' : formatWeight(weightKg, unit, { withUnit: false })}
+              {shownWeightKg == null ? '—' : formatWeight(shownWeightKg, unit, { withUnit: false })}
               <span className="ml-0.5 text-[0.75rem] font-semibold text-ink-muted">{unit}</span>
             </button>
           ) : (
@@ -120,6 +143,17 @@ export function PendingSetRow({
             : 'Pre-filled from your training history.'}
         </span>
       </div>
+
+      {/* The sum, stated where the number is typed — the row says what you put
+          on the machine, every total in the app says what you lifted, and the
+          difference has to be visible rather than inferred. `aria-hidden`
+          because the weight button's own label already carries both figures;
+          announcing them twice is worse than not at all. */}
+      {machineLine ? (
+        <p aria-hidden className="num px-2.5 text-[0.72rem] text-ink-muted">
+          {machineLine}
+        </p>
+      ) : null}
 
       {/* A disabled button with no stated reason is a dead end, and this one
           fires on the first set of every new exercise. */}

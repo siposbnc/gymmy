@@ -1,12 +1,13 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ThemeProvider } from '~/app/ThemeProvider'
 import {
   addExerciseToRoutine,
   createRoutine,
+  setRoutineSetPlan,
   startSessionFromRoutine,
   updateRoutineExercise,
 } from '~/db/repositories/routines'
@@ -25,6 +26,35 @@ import { ActiveSessionScreen } from './ActiveSessionScreen'
  * If this breaks, the product is broken — everything else in Gymmy exists to
  * serve this interaction.
  */
+/**
+ * Unmount before the next case deletes the database.
+ *
+ * `useLiveQuery` keeps a read in flight across the end of a test; if Dexie
+ * closes underneath it the promise rejects with `DatabaseClosedError`, which
+ * Vitest reports as an unhandled rejection and can attribute to whichever
+ * test happens to be running. Draining a tick with the database still open
+ * lets it settle.
+ */
+afterEach(cleanup)
+
+/**
+ * Start each case from a clean, seeded database — without closing the old one.
+ *
+ * Every other suite resets with `db.delete()`, which is fine when nothing is
+ * mounted. Here the session screen is, and its `useLiveQuery` spans five
+ * tables: a read can still be in the air when the connection goes, and Dexie
+ * rejects it with `DatabaseClosedError`. Vitest then reports an unhandled
+ * rejection against whichever test is running by then — a flake that fails a
+ * case which did nothing wrong.
+ *
+ * Emptying the tables leaves the connection open, so a late read returns
+ * nothing instead of throwing.
+ */
+async function resetDatabase() {
+  await Promise.all(db.tables.map((table) => table.clear()))
+  await bootstrapDatabase()
+}
+
 function renderSession() {
   return render(
     <ThemeProvider>
@@ -37,9 +67,7 @@ function renderSession() {
 
 describe('logging a set', () => {
   beforeEach(async () => {
-    await db.delete()
-    await db.open()
-    await bootstrapDatabase()
+    await resetDatabase()
     useRestTimer.setState({ endsAt: null, totalSeconds: 0, label: null, signalled: false })
   })
 
@@ -406,5 +434,280 @@ describe('logging a set', () => {
     // The rest bar lives in the app shell — left running it would count down
     // over the session summary and then chime for a workout that is over.
     await waitFor(() => expect(useRestTimer.getState().endsAt).toBeNull())
+  })
+})
+
+describe('a routine that plans a weight per set', () => {
+  beforeEach(async () => {
+    await resetDatabase()
+    useRestTimer.setState({ endsAt: null, totalSeconds: 0, label: null, signalled: false })
+  })
+
+  it('gives each set its own rung on the first run, then gets out of the way', async () => {
+    const user = userEvent.setup()
+
+    const routineId = await createRoutine('Legs')
+    const entryId = await addExerciseToRoutine(routineId, 'ex_squat')
+    await setRoutineSetPlan(entryId, [
+      { reps: 10, weight: { kind: 'absolute', kg: 60 } },
+      { reps: 8, weight: { kind: 'absolute', kg: 70 } },
+      { reps: 6, weight: { kind: 'absolute', kg: 80 } },
+    ])
+
+    const sessionId = await startSessionFromRoutine(routineId)
+    renderSession()
+    await screen.findByText('Squat')
+
+    // Written down, so it works before there is any history to copy — which
+    // is the whole reason a ladder is worth storing.
+    expect(screen.getByText(/60 × 10/)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 60 kg\. edit/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /reps: 10\. edit/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 70 kg\. edit/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /reps: 8\. edit/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+    await user.click(await screen.findByRole('button', { name: /^log$/i }))
+
+    // Wait on the screen, not just the database: the test ends by deleting
+    // the database, and a live query still in flight would then reject.
+    await screen.findByRole('button', { name: /set 3 options/i })
+
+    const links = await db.sessionExercises.where('sessionId').equals(sessionId).toArray()
+    await waitFor(async () => {
+      const logged = await listSets(links[0]!.id)
+      expect(logged.map((set) => set.weightKg)).toEqual([60, 70, 80])
+    })
+  })
+
+  it('is outranked by what you actually lifted', async () => {
+    const routineId = await createRoutine('Legs')
+    const entryId = await addExerciseToRoutine(routineId, 'ex_squat')
+    await setRoutineSetPlan(entryId, [
+      { reps: 10, weight: { kind: 'absolute', kg: 60 } },
+      { reps: 8, weight: { kind: 'absolute', kg: 70 } },
+    ])
+
+    // Last week you opened at 65, not the 60 the routine still says.
+    const past = await startSessionFromRoutine(routineId)
+    const pastLink = (await db.sessionExercises.where('sessionId').equals(past).toArray())[0]!
+    await db.sets.add({
+      id: 'past-1',
+      sessionExerciseId: pastLink.id,
+      setIndex: 1,
+      weightKg: 65,
+      reps: 10,
+      type: 'normal',
+      completedAt: Date.now() - 100_000,
+    })
+    await db.sessions.update(past, { status: 'completed', endedAt: Date.now() - 90_000 })
+
+    await startSessionFromRoutine(routineId)
+    renderSession()
+    await screen.findByText('Squat')
+
+    // The plan seeds an exercise with no history and then stops arguing with
+    // it. Otherwise it would hand back the stale 60 every week until someone
+    // went and edited the routine.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 65 kg\. edit/i })).toBeInTheDocument()
+    })
+  })
+})
+
+describe('an exercise you ramp', () => {
+  beforeEach(async () => {
+    await resetDatabase()
+    useRestTimer.setState({ endsAt: null, totalSeconds: 0, label: null, signalled: false })
+  })
+
+  /** Last session: 60 × 10, 70 × 8, 80 × 6. */
+  async function rampedLastWeek() {
+    const past = await startEmptySession('Legs')
+    const link = await addExerciseToSession(past, 'ex_squat')
+    const rungs = [
+      [60, 10],
+      [70, 8],
+      [80, 6],
+    ]
+    for (const [index, [weight, reps]] of rungs.entries()) {
+      await db.sets.add({
+        id: `past-${index}`,
+        sessionExerciseId: link,
+        setIndex: index + 1,
+        weightKg: weight!,
+        reps: reps!,
+        type: 'normal',
+        completedAt: Date.now() - 100_000 + index,
+      })
+    }
+    await db.sessions.update(past, { status: 'completed', endedAt: Date.now() - 90_000 })
+  }
+
+  it('offers the next rung instead of making you retype the climb', async () => {
+    const user = userEvent.setup()
+    await rampedLastWeek()
+
+    const sessionId = await startEmptySession('Legs')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_squat')
+
+    renderSession()
+    await screen.findByText('Squat')
+
+    // Set one opens on last session's opener, as it always has.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 60 kg\. edit/i })).toBeInTheDocument()
+    })
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+
+    // Set two is the rung above — with its own rep count, not the ten you did
+    // at the bottom. Before this, it offered 60 again.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 70 kg\. edit/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /reps: 8\. edit/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 80 kg\. edit/i })).toBeInTheDocument()
+    })
+
+    // Three taps, three rungs, nothing typed.
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+    await screen.findByRole('button', { name: /set 3 options/i })
+
+    await waitFor(async () => {
+      const logged = await listSets(sessionExerciseId)
+      expect(logged.map((set) => set.weightKg)).toEqual([60, 70, 80])
+      expect(logged.map((set) => set.reps)).toEqual([10, 8, 6])
+    })
+  })
+
+  it('carries the whole climb up when you push the opening set', async () => {
+    const user = userEvent.setup()
+    await rampedLastWeek()
+
+    const sessionId = await startEmptySession('Legs')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_squat')
+
+    renderSession()
+    await screen.findByText('Squat')
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 60 kg\. edit/i })).toBeInTheDocument()
+    })
+
+    // 60 → 62.5 on the opener.
+    await user.click(screen.getByRole('button', { name: /weight: 60 kg\. edit/i }))
+    await user.click(await screen.findByRole('button', { name: '6' }))
+    await user.click(screen.getByRole('button', { name: '2' }))
+    await user.click(screen.getByRole('button', { name: '.' }))
+    await user.click(screen.getByRole('button', { name: '5' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(await screen.findByRole('button', { name: /^log$/i }))
+
+    // The rest of the climb follows by the same 2.5, unasked.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /weight: 72\.5 kg\. edit/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+    await screen.findByRole('button', { name: /set 2 options/i })
+
+    await waitFor(async () => {
+      const logged = await listSets(sessionExerciseId)
+      expect(logged.map((set) => set.weightKg)).toEqual([62.5, 72.5])
+    })
+  })
+})
+
+/**
+ * A machine that weighs something before you load it.
+ *
+ * The claim being tested is the one the feature exists for: you enter what you
+ * added, because that is what you physically do, and what gets stored is what
+ * you actually moved — so every record, total and chart downstream keeps
+ * reading one field that means one thing.
+ */
+describe('a machine with a weight of its own', () => {
+  beforeEach(async () => {
+    await resetDatabase()
+    useRestTimer.setState({ endsAt: null, totalSeconds: 0, label: null, signalled: false })
+    await db.exercises.update('ex_leg-press', { machineWeightKg: 25 })
+  })
+
+  it('takes the weight you added and logs the total', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Legs')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_leg-press')
+
+    renderSession()
+    expect(await screen.findByText('Leg Press')).toBeInTheDocument()
+
+    // The field asks for what you add, and says so.
+    await user.click(screen.getByRole('button', { name: /added weight: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '4' }))
+    await user.click(screen.getByRole('button', { name: '0' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    // Both numbers are on screen: the one you typed and the one that counts.
+    expect(await screen.findByText('+ 25 kg machine = 65 kg total')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /added weight: 40 kg, 65 kg total/i }),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+
+    // Stored as the total — anything else would understate every record and
+    // volume figure derived from it.
+    await waitFor(async () => {
+      const sets = await listSets(sessionExerciseId)
+      expect(sets[0]?.weightKg).toBe(65)
+    })
+
+    // And the logged row reads as the total, with the convention stated once
+    // for the card rather than repeated on every row.
+    expect(screen.getByText(/logged weights include it/i)).toBeInTheDocument()
+  })
+
+  it('lets you log the carriage on its own, because that is real work', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Legs')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_leg-press')
+
+    renderSession()
+    await screen.findByText('Leg Press')
+
+    // Nothing on it: zero added is a legitimate entry here, where elsewhere a
+    // zero weight is a set that would vanish from volume and records.
+    await user.click(screen.getByRole('button', { name: /added weight: not set/i }))
+    await user.click(await screen.findByRole('button', { name: '0' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await user.click(await screen.findByRole('button', { name: /^log$/i }))
+
+    await waitFor(async () => {
+      const sets = await listSets(sessionExerciseId)
+      expect(sets[0]?.weightKg).toBe(25)
+    })
+  })
+
+  it('asks for a plain weight when the exercise has no machine weight', async () => {
+    const sessionId = await startEmptySession('Push')
+    await addExerciseToSession(sessionId, 'ex_bench-press')
+
+    renderSession()
+    await screen.findByText('Bench Press')
+
+    // The added/total split appears only where it means something.
+    expect(screen.getByRole('button', { name: /weight: not set/i })).toBeInTheDocument()
+    expect(screen.queryByText(/machine/i)).not.toBeInTheDocument()
   })
 })

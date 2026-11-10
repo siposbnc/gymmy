@@ -200,6 +200,7 @@ describe('buildSharedRoutine', () => {
       exercises: [
         exercise({
           barId: 'bar_mine',
+          machineWeightKg: 25,
           notes: 'Bench feels better with the thumbless grip',
           pinnedAt: 1_700_000_000_000,
           archivedAt: 1_700_000_000_000,
@@ -209,12 +210,50 @@ describe('buildSharedRoutine', () => {
 
     const carried = shared.library[0]!
     expect(carried).not.toHaveProperty('barId')
+    // What the leg press in your gym weighs is not a fact about the plan, and
+    // carrying it would add kilograms to every set the recipient logs.
+    expect(carried).not.toHaveProperty('machineWeightKg')
     expect(carried).not.toHaveProperty('notes')
     expect(carried).not.toHaveProperty('pinnedAt')
     expect(carried).not.toHaveProperty('archivedAt')
     expect(carried).not.toHaveProperty('isCustom')
     // Routine notes are plan instructions, so those do travel.
     expect(shared.notes).toBe('Slow eccentrics')
+  })
+
+  it('carries a ladder, because the shape of the work is the plan', () => {
+    const ladder = [
+      { reps: 10, weight: { kind: 'absolute' as const, kg: 60 } },
+      { reps: 8, weight: { kind: 'absolute' as const, kg: 70 } },
+      { reps: 6, weight: { kind: 'absolute' as const, kg: 80 }, isAmrap: true },
+    ]
+
+    const shared = buildSharedRoutine({
+      routine,
+      entries: [{ ...entries[0]!, setPlan: ladder }],
+      exercises: [exercise()],
+    })
+
+    expect(shared.entries[0]?.setPlan).toEqual(ladder)
+    // Alongside the flat targets, never instead of them: a recipient whose
+    // build predates ladders drops the field and imports straight sets.
+    expect(shared.entries[0]?.targetSets).toBe(3)
+    expect(shared.entries[0]?.targetRepsMin).toBe(8)
+  })
+
+  it('survives the round trip through bytes', () => {
+    const ladder = [
+      { reps: 10, weight: { kind: 'absolute' as const, kg: 60 } },
+      { reps: 6, weight: { kind: 'absolute' as const, kg: 80 } },
+    ]
+
+    const shared = buildSharedRoutine({
+      routine,
+      entries: [{ ...entries[0]!, setPlan: ladder }],
+      exercises: [exercise()],
+    })
+
+    expect(bytesToPayload(payloadToBytes(shared)).entries[0]?.setPlan).toEqual(ladder)
   })
 })
 
@@ -234,6 +273,54 @@ describe('planImport', () => {
 
     expect(plan.entries[0]?.exerciseId).toBe('bench-press')
     expect(plan.entries[0]).not.toHaveProperty('create')
+  })
+
+  it('imports a ladder as a ladder, and drops the flat weight beside it', () => {
+    const shared = payload({
+      entries: [
+        {
+          exerciseId: 'bench-press',
+          targetSets: 3,
+          targetRepsMin: 6,
+          targetRepsMax: 10,
+          isAmrap: false,
+          // A sender on a build that writes both; the ladder is the live one.
+          targetWeight: { kind: 'absolute', kg: 70 },
+          setPlan: [
+            { reps: 10, weight: { kind: 'absolute', kg: 60 } },
+            { reps: 8, weight: { kind: 'absolute', kg: 70 } },
+            { reps: 6, weight: { kind: 'absolute', kg: 80 } },
+          ],
+        },
+      ],
+    })
+
+    const draft = planImport(shared, [exercise()]).entries[0]?.draft
+    expect(draft?.setPlan).toHaveLength(3)
+    expect(draft).not.toHaveProperty('targetWeight')
+    expect(draft?.targetSets).toBe(3)
+  })
+
+  it('treats a ladder of identical rungs as the straight sets it is', () => {
+    const shared = payload({
+      entries: [
+        {
+          exerciseId: 'bench-press',
+          targetSets: 2,
+          targetRepsMin: 8,
+          isAmrap: false,
+          targetWeight: { kind: 'absolute', kg: 80 },
+          setPlan: [
+            { reps: 8, weight: { kind: 'absolute', kg: 80 } },
+            { reps: 8, weight: { kind: 'absolute', kg: 80 } },
+          ],
+        },
+      ],
+    })
+
+    const draft = planImport(shared, [exercise()]).entries[0]?.draft
+    expect(draft).not.toHaveProperty('setPlan')
+    expect(draft?.targetWeight).toEqual({ kind: 'absolute', kg: 80 })
   })
 
   it('matches by name when the local copy was renamed', () => {

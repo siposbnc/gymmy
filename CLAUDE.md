@@ -48,6 +48,25 @@ user-facing explanation cannot drift from the maths.
 - **Sessions snapshot their routine.** Name, order, rest, targets and the volume
   goal are copied at start. Editing a routine must never rewrite training
   history — including turning a session you beat into one you missed.
+- **History outranks the plan, on weight.** A routine is a group of exercises
+  with some useful defaults attached: it seeds an exercise with no history and
+  then gets out of the way, because what you can lift is a fact about your
+  training rather than a number somebody typed once. Reps are the other way
+  round — the plan leads there. A ladder (`setPlan`) contributes the *shape* of
+  an exercise, never the absolute numbers: it is shifted by whatever you
+  changed on set one, exactly as a ramp from last session is.
+- **A ladder always travels with the summary it implies.** `targetSets`,
+  `targetRepsMin/Max` and `isAmrap` are rewritten from `setPlan` on every
+  write, never by a caller, which is why the ribbon, the session header and
+  the weekly set counts never had to learn ladders exist. A ladder whose rungs
+  are identical is not stored — that is straight sets.
+- **A swap carries the shape, never the load — and never a logged set.**
+  Replacing an exercise mid-session moves its place, its superset group and its
+  rep prescription; absolute weights are stripped, because 80 kg of bench press
+  is not 80 kg of dumbbell press. If sets are already logged, the original
+  keeps them and the replacement is inserted below it: a set logged under Bench
+  Press is a bench press, and relabelling it would falsify history, the volume
+  split and the records path.
 - **Goals report, they do not score.** A missed volume goal is a number beside
   another number: no red state, no failure copy, no broken streak. And a goal is
   never invented — the first run of a routine has nothing to beat, so it shows
@@ -56,8 +75,13 @@ user-facing explanation cannot drift from the maths.
   converted at the boundary and nowhere else.
 - **A share code carries a plan, never history.** Routine, targets, rest,
   supersets, notes — and nothing else, ever. No sets, no records, no body
-  weight, no settings, and nothing device-local such as a `barId`. Adding a
-  field to the payload is a decision about what leaves someone's phone.
+  weight, no settings, and nothing device-local such as a `barId` or a
+  `machineWeightKg`. Adding a field to the payload is a decision about what
+  leaves someone's phone.
+- **A set's `weightKg` is the total load.** Plates plus the bar, and what you
+  added plus what the machine weighs. The session screen converts at the input,
+  nothing downstream knows the difference, and the split is snapshotted onto
+  the session so re-measuring a machine cannot rewrite how history reads.
 - **Derived targets are previewed before they are written.** Saving a session
   as a routine and importing a code both show the exact rows they will write,
   which is why the repositories expose a draft/plan step separately from the

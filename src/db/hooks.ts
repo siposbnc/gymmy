@@ -4,6 +4,13 @@ import { backupStatus, type BackupStatus } from '~/domain/backup-reminder'
 import { rankExerciseUsage, type ExerciseUsage } from '~/domain/exercise-usage'
 import { muscleSetProgress, type MuscleSetProgress } from '~/domain/goals'
 import { muscleLabel } from '~/domain/muscles'
+import {
+  lastRunByRoutine,
+  muscleRecency,
+  RECENCY_WINDOW_DAYS,
+  type MuscleRecency,
+  type RecencySet,
+} from '~/domain/recency'
 import type { RoutineDraft } from '~/domain/routine-draft'
 import {
   computeStreak,
@@ -109,6 +116,68 @@ export function useBackupStatus(): BackupStatus | undefined {
 
     return backupStatus({ lastExportAt, unsavedSessions })
   }, [lastExportAt])
+}
+
+export interface TrainingRecency {
+  /** Every muscle with any history, longest rested first. */
+  muscles: MuscleRecency[]
+  /** Last finished run of each routine, by routine id. */
+  routineLastRunAt: Map<string, number>
+}
+
+/**
+ * How long since each muscle and each routine was last trained.
+ *
+ * Reads a window of sets through the `completedAt` index rather than the whole
+ * table: this runs on the launch screen, and "how long ago" is a question about
+ * recent history by construction. Muscles trained before the window still
+ * appear — `sessionExercises` is small and says what has ever been trained —
+ * with a null date the copy reports as "6mo+" rather than as a number.
+ *
+ * Gated on `enabled` because the card that shows it is hidden while a workout
+ * is in progress, and by then the decision it supports has been made.
+ */
+export function useTrainingRecency(enabled = true): TrainingRecency | undefined {
+  return useLiveQuery(async () => {
+    if (!enabled) return { muscles: [], routineLastRunAt: new Map<string, number>() }
+
+    const cutoff = Date.now() - RECENCY_WINDOW_DAYS * 86_400_000
+    const [links, exercises, recentSets, sessions] = await Promise.all([
+      db.sessionExercises.toArray(),
+      db.exercises.toArray(),
+      db.sets.where('completedAt').above(cutoff).toArray(),
+      db.sessions.toArray(),
+    ])
+
+    const linkById = new Map(links.map((link) => [link.id, link]))
+    const primaryMuscle = new Map(
+      exercises.flatMap((exercise) =>
+        exercise.muscleGroups[0] ? [[exercise.id, exercise.muscleGroups[0]] as const] : [],
+      ),
+    )
+
+    const sets: RecencySet[] = recentSets.flatMap((set) => {
+      const link = linkById.get(set.sessionExerciseId)
+      if (!link) return []
+      return [
+        {
+          exerciseId: link.exerciseId,
+          completedAt: set.completedAt,
+          type: set.type,
+          reps: set.reps,
+        },
+      ]
+    })
+
+    return {
+      muscles: muscleRecency(
+        sets,
+        primaryMuscle,
+        links.map((link) => link.exerciseId),
+      ),
+      routineLastRunAt: lastRunByRoutine(sessions),
+    }
+  }, [enabled])
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import { bootstrapDatabase } from '../seed'
 import {
   addExerciseToRoutine,
   archiveRoutine,
+  clearRoutineSetPlan,
   clearRoutineTargetWeight,
   clearRoutineVolumeGoal,
   createRoutine,
@@ -18,6 +19,7 @@ import {
   moveRoutineExercise,
   removeRoutineExercise,
   renameRoutine,
+  setRoutineSetPlan,
   setRoutineVolumeGoal,
   startSessionFromRoutine,
   toggleSupersetWithPrevious,
@@ -254,6 +256,94 @@ describe('routines', () => {
     })
   })
 
+  describe('a weight and a rep count per set', () => {
+    async function benchIn(routineId: string) {
+      return addExerciseToRoutine(routineId, 'ex_bench-press')
+    }
+
+    const ladder = [
+      { reps: 10, weight: { kind: 'absolute' as const, kg: 60 } },
+      { reps: 8, weight: { kind: 'absolute' as const, kg: 70 } },
+      { reps: 6, weight: { kind: 'absolute' as const, kg: 80 } },
+    ]
+
+    it('rewrites the flat targets from the ladder, so everything else still reads', async () => {
+      const routineId = await createRoutine('Legs')
+      const entryId = await benchIn(routineId)
+
+      await setRoutineSetPlan(entryId, ladder)
+
+      const entry = (await listRoutineExercises(routineId))[0]
+      expect(entry?.setPlan).toHaveLength(3)
+      // The summary is what the ribbon, the session header and the weekly set
+      // counts read. It is never written by a caller.
+      expect(entry).toMatchObject({ targetSets: 3, targetRepsMin: 6, targetRepsMax: 10 })
+    })
+
+    it('drops the flat weight, so there is only one answer per set', async () => {
+      const routineId = await createRoutine('Legs')
+      const entryId = await benchIn(routineId)
+
+      await updateRoutineExercise(entryId, { targetWeight: { kind: 'absolute', kg: 100 } })
+      await setRoutineSetPlan(entryId, ladder)
+
+      expect((await listRoutineExercises(routineId))[0]).not.toHaveProperty('targetWeight')
+    })
+
+    it('refuses to store a ladder whose rungs are all the same', async () => {
+      const routineId = await createRoutine('Legs')
+      const entryId = await benchIn(routineId)
+
+      await setRoutineSetPlan(entryId, [
+        { reps: 8, weight: { kind: 'absolute', kg: 80 } },
+        { reps: 8, weight: { kind: 'absolute', kg: 80 } },
+        { reps: 8, weight: { kind: 'absolute', kg: 80 } },
+      ])
+
+      // Two states meaning the same thing would leave the editor guessing
+      // which mode to open in. It collapses to the straight-sets form.
+      const entry = (await listRoutineExercises(routineId))[0]
+      expect(entry).not.toHaveProperty('setPlan')
+      expect(entry).toMatchObject({
+        targetSets: 3,
+        targetRepsMin: 8,
+        targetWeight: { kind: 'absolute', kg: 80 },
+      })
+    })
+
+    it('collapses back to the rung you open on', async () => {
+      const routineId = await createRoutine('Legs')
+      const entryId = await benchIn(routineId)
+
+      await setRoutineSetPlan(entryId, ladder)
+      await clearRoutineSetPlan(entryId)
+
+      const entry = (await listRoutineExercises(routineId))[0]
+      expect(entry).not.toHaveProperty('setPlan')
+      expect(entry).toMatchObject({
+        targetSets: 3,
+        targetRepsMin: 10,
+        targetWeight: { kind: 'absolute', kg: 60 },
+      })
+      expect(entry).not.toHaveProperty('targetRepsMax')
+    })
+
+    it('is copied into a session, rung by rung', async () => {
+      const routineId = await createRoutine('Legs')
+      const entryId = await benchIn(routineId)
+      await setRoutineSetPlan(entryId, ladder)
+
+      const sessionId = await startSessionFromRoutine(routineId)
+      const planned = (await listSessionExercises(sessionId))[0]
+
+      expect(planned?.setPlan).toEqual(ladder)
+
+      // And editing the routine mid-workout does not reach back into it.
+      await setRoutineSetPlan(entryId, [...ladder, { reps: 4, weight: { kind: 'absolute', kg: 90 } }])
+      expect((await listSessionExercises(sessionId))[0]?.setPlan).toHaveLength(3)
+    })
+  })
+
   describe('starting a session from a routine', () => {
     it('copies the plan into the session', async () => {
       const { id } = await buildPushA()
@@ -277,6 +367,21 @@ describe('routines', () => {
         targetWeight: { kind: 'absolute', kg: 100 },
         restSeconds: 180,
       })
+    })
+
+    it('copies the machine weight, which lives on the exercise rather than the plan', async () => {
+      await db.exercises.update('ex_leg-press', { machineWeightKg: 25 })
+
+      const id = await createRoutine('Legs')
+      await addExerciseToRoutine(id, 'ex_leg-press')
+      await addExerciseToRoutine(id, 'ex_bench-press')
+
+      const sessionId = await startSessionFromRoutine(id)
+      const planned = await listSessionExercises(sessionId)
+
+      expect(planned[0]?.machineWeightKg).toBe(25)
+      // And nothing is invented for an exercise that has no machine weight.
+      expect(planned[1]).not.toHaveProperty('machineWeightKg')
     })
 
     it('snapshots, so editing the routine mid-session changes nothing', async () => {

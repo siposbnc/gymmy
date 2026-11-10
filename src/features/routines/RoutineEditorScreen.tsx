@@ -5,16 +5,19 @@ import { useNavigate, useParams } from 'react-router'
 import { useRoutine, useSettings } from '~/db/hooks'
 import {
   addExerciseToRoutine,
+  clearRoutineSetPlan,
   clearRoutineTargetWeight,
   clearRoutineVolumeGoal,
   moveRoutineExercise,
   removeRoutineExercise,
   renameRoutine,
+  setRoutineSetPlan,
   setRoutineVolumeGoal,
   toggleSupersetWithPrevious,
   updateRoutineExercise,
 } from '~/db/repositories/routines'
-import type { Exercise, Routine, RoutineExercise, Settings } from '~/domain/types'
+import { describePlannedSet, expandToSetPlan } from '~/domain/set-plan'
+import type { Exercise, PlannedSet, Routine, RoutineExercise, Settings } from '~/domain/types'
 import {
   formatVolume,
   formatWeight,
@@ -35,6 +38,9 @@ type PadTarget =
   | { kind: 'weight'; entryId: string }
   | { kind: 'reps-min'; entryId: string }
   | { kind: 'reps-max'; entryId: string }
+  // A single rung of a ladder. `row` is 0-based into `setPlan`.
+  | { kind: 'rung-weight'; entryId: string; row: number }
+  | { kind: 'rung-reps'; entryId: string; row: number }
 
 type GoalMode = 'none' | 'beat_last' | 'absolute'
 
@@ -111,6 +117,13 @@ export function RoutineEditorScreen() {
               onEditWeight={() => setPad({ kind: 'weight', entryId: entry.id })}
               onEditRepsMin={() => setPad({ kind: 'reps-min', entryId: entry.id })}
               onEditRepsMax={() => setPad({ kind: 'reps-max', entryId: entry.id })}
+              onEditRung={(row, field) =>
+                setPad({
+                  kind: field === 'weight' ? 'rung-weight' : 'rung-reps',
+                  entryId: entry.id,
+                  row,
+                })
+              }
             />
           )
         })}
@@ -195,22 +208,35 @@ export function RoutineEditorScreen() {
           onOpenChange={(open) => !open && setPad(null)}
           value={padValue(pad, padEntry.entry, settings)}
           onCommit={(value) => commitPad(pad, padEntry.entry, value, settings)}
-          {...(pad.kind === 'weight' ? { unit: settings.units } : {})}
+          {...(isWeightPad(pad) ? { unit: settings.units } : {})}
           eyebrow={`${padEntry.exercise?.name ?? 'Exercise'} · ${padLabel(pad)}`}
-          increment={pad.kind === 'weight' ? INCREMENT[settings.units] : 1}
-          allowDecimal={pad.kind === 'weight'}
+          increment={isWeightPad(pad) ? INCREMENT[settings.units] : 1}
+          allowDecimal={isWeightPad(pad)}
         />
       ) : null}
     </>
   )
 }
 
+/** Weight pads take decimals and a unit; rep pads take neither. */
+function isWeightPad(pad: PadTarget): boolean {
+  return pad.kind === 'weight' || pad.kind === 'rung-weight'
+}
+
 function padLabel(pad: PadTarget): string {
   if (pad.kind === 'weight') return 'target weight'
+  if (pad.kind === 'rung-weight') return `set ${pad.row + 1} · weight`
+  if (pad.kind === 'rung-reps') return `set ${pad.row + 1} · reps`
   return pad.kind === 'reps-min' ? 'target reps' : 'top of rep range'
 }
 
 function padValue(pad: PadTarget, entry: RoutineExercise, settings: Settings): number {
+  if (pad.kind === 'rung-weight' || pad.kind === 'rung-reps') {
+    const rung = entry.setPlan?.[pad.row]
+    if (pad.kind === 'rung-reps') return rung?.reps ?? entry.targetRepsMin
+    const kg = rung?.weight?.kind === 'absolute' ? rung.weight.kg : 0
+    return toDisplayUnit(kg, settings.units)
+  }
   if (pad.kind === 'weight') {
     const kg = entry.targetWeight?.kind === 'absolute' ? entry.targetWeight.kg : 0
     return toDisplayUnit(kg, settings.units)
@@ -225,6 +251,32 @@ function commitPad(
   value: number,
   settings: Settings,
 ): void {
+  if (pad.kind === 'rung-weight' || pad.kind === 'rung-reps') {
+    // The ladder is always written whole. A rung is not a row in the database
+    // — the array is — and sending a partial update would mean two code paths
+    // that have to agree about the summary fields.
+    const ladder = entry.setPlan ?? expandToSetPlan(entry)
+    const next = ladder.map((rung, index) => {
+      if (index !== pad.row) return rung
+      if (pad.kind === 'rung-reps') return { ...rung, reps: Math.max(1, Math.round(value)) }
+
+      // Zero means "no target for this rung", as it does for a flat target:
+      // the set falls through to what you actually lifted.
+      const { weight: _dropped, ...rest } = rung
+      return value <= 0
+        ? rest
+        : {
+            ...rest,
+            weight: {
+              kind: 'absolute' as const,
+              kg: fromDisplayUnit(value, settings.units),
+            },
+          }
+    })
+    void setRoutineSetPlan(entry.id, next)
+    return
+  }
+
   if (pad.kind === 'weight') {
     // Zero means "no target" rather than "lift nothing" — clearing it lets
     // prefill fall through to what you actually did last time.
@@ -347,6 +399,7 @@ function RoutineEntryCard({
   onEditWeight,
   onEditRepsMin,
   onEditRepsMax,
+  onEditRung,
 }: {
   entry: RoutineExercise
   exercise: Exercise | undefined
@@ -358,9 +411,25 @@ function RoutineEntryCard({
   onEditWeight: () => void
   onEditRepsMin: () => void
   onEditRepsMax: () => void
+  onEditRung: (row: number, field: 'weight' | 'reps') => void
 }) {
   const targetKg = entry.targetWeight?.kind === 'absolute' ? entry.targetWeight.kg : null
   const restSeconds = entry.restSeconds ?? exercise?.defaultRestSeconds ?? 120
+
+  /**
+   * Per-set mode without a stored ladder.
+   *
+   * A ladder whose rungs are identical is not stored — it would be a second
+   * way of saying what the three boxes already say. So asking for per-set mode
+   * shows the rows immediately and the first edit that makes them differ is
+   * what writes anything. Local state can only turn the mode *on*; a stored
+   * ladder turns it on by itself.
+   */
+  const [wantsPerSet, setWantsPerSet] = useState(false)
+  const [confirmCollapse, setConfirmCollapse] = useState(false)
+
+  const perSet = entry.setPlan != null || wantsPerSet
+  const ladder: PlannedSet[] = entry.setPlan ?? expandToSetPlan(entry)
 
   return (
     <div className={cn(groupedWithPrevious && 'relative ml-4')}>
@@ -421,6 +490,125 @@ function RoutineEntryCard({
           </div>
         </div>
 
+        {/* The mode is a property of this exercise, not of the routine: a push
+            day can have a ramped squat and three straight sets of curls. */}
+        <div
+          role="radiogroup"
+          aria-label={`How ${exercise?.name ?? 'this exercise'} is planned`}
+          className="mb-2 flex gap-1.5"
+        >
+          {[
+            { value: false, label: 'Same every set' },
+            { value: true, label: 'Per set' },
+          ].map((option) => (
+            <button
+              key={String(option.value)}
+              type="button"
+              role="radio"
+              aria-checked={perSet === option.value}
+              onClick={() => {
+                if (option.value) {
+                  setWantsPerSet(true)
+                  return
+                }
+                // Dropping a stored ladder is lossy, so it is asked about.
+                // Leaving a mode nobody has typed into yet is not.
+                if (entry.setPlan) setConfirmCollapse(true)
+                else setWantsPerSet(false)
+              }}
+              className={cn(
+                // Sized like the secondary chips below rather than like the
+                // target boxes: this is a mode switch, not the thing you came
+                // to the card to do.
+                'h-8 flex-1 cursor-pointer rounded-md px-2 text-[0.72rem] font-bold',
+                perSet === option.value ? 'bg-accent text-on-accent' : 'bg-sunken text-ink-muted',
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        {perSet ? (
+          <div className="grid gap-1.5">
+            {ladder.map((rung, row) => (
+              <div
+                key={row}
+                className="flex items-center gap-2 rounded-md bg-sunken px-2 py-1.5"
+              >
+                <span className="num w-4 shrink-0 text-center text-[0.7rem] font-extrabold text-ink-faint">
+                  {row + 1}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => onEditRung(row, 'weight')}
+                  aria-label={`Set ${row + 1} weight: ${
+                    rung.weight?.kind === 'absolute'
+                      ? formatWeight(rung.weight.kg, settings.units)
+                      : 'not set'
+                  }. Edit.`}
+                  className="num cursor-pointer rounded-sm border-b-2 border-accent bg-surface px-2 py-0.5 text-[1.0625rem] font-semibold"
+                >
+                  {rung.weight?.kind === 'absolute' ? (
+                    <>
+                      {formatWeight(rung.weight.kg, settings.units, { withUnit: false })}
+                      <span className="ml-0.5 text-[0.7rem] font-semibold text-ink-muted">
+                        {settings.units}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-ink-faint">—</span>
+                  )}
+                </button>
+
+                <span className="text-[0.85rem] text-ink-faint">×</span>
+
+                <button
+                  type="button"
+                  onClick={() => onEditRung(row, 'reps')}
+                  aria-label={`Set ${row + 1} reps: ${rung.reps}. Edit.`}
+                  className="num min-w-12 cursor-pointer rounded-sm border-b-2 border-accent bg-surface px-2 py-0.5 text-center text-[1.0625rem] font-semibold"
+                >
+                  {rung.reps}
+                  {rung.isAmrap ? <span className="text-accent-ink">+</span> : null}
+                </button>
+
+                <IconButton
+                  className="ml-auto"
+                  label={`Remove set ${row + 1}`}
+                  disabled={ladder.length <= 1}
+                  destructive
+                  onClick={() =>
+                    void setRoutineSetPlan(
+                      entry.id,
+                      ladder.filter((_unused, candidate) => candidate !== row),
+                    )
+                  }
+                >
+                  <Trash2 size={14} aria-hidden />
+                </IconButton>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                // A copy of the last rung: a ladder is usually extended at the
+                // top, and starting from the heaviest set is one edit closer
+                // than starting from an empty row.
+                void setRoutineSetPlan(entry.id, [
+                  ...ladder,
+                  { ...(ladder.at(-1) ?? { reps: entry.targetRepsMin }) },
+                ])
+              }
+              className="cursor-pointer rounded-md border border-dashed border-line-strong py-2 text-[0.75rem] font-bold text-ink-muted"
+            >
+              <Plus size={13} className="mr-1 inline align-[-2px]" aria-hidden />
+              Add set
+            </button>
+          </div>
+        ) : (
         <div className="grid grid-cols-3 gap-2">
           <TargetField
             label="Sets"
@@ -466,6 +654,7 @@ function RoutineEntryCard({
             </span>
           </button>
         </div>
+        )}
 
         {/* Secondary controls stay secondary. Rest is a compact inline stepper
             rather than a full-width one: it matters, but not more than the sets
@@ -501,19 +690,40 @@ function RoutineEntryCard({
             </button>
           </span>
 
-          <button
-            type="button"
-            onClick={onEditRepsMax}
-            className="rounded-full border border-line px-2.5 py-1.5 text-[0.7rem] font-bold text-ink-muted"
-          >
-            {entry.targetRepsMax == null ? 'Rep range' : 'Change range'}
-          </button>
+          {/* A range is the straight-sets way of saying "between 6 and 8".
+              A ladder says it per rung, so the chip would be a second, worse
+              answer to the same question. */}
+          {perSet ? null : (
+            <button
+              type="button"
+              onClick={onEditRepsMax}
+              className="rounded-full border border-line px-2.5 py-1.5 text-[0.7rem] font-bold text-ink-muted"
+            >
+              {entry.targetRepsMax == null ? 'Rep range' : 'Change range'}
+            </button>
+          )}
 
           <button
             type="button"
             aria-pressed={entry.isAmrap}
             aria-label="Take the last set to failure, as many reps as possible"
-            onClick={() => void updateRoutineExercise(entry.id, { isAmrap: !entry.isAmrap })}
+            onClick={() => {
+              // In per-set mode the flag belongs to the last rung, which is
+              // what "the last set" has always meant. Writing the ladder also
+              // keeps the summarised `isAmrap` right, so the chip stays lit.
+              if (perSet) {
+                const flag = !entry.isAmrap
+                void setRoutineSetPlan(
+                  entry.id,
+                  ladder.map((rung, row) => {
+                    const { isAmrap: _was, ...rest } = rung
+                    return flag && row === ladder.length - 1 ? { ...rest, isAmrap: true } : rest
+                  }),
+                )
+                return
+              }
+              void updateRoutineExercise(entry.id, { isAmrap: !entry.isAmrap })
+            }}
             className={cn(
               'rounded-full border px-2.5 py-1.5 text-[0.7rem] font-bold',
               entry.isAmrap
@@ -527,6 +737,40 @@ function RoutineEntryCard({
           <InfoAffordance explainerId="amrap" className="ml-auto" />
         </div>
       </Card>
+
+      <Sheet
+        open={confirmCollapse}
+        onOpenChange={setConfirmCollapse}
+        eyebrow={exercise?.name}
+        title="Back to the same weight every set?"
+        footer={
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setConfirmCollapse(false)}>
+              Keep the ladder
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                void clearRoutineSetPlan(entry.id)
+                setWantsPerSet(false)
+                setConfirmCollapse(false)
+              }}
+            >
+              Collapse it
+            </Button>
+          </div>
+        }
+      >
+        <p className="px-5 py-4 text-[0.9rem] leading-relaxed text-ink-muted">
+          The {ladder.length} sets you have written will be replaced by set one’s numbers,{' '}
+          <strong className="num font-semibold text-ink">
+            {describePlannedSet(ladder[0] ?? { reps: entry.targetRepsMin }, settings.units)}
+          </strong>
+          , repeated. Sessions you have already logged are not affected.
+        </p>
+      </Sheet>
     </div>
   )
 }
@@ -579,6 +823,7 @@ function IconButton({
   disabled = false,
   destructive = false,
   active = false,
+  className,
 }: {
   label: string
   children: React.ReactNode
@@ -586,6 +831,7 @@ function IconButton({
   disabled?: boolean
   destructive?: boolean
   active?: boolean
+  className?: string
 }) {
   return (
     <button
@@ -597,6 +843,7 @@ function IconButton({
         'grid size-8 cursor-pointer place-items-center rounded-full',
         'disabled:pointer-events-none disabled:opacity-30',
         destructive ? 'text-danger' : active ? 'text-accent-ink' : 'text-ink-muted',
+        className,
       )}
     >
       {children}

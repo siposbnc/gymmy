@@ -97,6 +97,28 @@ async function buildRoutine(page) {
   await page.waitForTimeout(250)
 }
 
+/** Build the routine, then give its first exercise a weight per set. */
+async function buildLadder(page) {
+  await buildRoutine(page)
+  await page.getByRole('radio', { name: 'Per set' }).first().click()
+  await page.waitForTimeout(250)
+
+  for (const [row, weight, reps] of [
+    [1, '60', '10'],
+    [2, '70', '8'],
+    [3, '80', '6'],
+  ]) {
+    await page.getByRole('button', { name: new RegExp(`set ${row} weight`, 'i') }).click()
+    for (const digit of weight) await tap(page, digit, true)
+    await tap(page, 'Done', true)
+
+    await page.getByRole('button', { name: new RegExp(`set ${row} reps`, 'i') }).click()
+    for (const digit of reps) await tap(page, digit, true)
+    await tap(page, 'Done', true)
+  }
+  await page.waitForTimeout(250)
+}
+
 /**
  * Log several finished sessions so the progress charts have something real to
  * draw. Done through IndexedDB directly rather than the UI — driving 40 sets
@@ -201,6 +223,53 @@ async function seedHistory(page) {
   await page.waitForTimeout(500)
 }
 
+/**
+ * Pull the seeded exercises apart in time.
+ *
+ * `seedHistory` trains squat, bench and RDL together in every session, so
+ * every muscle shares one date and the last-trained card comes out as one
+ * block of identical chips. The interesting thing about that card is the
+ * range — what a fortnight looks like next to yesterday, and whether the
+ * dimming of what you trained today reads as quiet rather than as broken — so
+ * the shot needs dates that actually differ.
+ *
+ * Done by id rather than by joining through `sessionExercises`: the seed
+ * numbers its rows `seed_set_<session>_<exercise>_<set>`, and index 1 is the
+ * bench press, 2 the Romanian deadlift.
+ */
+async function spreadTrainingDates(page) {
+  await page.evaluate(async () => {
+    const open = indexedDB.open('gymmy')
+    const db = await new Promise((resolve, reject) => {
+      open.onsuccess = () => resolve(open.result)
+      open.onerror = () => reject(open.error)
+    })
+
+    const DAY = 86_400_000
+    const shift = (id) =>
+      /^seed_set_\d+_1_/.test(id) ? 5 * DAY : /^seed_set_\d+_2_/.test(id) ? 16 * DAY : 0
+
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('sets', 'readwrite')
+      const store = tx.objectStore('sets')
+      store.openCursor().onsuccess = (event) => {
+        const cursor = event.target.result
+        if (!cursor) return
+        const back = shift(cursor.value.id)
+        if (back > 0) cursor.update({ ...cursor.value, completedAt: cursor.value.completedAt - back })
+        cursor.continue()
+      }
+      tx.oncomplete = resolve
+      tx.onerror = () => reject(tx.error)
+    })
+
+    db.close()
+  })
+
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+}
+
 const allErrors = []
 
 /** Assertion helper for the structural checks that follow the screenshots. */
@@ -215,6 +284,19 @@ const check = (label, condition) => {
 
 for (const theme of ['light', 'dark']) {
   allErrors.push(...(await shoot('today', { theme })))
+
+  // Today with training behind it: the last-trained card is the only thing on
+  // this screen that is not a start button, and whether a row of muscle chips
+  // reads as a glanceable answer or as a wall is not something a test can say.
+  allErrors.push(
+    ...(await shoot('today-trained', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await spreadTrainingDates(page)
+      },
+    })),
+  )
 
   allErrors.push(
     ...(await shoot('session-empty', {
@@ -233,6 +315,48 @@ for (const theme of ['light', 'dark']) {
         await intoSession(page)
         await logSet(page, 80, 8)
         await logSet(page, 80, 8)
+      },
+    })),
+  )
+
+  // A machine that weighs something before you load it. The row shows what
+  // you added and states the total underneath, and the only way to know that
+  // reads clearly rather than crowding the row is to look at it.
+  allErrors.push(
+    ...(await shoot('session-machine', {
+      theme,
+      steps: async (page) => {
+        await tap(page, /empty workout/i)
+        await tap(page, /add exercise/i)
+        await page.getByRole('button', { name: /^Leg Press/ }).click()
+        await page.waitForTimeout(250)
+
+        // Through the session's own exercise menu, which is where a machine
+        // weight gets set or corrected while you are standing at the machine.
+        await tap(page, /leg press options/i)
+        await page.waitForTimeout(300)
+        for (let step = 0; step < 10; step += 1) {
+          await tap(page, /increase machine weight/i)
+        }
+        await page.keyboard.press('Escape')
+        await page.waitForTimeout(300)
+
+        await logSet(page, 40, 10)
+      },
+    })),
+  )
+
+  // The exercise menu mid-workout, with two sets already logged. The swap
+  // sub-label has to state what happens to them, and it is the longest line in
+  // the sheet — so this is the shot that proves it does not wrap into mush.
+  allErrors.push(
+    ...(await shoot('session-exercise-menu', {
+      theme,
+      steps: async (page) => {
+        await intoSession(page)
+        await logSet(page, 80, 8)
+        await tap(page, /bench press options/i)
+        await page.waitForTimeout(350)
       },
     })),
   )
@@ -265,6 +389,26 @@ for (const theme of ['light', 'dark']) {
     ...(await shoot('routine-editor', {
       theme,
       steps: buildRoutine,
+    })),
+  )
+
+  // A weight per set. The rows have to stay readable at phone width with a
+  // pad-sized tap target on every number, which is the thing a test cannot
+  // tell you.
+  allErrors.push(...(await shoot('routine-ladder', { theme, steps: buildLadder })))
+
+  // And the same ladder in the gym: the plan line under "last time", with the
+  // rung you are on picked out.
+  allErrors.push(
+    ...(await shoot('session-ladder', {
+      theme,
+      steps: async (page) => {
+        await buildLadder(page)
+        await page.getByRole('button', { name: /back to routines/i }).click()
+        await page.waitForTimeout(250)
+        await tap(page, 'Start', true)
+        await page.waitForTimeout(400)
+      },
     })),
   )
 

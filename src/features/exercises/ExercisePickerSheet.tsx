@@ -14,6 +14,8 @@ interface ExercisePickerSheetProps {
   onPick: (exerciseId: string) => void
   /** Already in the session — shown but marked, since repeats are legitimate. */
   alreadyAdded?: readonly string[]
+  /** Swapping borrows this sheet, and a sheet titled "Add" would be a lie. */
+  title?: string
 }
 
 const GROUPS: readonly { value: MuscleGroup | 'all'; label: string }[] = [
@@ -53,6 +55,7 @@ export function ExercisePickerSheet({
   onOpenChange,
   onPick,
   alreadyAdded = [],
+  title = 'Add exercise',
 }: ExercisePickerSheetProps) {
   const [search, setSearch] = useState('')
   const [group, setGroup] = useState<MuscleGroup | 'all'>('all')
@@ -103,7 +106,7 @@ export function ExercisePickerSheet({
   return (
     // Full height: this sheet exists to browse a list, and once you are
     // searching every visible row is worth more than the backdrop behind it.
-    <Sheet open={open} onOpenChange={onOpenChange} title="Add exercise" fullHeight>
+    <Sheet open={open} onOpenChange={onOpenChange} title={title} fullHeight>
       <div className="sticky top-0 z-10 bg-raised px-5 pt-3 pb-2">
         <label className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-3.5 py-2.5">
           <Search size={17} className="shrink-0 text-ink-faint" aria-hidden />

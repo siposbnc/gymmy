@@ -620,6 +620,102 @@ losing "this is a kettlebell" is a scratch, losing the routine is the feature no
 targets, and exactly which exercises would be added to your library; `importRoutinePlan` writes the plan
 that was shown, in one transaction. Importing blind is how a picker fills up with near-duplicates.
 
+### 18. What to train today — shipped post-v1
+
+Choosing a workout is arithmetic on dates, and until now the app held every
+date and showed none of them. Today gained one card: every muscle with any
+history, longest rested first, and a last-run age on each routine button.
+
+**Derived, never recorded.** `domain/recency` reads logged sets and dates each
+muscle by its exercise's primary mover — the same attribution as weekly set
+counts, warm-ups excluded. Nothing is stored, so it cannot drift out of step
+with training the way a "last trained" field would.
+
+**It reports, it does not prescribe.** The card says how long it has been. It
+never says a muscle is recovered, ready, or overdue: recovery depends on the
+load, the lifter and the week, and the number of days is the honest part of it.
+The ordering is the entire recommendation. Today and yesterday are dimmed,
+which is the one distinction the data makes on its own.
+
+**A muscle with no history at all is absent**, so a fresh install shows nothing
+rather than fourteen rows of "never". The query reads a six-month window
+through the `completedAt` index — this runs on the launch screen — and anything
+older is reported as `6mo+` rather than as a figure, because showing "47d" when
+the window cannot see that far would be a precision the data does not have.
+
+### 19. Swapping an exercise mid-workout — shipped post-v1
+
+The rack is taken, the machine is broken, your shoulder says no. The
+substitution is a normal part of training, and without it the only way out was
+to delete the exercise and add another — losing its place, its superset
+grouping and its targets.
+
+**What travels is the shape of the work.** Position, grouping, rest and the rep
+prescription. Absolute weights do not: 80 kg of bench press is not 80 kg of
+dumbbell press, and prefill's ladder tier sits above carry-forward, so a load
+carried across would be offered as today's opening set on a movement it was
+never lifted on. Notes do not travel either — "seat 4, close grip" described a
+machine you are no longer on.
+
+**Logged sets never change exercise.** That is the hard rule, and it gives the
+swap two shapes. Nothing logged yet: the row changes exercise in place, and
+nothing else in the session can tell. Sets already logged: the original keeps
+them with its target trimmed to the sets it actually accounted for, and the
+replacement is inserted directly below with the remainder — so "two sets of
+bench, then the rack went" is what the session says, because it is what
+happened.
+
+**The picker is borrowed, not duplicated.** Adding and swapping differ only in
+what happens to the exercise that comes back, so the screen owns one sheet and
+the cards ask it to open. A picker per card would mean a live query over the
+exercise library per exercise in the workout, for a sheet that is shut almost
+always.
+
+### Agreed backlog — from the gap review of 2026-11-08
+
+A feature-by-feature comparison against Strong, Hevy, Boostcamp, Alpha Progression, JEFIT and
+FitNotes. Everything below was reviewed and **accepted**; it is ordered, not dated. Each one is
+stated with the reason it survived the review, because the reason is what decides how it gets built
+later.
+
+**Next, once §18 and §19 are in.**
+
+- **A warm-up ramp in one tap.** The warm-up flag and the plate calculator both exist; what is
+  missing is "ramp me to 100 kg" writing two or three greyed rows at loadable weights. Generated,
+  never stored as a plan — a ramp is a property of today's top set, not of the routine. It must use
+  `calculatePlates` so it cannot propose a weight the user's plates do not make.
+
+**Later, in the order they are listed.**
+
+- **Import from another app's CSV.** Gymmy exports CSV and cannot read one. That makes it adoptable
+  only by someone starting from zero, which is the single largest barrier to anyone switching with
+  two years of history. Strong's and Hevy's export shapes are the two worth supporting. It resolves
+  exercises the way a share code already does — by id, then by name, then by creating one — and it
+  previews before it writes, for the same reason routine import does.
+- **Best set per rep count.** "Best 1RM, 3RM, 5RM, 8RM, 10RM" on the exercise detail screen. All
+  observations of logged work, so it sits inside §4.1 rather than beside it, and it answers the
+  question the three record kinds do not: _what is my best triple?_ A pure reduction over sets
+  already stored; no new table, no new record kind.
+- **Exercise notes carried forward.** `SessionExercise.notes` is stored and never shown again. The
+  note a lifter actually writes is "seat 4, pins at 7, close grip", which is worth nothing unless it
+  appears next to the ghost line the next time that exercise comes round.
+- **History search.** §2D promises "when did I last squat 140?" in two taps; today that is answered
+  by scrolling. Searching by exercise, and by weight within an exercise, is what makes the claim
+  true.
+- **Repeat this session.** Saving a session as a routine (§16) is the heavy version of this. The
+  light one — start a new workout shaped like that one, creating nothing — is what gets reached for
+  more often.
+- **Folders or tags for routines.** The list is flat, which is correct at five routines and wrong at
+  twenty. Anyone running a block plus accessory days arrives at twenty.
+- **Durable backup.** Gymmy nudges (§15); every competitor simply backs up. Since IndexedDB eviction
+  is a named risk in §9, an automatic write to a file handle the user picked once converts "they
+  remembered" into "the file exists".
+
+**Reviewed and still declined**, for the record: a social feed, friends and likes · nutrition and
+macros · badge economies · an AI coach · in-app purchases. §1 ruled these out and the review did not
+change the reasoning — Hevy's growth being partly social is a fact about Hevy, not an argument that
+Gymmy should dilute the loop it is built around.
+
 ### v1.5 — next, once the loop is proven
 
 - **Weekly program scheduler** — assign routines to weekdays, "what's today?" on the Today tab.

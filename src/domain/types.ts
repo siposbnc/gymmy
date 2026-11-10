@@ -69,6 +69,19 @@ export interface Exercise {
    */
   barId?: Id
   /**
+   * What this machine weighs with nothing on it.
+   *
+   * A plate-loaded leg press or pendulum squat moves a carriage that already
+   * weighs something, so "40 kg" on one is not 40 kg of work. Stored like a
+   * bar weight and used the same way: every set logged on the machine records
+   * the total, and the session screen converts what you added into that total.
+   *
+   * Device-local — it describes the machine in *your* gym, which is why it
+   * never travels in a share code. Absent means no machine weight, which is
+   * the right answer for everything but a handful of exercises.
+   */
+  machineWeightKg?: number
+  /**
    * What the exercise is and how it differs from its neighbours.
    *
    * Seeded for built-ins and backfilled on launch for installs that predate
@@ -129,6 +142,24 @@ export interface Routine {
   archivedAt?: number
 }
 
+/**
+ * One rung of a ladder: what a single set of an exercise asks for.
+ *
+ * Almost nobody takes every working set at one weight, and a routine holding a
+ * single weight and a single rep figure cannot describe 60 × 10, 70 × 8, 80 × 6.
+ * A `setPlan` can.
+ *
+ * `weight` is optional for the same reason {@link RoutineExercise.targetWeight}
+ * is: a plan that names reps but leaves the load to you is a legitimate plan,
+ * and the commonest one.
+ */
+export interface PlannedSet {
+  reps: number
+  weight?: TargetWeight
+  /** This rung is taken to failure. Usually the last one, but not necessarily. */
+  isAmrap?: boolean
+}
+
 export interface RoutineExercise {
   id: Id
   routineId: Id
@@ -144,6 +175,22 @@ export interface RoutineExercise {
   /** Exercises sharing a group are performed back to back. */
   supersetGroup?: number
   notes?: string
+
+  /**
+   * A weight and a rep count per set, when they are not all the same.
+   *
+   * Absent means straight sets, described by the fields above — which is why
+   * adding this needed no migration.
+   *
+   * **The fields above stay in sync when this is present**, and that is the
+   * whole reason this was cheap to add: `targetSets` is the number of rungs,
+   * `targetRepsMin`/`targetRepsMax` span them, and `isAmrap` is true if any
+   * rung is. Everything that only wants to know the shape of the work — the
+   * progress ribbon, the session header, weekly set counts, the volume goal —
+   * keeps reading the summary and never learns ladders exist. Only prefill,
+   * the editor and the two previews read the rungs themselves.
+   */
+  setPlan?: PlannedSet[]
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +250,20 @@ export interface SessionExercise {
   targetRepsMax?: number
   targetWeight?: TargetWeight
   isAmrap?: boolean
+  /** The routine's ladder, copied at session start along with the rest. */
+  setPlan?: PlannedSet[]
+
+  /**
+   * What the machine weighed, copied at session start.
+   *
+   * Snapshotted for the same reason the targets above are. Sets store the
+   * total load, so the split into "what you added" and "what the machine
+   * weighs" is derived — and re-measuring the machine in November would
+   * otherwise rewrite how every past session reads, turning 40 kg added onto a
+   * 25 kg carriage into 35 onto a 30. Absent means no machine weight, which is
+   * correct for every row written before this existed.
+   */
+  machineWeightKg?: number
 }
 
 /**

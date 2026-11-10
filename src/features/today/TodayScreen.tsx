@@ -2,10 +2,12 @@ import { ArrowRight, Play } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { useActiveSession, useRoutines, useSettings } from '~/db/hooks'
+import { useActiveSession, useRoutines, useSettings, useTrainingRecency } from '~/db/hooks'
 import { startSessionFromRoutine } from '~/db/repositories/routines'
 import { discardSession, isStale, startEmptySession } from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
+import { MUSCLE_LABEL } from '~/domain/muscles'
+import { describeLastRun, describeRecency, type MuscleRecency } from '~/domain/recency'
 import { formatVolume } from '~/domain/units'
 import { useRestTimer } from '~/features/rest/restTimer'
 import { Button } from '~/ui/Button'
@@ -26,6 +28,8 @@ export function TodayScreen() {
 
   const session = active?.session ?? null
   const stale = session ? isStale(session) : false
+  // Mid-workout the question this answers has already been answered.
+  const recency = useTrainingRecency(session == null)
 
   async function start() {
     await startEmptySession('Workout')
@@ -67,25 +71,33 @@ export function TodayScreen() {
             {(routines ?? [])
               .filter((summary) => summary.exerciseCount > 0)
               .slice(0, 3)
-              .map((summary) => (
-                <button
-                  key={summary.routine.id}
-                  type="button"
-                  onClick={() => void startRoutine(summary.routine.id)}
-                  className="flex h-16 cursor-pointer items-center gap-3 rounded-xl bg-accent px-5 text-on-accent shadow-(--shadow-md) transition-transform duration-(--dur-fast) active:scale-[0.98]"
-                >
-                  <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
-                  <span className="min-w-0 flex-1 text-left">
-                    <span className="label-caps block">
-                      {summary.exerciseCount} exercise{summary.exerciseCount === 1 ? '' : 's'}
+              .map((summary) => {
+                // "Have I already done this one this week?" is half of choosing
+                // a routine, and it is the half the card could not answer. A
+                // routine never run says nothing rather than "never".
+                const lastRun = describeLastRun(recency?.routineLastRunAt.get(summary.routine.id))
+
+                return (
+                  <button
+                    key={summary.routine.id}
+                    type="button"
+                    onClick={() => void startRoutine(summary.routine.id)}
+                    className="flex h-16 cursor-pointer items-center gap-3 rounded-xl bg-accent px-5 text-on-accent shadow-(--shadow-md) transition-transform duration-(--dur-fast) active:scale-[0.98]"
+                  >
+                    <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="label-caps block">
+                        {summary.exerciseCount} exercise{summary.exerciseCount === 1 ? '' : 's'}
+                        {lastRun ? ` · ${lastRun}` : null}
+                      </span>
+                      <span className="block truncate text-[1.1rem] font-bold tracking-tight">
+                        {summary.routine.name}
+                      </span>
                     </span>
-                    <span className="block truncate text-[1.1rem] font-bold tracking-tight">
-                      {summary.routine.name}
-                    </span>
-                  </span>
-                  <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
-                </button>
-              ))}
+                    <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
+                  </button>
+                )
+              })}
 
             <button
               type="button"
@@ -109,9 +121,13 @@ export function TodayScreen() {
           </>
         )}
 
-        {/* Nothing else belongs here. You open Gymmy to start training, not to
-            read — the maths reference lives under More, and every number that
-            needs explaining carries its own ⓘ where it appears. */}
+        {/* The one exception to "nothing else belongs here": choosing what to
+            train is the decision made on this screen, and it is made out of
+            dates. Everything else stays away — the maths reference lives under
+            More, and every number that needs explaining carries its own ⓘ
+            where it appears. */}
+        {session ? null : <LastTrainedCard muscles={recency?.muscles ?? []} />}
+
         <InstallNudge />
       </div>
 
@@ -146,6 +162,50 @@ export function TodayScreen() {
         </p>
       </Sheet>
     </>
+  )
+}
+
+/**
+ * How long since each muscle was trained, longest rested first.
+ *
+ * The order is the entire recommendation: it reports dates and lets you draw
+ * the conclusion, rather than announcing that your chest is recovered — which
+ * depends on the load, the week and the lifter, and is not something a date can
+ * know. Nothing is red, nothing is overdue, and tapping is not required.
+ *
+ * Today and yesterday are dimmed. That is not a recovery claim: it is the one
+ * distinction the data makes on its own, since a muscle you trained hours ago
+ * is categorically not the answer to what to train now.
+ */
+function LastTrainedCard({ muscles }: { muscles: readonly MuscleRecency[] }) {
+  // A fresh install has nothing to say about where to start.
+  if (muscles.length === 0) return null
+
+  return (
+    <Card>
+      <p className="label-caps text-ink-muted">Last trained · longest rested first</p>
+
+      <ul className="mt-2.5 flex flex-wrap gap-1.5">
+        {muscles.map((entry) => {
+          const fresh = entry.daysSince != null && entry.daysSince <= 1
+
+          return (
+            <li
+              key={entry.muscle}
+              className={cn(
+                'flex items-baseline gap-1.5 rounded-full border px-2.5 py-1 text-[0.78rem]',
+                fresh ? 'border-line bg-sunken' : 'border-line-strong bg-surface',
+              )}
+            >
+              <span className={fresh ? 'text-ink-muted' : 'font-semibold text-ink'}>
+                {MUSCLE_LABEL[entry.muscle]}
+              </span>
+              <span className="num text-ink-muted">{describeRecency(entry)}</span>
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
   )
 }
 

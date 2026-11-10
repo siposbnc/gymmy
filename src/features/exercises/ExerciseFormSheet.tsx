@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
 
 import { useSettings } from '~/db/hooks'
-import { clearExerciseBar, createCustomExercise, updateExercise } from '~/db/repositories/exercises'
+import {
+  clearExerciseBar,
+  clearExerciseMachineWeight,
+  createCustomExercise,
+  updateExercise,
+} from '~/db/repositories/exercises'
 import { usesBar } from '~/domain/bars'
+import { usesMachineWeight } from '~/domain/machines'
 import { MUSCLE_OPTIONS } from '~/domain/muscles'
 import type { Equipment, Exercise, MovementType, MuscleGroup, TrackingType } from '~/domain/types'
+import { fromDisplayUnit, roundForDisplay, toDisplayUnit } from '~/domain/units'
 import { formatRestLength } from '~/lib/time'
 import { Button } from '~/ui/Button'
 import { Sheet } from '~/ui/Sheet'
@@ -47,8 +54,17 @@ export function ExerciseFormSheet({
   const [description, setDescription] = useState('')
   /** Empty string means "follow the default bar". */
   const [barId, setBarId] = useState('')
+  /**
+   * What the machine weighs, as typed, in display units.
+   *
+   * Kept as a string rather than a number so the field can be empty — "this
+   * machine has no weight of its own" and "it weighs zero" are the same thing
+   * here, and a 0 sitting in the box reads as neither.
+   */
+  const [machineWeight, setMachineWeight] = useState('')
 
   const settings = useSettings()
+  const unit = settings.units
 
   // Re-seed from the exercise being edited each time the sheet opens.
   useEffect(() => {
@@ -61,11 +77,24 @@ export function ExerciseFormSheet({
     setRestSeconds(existing?.defaultRestSeconds ?? 120)
     setDescription(existing?.description ?? '')
     setBarId(existing?.barId ?? '')
-  }, [open, existing])
+    setMachineWeight(
+      existing?.machineWeightKg == null
+        ? ''
+        : String(roundForDisplay(toDisplayUnit(existing.machineWeightKg, unit), unit)),
+    )
+  }, [open, existing, unit])
 
   const trimmed = name.trim()
   const defaultBarName =
     settings.bars.find((bar) => bar.id === settings.defaultBarId)?.name ?? 'none set'
+
+  // Blank, zero or nonsense all mean "no weight of its own".
+  const typedMachineKg = (() => {
+    if (!usesMachineWeight({ equipment })) return null
+    const value = Number.parseFloat(machineWeight.replace(',', '.'))
+    if (!Number.isFinite(value) || value <= 0) return null
+    return fromDisplayUnit(value, unit)
+  })()
 
   async function save() {
     if (!trimmed) return
@@ -79,12 +108,17 @@ export function ExerciseFormSheet({
       defaultRestSeconds: restSeconds,
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(barId && usesBar({ equipment }) ? { barId } : {}),
+      ...(typedMachineKg == null ? {} : { machineWeightKg: typedMachineKg }),
     }
 
     if (existing) {
       // Clearing the bar has to remove the field, not set it to empty, or the
       // exercise would stay pinned to a bar that no longer applies.
       if (!barId || !usesBar({ equipment })) await clearExerciseBar(existing.id)
+      // Same for the machine weight, and for the same reason: switching the
+      // equipment away from a machine must not leave kilograms behind that
+      // every future set would silently be credited with.
+      if (typedMachineKg == null) await clearExerciseMachineWeight(existing.id)
       await updateExercise(existing.id, shared)
       onSaved?.(existing.id)
     } else {
@@ -179,6 +213,24 @@ export function ExerciseFormSheet({
               value={barId}
               onChange={setBarId}
               ariaLabel="Bar used"
+            />
+          </Field>
+        ) : null}
+
+        {usesMachineWeight({ equipment }) ? (
+          <Field
+            label={`Machine weight — ${unit}`}
+            hint="What the carriage weighs with nothing on it, on a leg press or pendulum squat. Added to every set you log, so your totals are what you actually moved. Leave blank if it has none."
+            htmlFor="exercise-machine-weight"
+          >
+            <input
+              id="exercise-machine-weight"
+              value={machineWeight}
+              onChange={(event) => setMachineWeight(event.target.value)}
+              inputMode="decimal"
+              placeholder="e.g. 25"
+              autoComplete="off"
+              className="num w-full rounded-md border border-line bg-surface px-3.5 py-3 text-[1rem] outline-none focus-visible:border-accent"
             />
           </Field>
         ) : null}

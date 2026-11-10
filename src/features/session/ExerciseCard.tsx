@@ -6,6 +6,7 @@ import {
   deleteSet,
   logSet,
   removeSessionExercise,
+  setExerciseMachineWeight,
   setExerciseRest,
   toggleWarmup,
   updateSet,
@@ -16,6 +17,13 @@ import { formatRestLength } from '~/lib/time'
 import { Stepper } from '~/ui/Stepper'
 import { barContext, describeBar, resolveBar, resolveBarWeight, usesBar } from '~/domain/bars'
 import {
+  addedWeightKg,
+  machineWeightKg,
+  totalWeightKg,
+  usesMachineWeight,
+} from '~/domain/machines'
+import { describePlannedSet, setPlanUnitSuffix } from '~/domain/set-plan'
+import {
   calculatePlates,
   formatPlates,
   lastTimeSummary,
@@ -24,7 +32,13 @@ import {
   suggestProgression,
 } from '~/domain/metrics'
 import type { Settings, SetEntry } from '~/domain/types'
-import { formatWeight, fromDisplayUnit, INCREMENT, toDisplayUnit } from '~/domain/units'
+import {
+  formatWeight,
+  fromDisplayUnit,
+  INCREMENT,
+  roundForDisplay,
+  toDisplayUnit,
+} from '~/domain/units'
 import { Card } from '~/ui/Card'
 import { InfoAffordance } from '~/ui/InfoAffordance'
 import { NumericPad } from '~/ui/NumericPad'
@@ -47,6 +61,14 @@ interface ExerciseCardProps {
   active?: boolean
   /** Shares a superset group with the exercise above it. */
   groupedWithPrevious?: boolean
+  /**
+   * Open the exercise picker in swap mode.
+   *
+   * Raised to the screen rather than owned here: the picker runs live queries
+   * over the exercise library, and one per card would mean a query per
+   * exercise in the workout for a sheet that is closed almost always.
+   */
+  onSwap?: () => void
 }
 
 export function ExerciseCard({
@@ -54,6 +76,7 @@ export function ExerciseCard({
   settings,
   active = false,
   groupedWithPrevious = false,
+  onSwap,
 }: ExerciseCardProps) {
   const { sessionExercise, exercise, sets, previousSets } = view
   const unit = settings.units
@@ -83,10 +106,25 @@ export function ExerciseCard({
         target: {
           weight: sessionExercise.targetWeight,
           reps: sessionExercise.targetRepsMin,
+          plan: sessionExercise.setPlan,
         },
       }),
-    [nextIndex, sets, previousSets, sessionExercise.targetWeight, sessionExercise.targetRepsMin],
+    [
+      nextIndex,
+      sets,
+      previousSets,
+      sessionExercise.targetWeight,
+      sessionExercise.targetRepsMin,
+      sessionExercise.setPlan,
+    ],
   )
+
+  // Drafts, prefill and everything downstream deal in the TOTAL load, exactly
+  // as `SetEntry.weightKg` does. The machine weight is subtracted at the one
+  // point the user touches a number and added straight back on commit, so no
+  // calculation in the app has to know this exercise is a machine.
+  const machineKg = machineWeightKg(sessionExercise)
+  const ladder = sessionExercise.setPlan ?? []
 
   const weightKg = draftWeight ?? prefill.weightKg
   const reps = draftReps ?? prefill.reps
@@ -172,14 +210,23 @@ export function ExerciseCard({
     if (!pad) return null
 
     if (pad.kind === 'pending-weight') {
+      // The pad opens on the number the user tapped. On a machine that is what
+      // they added, so it converts both ways here; `requirePositive` also has
+      // to relax, because nothing on the carriage is a legitimate entry when
+      // the carriage itself weighs something.
+      const added = addedWeightKg(weightKg, machineKg)
       return {
-        value: weightKg == null ? 0 : toDisplayUnit(weightKg, unit),
+        value: added == null ? 0 : toDisplayUnit(added, unit),
         unit,
         increment: INCREMENT[unit],
         allowDecimal: true,
-        requirePositive: weightRequired,
-        eyebrow: `${exercise?.name ?? 'Exercise'} · set ${nextIndex} · weight`,
-        commit: (value: number) => setDraftWeight(fromDisplayUnit(value, unit)),
+        requirePositive: weightRequired && machineKg <= 0,
+        eyebrow:
+          machineKg > 0
+            ? `${exercise?.name ?? 'Exercise'} · set ${nextIndex} · weight you add`
+            : `${exercise?.name ?? 'Exercise'} · set ${nextIndex} · weight`,
+        commit: (value: number) =>
+          setDraftWeight(totalWeightKg(fromDisplayUnit(value, unit), machineKg) ?? 0),
       }
     }
     if (pad.kind === 'pending-reps') {
@@ -202,7 +249,13 @@ export function ExerciseCard({
         increment: INCREMENT[unit],
         allowDecimal: true,
         requirePositive: weightRequired,
-        eyebrow: `${exercise?.name ?? 'Exercise'} · edit weight`,
+        // A logged row shows the total, so this pad edits the total — the pad
+        // always opens on the number that was tapped. Naming the machine in
+        // the eyebrow is what stops that being a trap.
+        eyebrow:
+          machineKg > 0
+            ? `${exercise?.name ?? 'Exercise'} · edit total, incl. ${formatWeight(machineKg, unit)} machine`
+            : `${exercise?.name ?? 'Exercise'} · edit weight`,
         commit: (value: number) =>
           void updateSet(target.id, { weightKg: fromDisplayUnit(value, unit) }),
       }
@@ -269,6 +322,28 @@ export function ExerciseCard({
           {ghost ?? <span className="text-ink-faint italic">first time — no history yet</span>}
         </p>
 
+        {/* A ladder is the one plan you cannot infer from the set rows, so it
+            is written out — with the rung you are on picked out, because
+            reading a list to find your place between sets is a tax. */}
+        {ladder.length > 0 ? (
+          <p className="num mb-2.5 text-meta text-ink-muted">
+            <span className="label-caps mr-1.5 text-ink-faint">plan</span>
+            {ladder.map((rung, index) => (
+              <span key={index}>
+                {index > 0 ? <span className="text-ink-faint"> · </span> : null}
+                <span
+                  className={
+                    index + 1 === nextIndex && !draftWarmup ? 'font-semibold text-ink' : undefined
+                  }
+                >
+                  {describePlannedSet(rung, unit)}
+                </span>
+              </span>
+            ))}
+            <span className="text-ink-faint">{setPlanUnitSuffix(ladder, unit)}</span>
+          </p>
+        ) : null}
+
         {/* Advice, not instruction: it sits beside the plan rather than inside
             the set row, and nothing changes until it is tapped. Hidden once
             accepted, because by then the pending row says the same thing. */}
@@ -322,6 +397,7 @@ export function ExerciseCard({
           <PendingSetRow
             setIndex={nextIndex}
             weightKg={weightKg}
+            machineWeightKg={machineKg}
             reps={reps}
             source={prefill.source}
             isWarmup={draftWarmup}
@@ -350,6 +426,17 @@ export function ExerciseCard({
                 inventory: settings.plateInventory,
               }}
             />
+          </p>
+        ) : null}
+
+        {/* Stated once per card rather than on every row: the logged rows above
+            read as plain weights, and this is the sentence that tells you what
+            those weights include. */}
+        {machineKg > 0 ? (
+          <p className="num mt-2.5 flex flex-wrap items-center gap-x-1.5 border-t border-dashed border-line pt-2.5 text-[0.72rem] text-ink-muted">
+            <span className="label-caps text-ink-faint">machine</span>
+            <strong className="font-semibold text-ink">{formatWeight(machineKg, unit)}</strong>
+            <span className="text-ink-faint">· logged weights include it</span>
           </p>
         ) : null}
 
@@ -408,7 +495,61 @@ export function ExerciseCard({
             />
           </div>
 
+          {/* The session's machine weight is snapshotted, so editing the
+              exercise elsewhere deliberately will not reach this workout. That
+              makes this the only place a wrong value can be fixed while you
+              are standing in front of the machine — so it writes both, exactly
+              as the rest control above does. */}
+          {usesMachineWeight(exercise) ? (
+            <div className="border-b border-line px-5 py-4">
+              <p className="label-caps mb-2 text-ink-faint">What the machine weighs empty</p>
+              <Stepper
+                value={roundForDisplay(toDisplayUnit(machineKg, unit), unit)}
+                onChange={(displayValue) => {
+                  if (exercise) {
+                    void setExerciseMachineWeight(
+                      sessionExercise.id,
+                      exercise.id,
+                      fromDisplayUnit(Math.max(0, displayValue), unit),
+                    )
+                  }
+                }}
+                step={INCREMENT[unit]}
+                min={0}
+                max={roundForDisplay(toDisplayUnit(300, unit), unit)}
+                unit={unit}
+                hint="Added to every set you log here"
+                decreaseLabel={`Decrease machine weight by ${INCREMENT[unit]} ${unit}`}
+                increaseLabel={`Increase machine weight by ${INCREMENT[unit]} ${unit}`}
+              />
+            </div>
+          ) : null}
+
           <div className="pb-2">
+            {/* The substitution is a normal part of training — the rack is
+                taken, the machine is broken — and the alternative without it is
+                delete-and-re-add, which costs the exercise its place, its
+                superset grouping and its targets. The sub-label states the
+                consequence before the picker opens, because what happens to
+                sets you have already logged is the one thing worth knowing. */}
+            <button
+              type="button"
+              onClick={() => {
+                setExerciseMenu(false)
+                onSwap?.()
+              }}
+              className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.95rem] font-medium">Swap for another exercise</span>
+                <span className="block text-[0.75rem] text-ink-muted">
+                  {sets.length === 0
+                    ? 'Keeps its place and its rep targets'
+                    : `Keeps your ${sets.length} logged set${sets.length === 1 ? '' : 's'} here and continues below`}
+                </span>
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
