@@ -55,6 +55,20 @@
   /* --- The status rail: Gymmy's signature element ----------------------- */
   --rail-empty: #ded7cd;
 
+  /* --- The rest ramp: how long since a muscle was trained ---------------- */
+  /* One hue, five steps, faintest = trained today. An ORDINAL ramp, not a
+     palette: on the body map position carries identity, so colour is free to
+     carry magnitude. Validated against --surface — monotone OKLCH lightness,
+     every adjacent gap >= 0.06, faint end 2.08:1 — rather than eyeballed.
+     --rest-0 sits off the ramp on purpose: "never trained" is not a long rest,
+     it is the absence of a measurement, so it is given no hue at all. */
+  --rest-5: #8f2f09; /* a fortnight or more */
+  --rest-4: #b9400f; /* 7–13 days           */
+  --rest-3: #d15d26; /* 4–6 days            */
+  --rest-2: #e0814a; /* 2–3 days            */
+  --rest-1: #eca176; /* today or yesterday  */
+  --rest-0: #ded7cd; /* never trained       */
+
   /* --- Elevation: soft, warm-tinted, never grey -------------------------- */
   --shadow-sm: 0 1px 2px rgba(42, 32, 24, 0.06), 0 2px 8px rgba(42, 32, 24, 0.05);
   --shadow-md: 0 2px 4px rgba(42, 32, 24, 0.06), 0 10px 26px rgba(42, 32, 24, 0.08);
@@ -101,6 +115,17 @@
   --danger-wash: #341613;
 
   --rail-empty: #3a322e;
+
+  /* Re-stepped against the dark surface rather than flipped into it, and
+     validated the same way: faint end 2.05:1 on --surface. --rest-0 is lifted
+     well off the background — a near-black region reads as a hole in the
+     figure rather than as "no data". */
+  --rest-5: #f7723f;
+  --rest-4: #d96233;
+  --rest-3: #ba522a;
+  --rest-2: #9c4523;
+  --rest-1: #7f371b;
+  --rest-0: #433a35;
 
   /* Shadows read as mud on dark. Lean on borders and surface lift instead. */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);

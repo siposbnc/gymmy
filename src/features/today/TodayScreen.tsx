@@ -6,9 +6,17 @@ import { useActiveSession, useRoutines, useSettings, useTrainingRecency } from '
 import { startSessionFromRoutine } from '~/db/repositories/routines'
 import { discardSession, isStale, startEmptySession } from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
-import { MUSCLE_LABEL } from '~/domain/muscles'
-import { describeLastRun, describeRecency, type MuscleRecency } from '~/domain/recency'
+import { MUSCLE_LABEL, MUSCLE_ORDER } from '~/domain/muscles'
+import {
+  describeLastRun,
+  describeRecency,
+  restBand,
+  type MuscleRecency,
+  type RestBand,
+} from '~/domain/recency'
+import type { MuscleGroup } from '~/domain/types'
 import { formatVolume } from '~/domain/units'
+import { BodyMap, RestKey } from './BodyMap'
 import { useRestTimer } from '~/features/rest/restTimer'
 import { Button } from '~/ui/Button'
 import { Card } from '~/ui/Card'
@@ -166,46 +174,112 @@ export function TodayScreen() {
 }
 
 /**
- * How long since each muscle was trained, longest rested first.
+ * Muscles that get a region on the figure.
  *
- * The order is the entire recommendation: it reports dates and lets you draw
- * the conclusion, rather than announcing that your chest is recovered — which
- * depends on the load, the week and the lifter, and is not something a date can
- * know. Nothing is red, nothing is overdue, and tapping is not required.
+ * `full_body` is an attribution bucket rather than a place on the body — a
+ * clean is credited to it — so it has nowhere to be shaded and is never
+ * counted as untrained.
+ */
+const MAPPED_MUSCLES = MUSCLE_ORDER.filter((muscle) => muscle !== 'full_body')
+
+/**
+ * How long since each muscle was trained, as a map of the body.
  *
- * Today and yesterday are dimmed. That is not a recovery claim: it is the one
- * distinction the data makes on its own, since a muscle you trained hours ago
- * is categorically not the answer to what to train now.
+ * It reports dates and lets you draw the conclusion, rather than announcing
+ * that your chest is recovered — which depends on the load, the week and the
+ * lifter, and is not something a date can know. Nothing is red, nothing is
+ * overdue, and nothing has to be tapped.
+ *
+ * The two lines underneath name the extremes. A map is read in seconds and a
+ * shaded figure is only ever approximate, so the one number worth having — how
+ * long the longest rest actually is — is written out in words beside it.
  */
 function LastTrainedCard({ muscles }: { muscles: readonly MuscleRecency[] }) {
   // A fresh install has nothing to say about where to start.
   if (muscles.length === 0) return null
 
+  const bands: Partial<Record<MuscleGroup, RestBand>> = {}
+  for (const entry of muscles) bands[entry.muscle] = restBand(entry)
+
+  // Already sorted longest-rested first by the domain.
+  const longest = muscles[0]
+  const untrained = MAPPED_MUSCLES.filter((muscle) => bands[muscle] == null)
+
   return (
     <Card>
-      <p className="label-caps text-ink-muted">Last trained · longest rested first</p>
+      <p className="label-caps text-ink-muted">Last trained</p>
 
-      <ul className="mt-2.5 flex flex-wrap gap-1.5">
-        {muscles.map((entry) => {
-          const fresh = entry.daysSince != null && entry.daysSince <= 1
+      <div className="mt-2">
+        <BodyMap bands={bands} />
+      </div>
 
-          return (
-            <li
-              key={entry.muscle}
-              className={cn(
-                'flex items-baseline gap-1.5 rounded-full border px-2.5 py-1 text-[0.78rem]',
-                fresh ? 'border-line bg-sunken' : 'border-line-strong bg-surface',
-              )}
-            >
-              <span className={fresh ? 'text-ink-muted' : 'font-semibold text-ink'}>
-                {MUSCLE_LABEL[entry.muscle]}
-              </span>
-              <span className="num text-ink-muted">{describeRecency(entry)}</span>
-            </li>
-          )
-        })}
+      <RestKey />
+
+      <div className="mt-2.5 flex gap-2 border-t border-dashed border-line pt-2.5">
+        {longest ? (
+          <Readout
+            swatch={FILL_FOR_BAND[restBand(longest)]}
+            name={MUSCLE_LABEL[longest.muscle]}
+            value={describeRecency(longest)}
+          />
+        ) : null}
+
+        {untrained.length > 0 ? (
+          <Readout
+            swatch="bg-rest-0"
+            name={MUSCLE_LABEL[untrained[0]!]}
+            value={
+              untrained.length === 1
+                ? 'not trained yet'
+                : `+${untrained.length - 1} more, not trained yet`
+            }
+          />
+        ) : (
+          // Nothing untrained — name the other end of the ramp instead, so the
+          // line always says what the palest shading on the figure means.
+          <Readout
+            swatch={FILL_FOR_BAND[restBand(muscles.at(-1))]}
+            name={MUSCLE_LABEL[muscles.at(-1)!.muscle]}
+            value={describeRecency(muscles.at(-1)!)}
+          />
+        )}
+      </div>
+
+      {/* The figure is colour-only by construction, so the whole reading is
+          also available as text. */}
+      <ul className="sr-only">
+        {muscles.map((entry) => (
+          <li key={entry.muscle}>
+            {MUSCLE_LABEL[entry.muscle]}: last trained {describeRecency(entry)}
+          </li>
+        ))}
+        {untrained.map((muscle) => (
+          <li key={muscle}>{MUSCLE_LABEL[muscle]}: not trained yet</li>
+        ))}
       </ul>
     </Card>
+  )
+}
+
+/** Swatch classes, spelled out so Tailwind can see them. */
+const FILL_FOR_BAND: Readonly<Record<RestBand, string>> = {
+  none: 'bg-rest-0',
+  fresh: 'bg-rest-1',
+  recent: 'bg-rest-2',
+  few: 'bg-rest-3',
+  week: 'bg-rest-4',
+  long: 'bg-rest-5',
+}
+
+function Readout({ swatch, name, value }: { swatch: string; name: string; value: string }) {
+  return (
+    <p className="min-w-0 flex-1">
+      <span className="flex items-center gap-1.5 text-[0.8rem] font-semibold text-ink">
+        <i className={cn('size-2.5 shrink-0 rounded-xs', swatch)} aria-hidden />
+        <span className="truncate">{name}</span>
+      </span>
+      <span className="num mt-0.5 block text-[0.75rem] text-ink-muted">{value}</span>
+    </p>
   )
 }
 

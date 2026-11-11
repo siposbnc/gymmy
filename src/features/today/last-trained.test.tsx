@@ -51,17 +51,41 @@ describe('the last-trained card', () => {
   })
   afterEach(cleanup)
 
-  it('lists the muscles you train, longest rested first', async () => {
+  it('names the longest rest, which is the answer it exists to give', async () => {
     await trained('ex_squat', 9)
     await trained('ex_bench-press', 2)
 
     renderToday()
 
-    const list = await screen.findByRole('list')
-    const muscles = Array.from(list.querySelectorAll('li')).map((item) => item.textContent)
+    expect(await screen.findByText('Last trained')).toBeInTheDocument()
+    // Quads first: the order is the entire recommendation, and the readout
+    // writes out the one number a shaded figure can only approximate.
+    expect(screen.getByText('Quads')).toBeInTheDocument()
+    expect(screen.getByText('9d')).toBeInTheDocument()
+  })
 
-    // Quads first: the order is the entire recommendation.
-    expect(muscles).toEqual(['Quads9d', 'Chest2d'])
+  it('says which muscles have never been trained — the thing a date cannot', async () => {
+    await trained('ex_squat', 9)
+
+    renderToday()
+
+    // Only quads have history, so everything else is drawn as never trained
+    // and the readout names one of them plus how many more there are.
+    expect(await screen.findByText(/\+\d+ more, not trained yet/i)).toBeInTheDocument()
+  })
+
+  it('reads as text as well as colour, since the figure is colour-only', async () => {
+    await trained('ex_squat', 9)
+    await trained('ex_bench-press', 2)
+
+    renderToday()
+
+    const spoken = await screen.findByText(/^Quads: last trained 9d$/)
+    const list = spoken.closest('ul')
+    const lines = Array.from(list?.querySelectorAll('li') ?? []).map((item) => item.textContent)
+
+    expect(lines.slice(0, 2)).toEqual(['Quads: last trained 9d', 'Chest: last trained 2d'])
+    expect(lines).toContain('Hamstrings: not trained yet')
   })
 
   it('says nothing at all on a fresh install', async () => {

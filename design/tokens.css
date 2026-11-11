@@ -50,6 +50,18 @@
   /* --- The status rail: Gymmy's signature element ----------------------- */
   --rail-empty:      #DED7CD;
 
+  /* --- The rest ramp: how long since a muscle was trained ---------------- */
+  /* Ordinal, not categorical: one hue, five steps, faintest = trained today.
+     Validated against --surface — monotone OKLCH lightness, adjacent gaps
+     >= 0.06, faint end 2.08:1. --rest-0 is off the ramp on purpose: never
+     trained is an absent measurement, not a long rest. */
+  --rest-5:          #8F2F09;
+  --rest-4:          #B9400F;
+  --rest-3:          #D15D26;
+  --rest-2:          #E0814A;
+  --rest-1:          #ECA176;
+  --rest-0:          #DED7CD;
+
   /* --- Elevation: soft, warm-tinted, never grey -------------------------- */
   --shadow-sm: 0 1px 2px rgba(42, 32, 24, .06), 0 2px 8px rgba(42, 32, 24, .05);
   --shadow-md: 0 2px 4px rgba(42, 32, 24, .06), 0 10px 26px rgba(42, 32, 24, .08);
@@ -92,6 +104,16 @@
   --danger-wash:     #341613;
 
   --rail-empty:      #3A322E;
+
+  /* Re-stepped against the dark surface, not flipped into it: faint end
+     2.05:1, and --rest-0 lifted well off the background so an untrained
+     region reads as data rather than as a hole in the figure. */
+  --rest-5:          #F7723F;
+  --rest-4:          #D96233;
+  --rest-3:          #BA522A;
+  --rest-2:          #9C4523;
+  --rest-1:          #7F371B;
+  --rest-0:          #433A35;
 
   /* Shadows read as mud on dark. Lean on borders and surface lift instead. */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .40);

@@ -623,8 +623,31 @@ that was shown, in one transaction. Importing blind is how a picker fills up wit
 ### 18. What to train today — shipped post-v1
 
 Choosing a workout is arithmetic on dates, and until now the app held every
-date and showed none of them. Today gained one card: every muscle with any
-history, longest rested first, and a last-run age on each routine button.
+date and showed none of them. Today gained one card — a map of the body, each
+muscle shaded by how long since it was trained — and a last-run age on each
+routine button.
+
+**A map, because position is already identity.** Everywhere else in Gymmy a
+one-hue bar carries the magnitude and the row label carries the identity. On a
+body the position says *which muscle* on its own, which frees the colour
+channel to say *how long*. That is the whole argument for the figure over the
+list of chips it replaced, and it is also why the legend is not optional: the
+ramp is the only thing encoding the number. The two lines underneath name the
+extremes in words, because a shaded region is read in a second and is only ever
+approximate.
+
+**The ramp is computed, not chosen.** Five steps of one hue, `--rest-1` to
+`--rest-5`, validated as an ordinal ramp in each theme separately — monotone
+OKLCH lightness, every adjacent gap ≥ 0.06, the faintest step clearing 2:1 on
+the card it sits on. Dark is re-stepped against the dark surface rather than
+flipped into it. `--rest-0` sits off the ramp with no hue at all, because
+*never trained* is a missing measurement rather than a long rest — and saying
+it is the one thing the chip list could not do, since it only knew about
+muscles that had history.
+
+**The figure is a diagram, not an illustration.** Flat geometric regions on a
+thin frame. Realistic musculature would be the only illustrative thing in an
+app made of type and numerals, and it would date badly.
 
 **Derived, never recorded.** `domain/recency` reads logged sets and dates each
 muscle by its exercise's primary mover — the same attribution as weekly set
@@ -657,13 +680,19 @@ carried across would be offered as today's opening set on a movement it was
 never lifted on. Notes do not travel either — "seat 4, close grip" described a
 machine you are no longer on.
 
-**Logged sets never change exercise.** That is the hard rule, and it gives the
-swap two shapes. Nothing logged yet: the row changes exercise in place, and
-nothing else in the session can tell. Sets already logged: the original keeps
-them with its target trimmed to the sets it actually accounted for, and the
-replacement is inserted directly below with the remainder — so "two sets of
-bench, then the rack went" is what the session says, because it is what
-happened.
+**One row, re-pointed — the sets come along.** Sets hang off the session
+exercise row, so changing which exercise that row names takes them with it: the
+card simply becomes the new exercise, wherever you are in the workout.
+
+This was built the other way first, and changed deliberately. Keeping the
+logged sets under the original and inserting the replacement below it preserved
+the stricter reading of history — a set logged on the bench is a bench press —
+but on the phone it reads as an _add_, not a swap: you asked to replace one
+exercise and ended up with two. The cost is explicit and accepted: two sets
+logged before the swap are counted as the new exercise in the volume split, the
+charts and the records path. Swapping with work already logged is rare, and
+being lied to by the UI about what the button did is worse than the attribution
+being approximate on the occasion it happens.
 
 **The picker is borrowed, not duplicated.** Adding and swapping differ only in
 what happens to the exercise that comes back, so the screen owns one sheet and

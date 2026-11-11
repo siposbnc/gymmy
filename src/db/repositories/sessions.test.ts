@@ -272,7 +272,7 @@ describe('sessions', () => {
 
       const result = await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
 
-      expect(result).toEqual({ sessionExerciseId: benchRow.id, inserted: false })
+      expect(result).toBe(benchRow.id)
       const swapped = await db.sessionExercises.get(benchRow.id)
       expect(swapped?.exerciseId).toBe('ex_dumbbell-bench-press')
       // Its place in the session is the thing delete-and-re-add costs you.
@@ -357,56 +357,43 @@ describe('sessions', () => {
       expect(await db.sessionExercises.get(sexId)).not.toHaveProperty('machineWeightKg')
     })
 
-    it('keeps the logged sets on the exercise they were performed on', async () => {
-      const { benchRow } = await startPlannedSession()
+    it('takes the logged sets with it rather than adding a second exercise', async () => {
+      const { sessionId, benchRow } = await startPlannedSession()
       await logSet(benchRow.id, { weightKg: 80, reps: 8 })
       await logSet(benchRow.id, { weightKg: 80, reps: 7 })
 
       const result = await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
 
-      expect(result?.inserted).toBe(true)
-      // A set logged under Bench Press is a bench press. Relabelling it would
-      // falsify history, the volume split and the records path.
-      const original = await db.sessionExercises.get(benchRow.id)
-      expect(original?.exerciseId).toBe('ex_bench-press')
+      // One row, re-pointed: sets hang off the row, so they come along. The
+      // session says you did those two sets of the exercise you swapped to.
+      expect(result).toBe(benchRow.id)
+      expect(await db.sessionExercises.count()).toBe(2)
+      const swapped = await db.sessionExercises.get(benchRow.id)
+      expect(swapped?.exerciseId).toBe('ex_dumbbell-bench-press')
       expect(await listSets(benchRow.id)).toHaveLength(2)
-      expect(await listSets(result!.sessionExerciseId)).toHaveLength(0)
-    })
-
-    it('inserts the replacement directly below and shifts what follows', async () => {
-      const { sessionId, benchRow } = await startPlannedSession()
-      await logSet(benchRow.id, { weightKg: 80, reps: 8 })
-
-      const result = await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
 
       const rows = await listSessionExercises(sessionId)
       expect(rows.map((row) => row.exerciseId)).toEqual([
-        'ex_bench-press',
         'ex_dumbbell-bench-press',
         'ex_barbell-row',
       ])
-      expect(rows.map((row) => row.order)).toEqual([0, 1, 2])
-      expect(rows[1]?.id).toBe(result?.sessionExerciseId)
+      expect(rows.map((row) => row.order)).toEqual([0, 1])
     })
 
-    it('splits the target sets between the two, so the session still asks for four', async () => {
+    it('keeps the whole target, since the sets already done still count toward it', async () => {
       const { benchRow } = await startPlannedSession()
       await logSet(benchRow.id, { weightKg: 80, reps: 8 })
       await logSet(benchRow.id, { weightKg: 80, reps: 8 })
 
-      const result = await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
+      await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
 
-      const original = await db.sessionExercises.get(benchRow.id)
-      const inserted = await db.sessionExercises.get(result!.sessionExerciseId)
-      // "2 of 2" rather than "2 of 4" on an exercise you have finished with.
-      expect(original?.targetSets).toBe(2)
-      expect(inserted?.targetSets).toBe(2)
-      // The set to be taken to failure is in the remainder now.
-      expect(original?.isAmrap).toBe(false)
-      expect(inserted?.isAmrap).toBe(true)
+      const swapped = await db.sessionExercises.get(benchRow.id)
+      // Still "2 of 4" — two done, two to go, on the new exercise.
+      expect(swapped?.targetSets).toBe(4)
+      expect(swapped?.isAmrap).toBe(true)
     })
 
-    it('hands the replacement the rungs that are left of a ladder', async () => {
+    it('carries a whole ladder, stripped, however far into it you were', async () => {
       const routineId = await createRoutine('Push A')
       const bench = await addExerciseToRoutine(routineId, 'ex_bench-press')
       await setRoutineSetPlan(bench, [
@@ -418,44 +405,11 @@ describe('sessions', () => {
       const row = (await listSessionExercises(sessionId))[0]!
       await logSet(row.id, { weightKg: 60, reps: 10 })
 
-      const result = await swapSessionExercise(row.id, 'ex_dumbbell-bench-press')
+      await swapSessionExercise(row.id, 'ex_dumbbell-bench-press')
 
-      const inserted = await db.sessionExercises.get(result!.sessionExerciseId)
-      expect(inserted?.setPlan).toEqual([{ reps: 8 }, { reps: 6 }])
-      const original = await db.sessionExercises.get(row.id)
-      // The rung that was done keeps its weight: that is a record of what was
-      // planned and performed here, not a prescription being handed on.
-      expect(original?.targetSets).toBe(1)
-      expect(original?.setPlan).toBeUndefined()
-      expect(original?.targetRepsMin).toBe(10)
-    })
-
-    it('leaves the whole plan with the replacement when only warm-ups were done', async () => {
-      const { benchRow } = await startPlannedSession()
-      await logSet(benchRow.id, { weightKg: 40, reps: 10, type: 'warmup' })
-
-      const result = await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
-
-      const original = await db.sessionExercises.get(benchRow.id)
-      const inserted = await db.sessionExercises.get(result!.sessionExerciseId)
-      // The warm-ups stay where they were performed; no plan survives on a row
-      // that accounted for none of the working sets.
-      expect(await listSets(benchRow.id)).toHaveLength(1)
-      expect(original).not.toHaveProperty('targetSets')
-      expect(inserted?.targetSets).toBe(4)
-    })
-
-    it('gives the replacement no targets once the plan is already complete', async () => {
-      const { benchRow } = await startPlannedSession()
-      for (let index = 0; index < 4; index += 1) {
-        await logSet(benchRow.id, { weightKg: 80, reps: 8 })
-      }
-
-      const result = await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
-
-      const inserted = await db.sessionExercises.get(result!.sessionExerciseId)
-      expect(inserted).not.toHaveProperty('targetSets')
-      expect((await db.sessionExercises.get(benchRow.id))?.targetSets).toBe(4)
+      const swapped = await db.sessionExercises.get(row.id)
+      expect(swapped?.setPlan).toEqual([{ reps: 10 }, { reps: 8 }, { reps: 6 }])
+      expect(swapped).not.toHaveProperty('targetWeight')
     })
 
     it('does nothing when the exercise picked is the one already there', async () => {
@@ -464,8 +418,12 @@ describe('sessions', () => {
 
       const result = await swapSessionExercise(benchRow.id, 'ex_bench-press')
 
-      expect(result).toEqual({ sessionExerciseId: benchRow.id, inserted: false })
+      expect(result).toBe(benchRow.id)
       expect(await db.sessionExercises.count()).toBe(2)
+      expect((await db.sessionExercises.get(benchRow.id))?.targetWeight).toEqual({
+        kind: 'absolute',
+        kg: 80,
+      })
     })
 
     it('reports a row that is no longer there rather than writing one', async () => {

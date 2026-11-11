@@ -1,0 +1,325 @@
+<!-- @dsCard group="Components" name="Last trained" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gymmy · Last trained</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+.t{
+  --bg:#F6F3EE;--surface:#FFFDFA;--surface-raised:#FFFFFF;--surface-sunken:#EDE8E1;
+  --border:#E3DCD2;--border-strong:#C9BFB2;
+  --text:#1A1614;--text-muted:#6B625A;--text-faint:#9A9087;
+  --accent:#C7430F;--accent-wash:#FBEAE1;--on-accent:#FFF8F4;
+  --rail-empty:#DED7CD;
+  --shadow-sm:0 1px 2px rgba(42,32,24,.06),0 2px 8px rgba(42,32,24,.05);
+  --grain-opacity:.035;color-scheme:light;
+
+  /* Rest ramp — one hue, five steps, most-rested first.
+     Validated as an ordinal ramp against --surface: monotone lightness,
+     every adjacent gap >= 0.06 OKLCH L, faint end 2.08:1. */
+  --rest-5:#8F2F09;  /* a fortnight or more */
+  --rest-4:#B9400F;  /* 7–13 days           */
+  --rest-3:#D15D26;  /* 4–6 days            */
+  --rest-2:#E0814A;  /* 2–3 days            */
+  --rest-1:#ECA176;  /* today or yesterday  */
+  --rest-0:#DED7CD;  /* never trained — off the ramp, deliberately colourless */
+  --figure-line:#C9BFB2;
+}
+.t[data-theme="dark"]{
+  --bg:#14110F;--surface:#1D1917;--surface-raised:#262120;--surface-sunken:#0E0C0B;
+  --border:#332C29;--border-strong:#4A4138;
+  --text:#F5F0E9;--text-muted:#A79C91;--text-faint:#7C7268;
+  --accent:#FF6A33;--accent-wash:#2E1810;--on-accent:#1A0E07;
+  --rail-empty:#3A322E;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.40);
+  --grain-opacity:.05;color-scheme:dark;
+
+  /* Selected for dark, not flipped into it: the ramp is re-stepped against
+     the dark surface, faint end 2.05:1. */
+  --rest-5:#F7723F;
+  --rest-4:#D96233;
+  --rest-3:#BA522A;
+  --rest-2:#9C4523;
+  --rest-1:#7F371B;
+  --rest-0:#433A35;  /* lifted off the surface: a void reads as a hole, not as data */
+  --figure-line:#4A4138;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;background:#2A2422;padding:28px;
+  display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(410px,1fr));align-items:start;
+}
+.t{
+  background:var(--bg);color:var(--text);border-radius:20px;padding:26px;
+  position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.t::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  opacity:var(--grain-opacity);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.t>*{position:relative;z-index:1}
+
+.theme-tag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--text-faint);margin-bottom:6px}
+h1{font-family:"Instrument Serif",Georgia,serif;font-size:26px;font-weight:400;margin-bottom:6px;line-height:1.1}
+.lede{font-size:11.5px;line-height:1.5;color:var(--text-muted);margin-bottom:20px}
+h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:var(--accent);margin:24px 0 9px}
+.desc{font-size:11.5px;line-height:1.5;color:var(--text-muted);margin-top:9px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.caps{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--text-faint)}
+
+/* The card as it sits on Today, at phone width. */
+.card{
+  width:342px;background:var(--surface);border:1px solid var(--border);
+  border-radius:16px;padding:14px;box-shadow:var(--shadow-sm);
+}
+.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+
+/* ===== A — body map ======================================================= */
+.figs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fig{display:grid;justify-items:center;gap:4px}
+/* Height-capped, not width-filled: the card sits under the start buttons on a
+   844px screen, and a figure that scales with the column runs past the fold. */
+.fig svg{height:228px;width:auto;display:block}
+.fig-k{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--text-faint)}
+
+.region{stroke:var(--figure-line);stroke-width:.8;transition:fill 220ms cubic-bezier(.2,.8,.25,1)}
+.frame{fill:none;stroke:var(--figure-line);stroke-width:.9}
+.inert{fill:var(--surface-sunken);stroke:var(--figure-line);stroke-width:.8}
+.r5{fill:var(--rest-5)}.r4{fill:var(--rest-4)}.r3{fill:var(--rest-3)}
+.r2{fill:var(--rest-2)}.r1{fill:var(--rest-1)}.r0{fill:var(--rest-0)}
+
+/* Readout: the figure says where, this says how long. Two muscles, because a
+   body map answers "which" well and "how many days" only roughly. */
+.readout{
+  display:flex;gap:8px;margin-top:10px;padding-top:10px;
+  border-top:1px dashed var(--border);
+}
+.read{flex:1;min-width:0}
+.read-k{font-size:11px;font-weight:700;color:var(--text);display:block}
+.read-v{font-size:11px;color:var(--text-muted)}
+.swatch{width:9px;height:9px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:5px}
+
+/* Legend — the ramp is the only channel on the map, so it is never optional. */
+.key{display:flex;align-items:center;gap:7px;margin-top:11px}
+.key-steps{display:flex;gap:2px;flex:1}
+.key-step{height:7px;flex:1;border-radius:2px}
+.key-end{font-size:9.5px;font-weight:700;color:var(--text-faint);white-space:nowrap}
+
+/* ===== B — rest axis ===================================================== */
+.axis{position:relative;padding:16px 2px 0}
+.axis-line{height:1px;background:var(--border-strong);position:relative;margin-bottom:5px}
+.tick{position:absolute;top:-4px;width:1px;height:5px;background:var(--border-strong)}
+.tick-l{position:absolute;top:7px;font-size:9.5px;font-weight:700;color:var(--text-faint);transform:translateX(-50%);white-space:nowrap}
+.strip{position:relative;height:118px;margin-top:22px}
+.dot{
+  position:absolute;height:20px;display:flex;align-items:center;gap:5px;
+  transform:translateX(-5px);
+}
+.dot i{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none;box-shadow:0 0 0 2px var(--surface)}
+.dot b{font-size:11px;font-weight:600;color:var(--text)}
+.dot.late{transform:translateX(-100%);flex-direction:row-reverse;padding-right:5px}
+
+/* ===== C — ranked rows =================================================== */
+.rows{display:grid;gap:7px}
+.row{display:grid;grid-template-columns:72px 1fr 44px;align-items:center;gap:9px}
+.row-k{font-size:11.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track{height:8px;background:var(--surface-sunken);border-radius:999px;overflow:hidden}
+.fill{display:block;height:100%;background:var(--accent);border-radius:999px}
+.row-v{font-size:11px;font-weight:700;color:var(--text-muted);text-align:right}
+.row.fresh .fill{background:var(--rail-empty)}
+.row.fresh .row-k{color:var(--text-muted);font-weight:500}
+</style>
+</head>
+<body>
+
+<!-- =====================================================================
+     One figure, used by both themes. Abstract rather than anatomical: flat
+     geometric regions on a thin frame, in the same register as the rest of
+     the system. Realistic musculature would be the only illustrative thing
+     in the app and would date badly.
+     ================================================================== -->
+<template id="front">
+  <svg viewBox="0 0 100 172" role="img" aria-label="Front of the body, shaded by how long since each muscle was trained">
+    <!-- head and neck: never a muscle, never shaded -->
+    <circle class="frame" cx="50" cy="12" r="8.5"/>
+    <path class="frame" d="M45.5 20.5h9"/>
+    <!-- traps -->
+    <path class="region r4" d="M35.5 25q14.5-4.5 29 0l-3 7h-23z"/>
+    <!-- shoulders -->
+    <ellipse class="region r2" cx="26.5" cy="39" rx="8" ry="8.5"/>
+    <ellipse class="region r2" cx="73.5" cy="39" rx="8" ry="8.5"/>
+    <!-- chest -->
+    <path class="region r3" d="M36.5 34h12v15h-10q-2 0-2-2z"/>
+    <path class="region r3" d="M63.5 34h-12v15h10q2 0 2-2z"/>
+    <!-- biceps -->
+    <rect class="region r3" x="19.5" y="49" width="13" height="21" rx="6.5"/>
+    <rect class="region r3" x="67.5" y="49" width="13" height="21" rx="6.5"/>
+    <!-- forearms -->
+    <rect class="region r0" x="18.5" y="72" width="11.5" height="25" rx="5.7"/>
+    <rect class="region r0" x="70" y="72" width="11.5" height="25" rx="5.7"/>
+    <!-- core, inset from the chest so the torso reads as two regions -->
+    <rect class="region r2" x="39" y="53" width="22" height="30" rx="5"/>
+    <!-- quads -->
+    <rect class="region r1" x="35.5" y="89" width="13" height="36" rx="6.5"/>
+    <rect class="region r1" x="51.5" y="89" width="13" height="36" rx="6.5"/>
+    <!-- calves, narrower than the thigh so the leg tapers -->
+    <rect class="region r0" x="37" y="131" width="10.5" height="31" rx="5.2"/>
+    <rect class="region r0" x="52.5" y="131" width="10.5" height="31" rx="5.2"/>
+    <path class="frame" d="M37.5 166h9.5M53 166h9.5"/>
+  </svg>
+</template>
+
+<template id="back">
+  <svg viewBox="0 0 100 172" role="img" aria-label="Back of the body, shaded by how long since each muscle was trained">
+    <circle class="frame" cx="50" cy="12" r="8.5"/>
+    <path class="frame" d="M45.5 20.5h9"/>
+    <!-- traps, which own more of the back than they do of the front -->
+    <path class="region r4" d="M35 25q15-4.5 30 0l-4 14h-22z"/>
+    <!-- rear delts -->
+    <ellipse class="region r2" cx="26.5" cy="41" rx="8" ry="8.5"/>
+    <ellipse class="region r2" cx="73.5" cy="41" rx="8" ry="8.5"/>
+    <!-- lats, wrapping outward and tapering to the waist -->
+    <path class="region r4" d="M37 41h10v29l-7.5-3.5q-2.5-1.2-2.5-4.5z"/>
+    <path class="region r4" d="M63 41H53v29l7.5-3.5q2.5-1.2 2.5-4.5z"/>
+    <!-- mid back, the column between them -->
+    <rect class="region r4" x="48.5" y="41" width="3" height="29" rx="1.5"/>
+    <!-- triceps -->
+    <rect class="region r3" x="19.5" y="51" width="13" height="21" rx="6.5"/>
+    <rect class="region r3" x="67.5" y="51" width="13" height="21" rx="6.5"/>
+    <!-- forearms -->
+    <rect class="region r0" x="18.5" y="74" width="11.5" height="25" rx="5.7"/>
+    <rect class="region r0" x="70" y="74" width="11.5" height="25" rx="5.7"/>
+    <!-- glutes -->
+    <path class="region r1" d="M36 74h12v14q0 5-6 5t-6-5z"/>
+    <path class="region r1" d="M64 74H52v14q0 5 6 5t6-5z"/>
+    <!-- hamstrings -->
+    <rect class="region r5" x="35.5" y="97" width="13" height="28" rx="6.5"/>
+    <rect class="region r5" x="51.5" y="97" width="13" height="28" rx="6.5"/>
+    <!-- calves -->
+    <rect class="region r0" x="37" y="131" width="10.5" height="31" rx="5.2"/>
+    <rect class="region r0" x="52.5" y="131" width="10.5" height="31" rx="5.2"/>
+    <path class="frame" d="M37.5 166h9.5M53 166h9.5"/>
+  </svg>
+</template>
+
+<script>
+// Both theme panels render the same markup, so it is written once.
+const PANEL = (theme) => `
+<div class="t"${theme === 'dark' ? ' data-theme="dark"' : ''}>
+  <p class="theme-tag">${theme}</p>
+  <h1>Last trained</h1>
+  <p class="lede">
+    On Today, under the start buttons. It answers one question — what should I
+    train now — and answers it with dates rather than advice. Nothing here says
+    a muscle is recovered: how long it has been is the honest part, and the
+    ordering is the whole recommendation.
+  </p>
+
+  <h2>A · Body map</h2>
+  <div class="card">
+    <div class="card-head">
+      <span class="caps">Last trained</span>
+      <span class="caps">16d since hamstrings</span>
+    </div>
+    <div class="figs">
+      <div class="fig">${FRONT}<span class="fig-k">front</span></div>
+      <div class="fig">${BACK}<span class="fig-k">back</span></div>
+    </div>
+    <div class="key">
+      <span class="key-end">just trained</span>
+      <span class="key-steps">
+        <i class="key-step" style="background:var(--rest-1)"></i>
+        <i class="key-step" style="background:var(--rest-2)"></i>
+        <i class="key-step" style="background:var(--rest-3)"></i>
+        <i class="key-step" style="background:var(--rest-4)"></i>
+        <i class="key-step" style="background:var(--rest-5)"></i>
+      </span>
+      <span class="key-end">2w+</span>
+    </div>
+    <div class="readout">
+      <span class="read">
+        <span class="read-k"><i class="swatch" style="background:var(--rest-5)"></i>Hamstrings</span>
+        <span class="read-v num">16 days ago</span>
+      </span>
+      <span class="read">
+        <span class="read-k"><i class="swatch" style="background:var(--rest-0)"></i>Calves</span>
+        <span class="read-v">not trained yet</span>
+      </span>
+    </div>
+  </div>
+  <p class="desc">
+    Position carries identity, so colour is free to carry magnitude — one hue,
+    five steps, validated against this surface in each theme rather than flipped
+    into dark. Grey is <em>never trained</em>, which the chip list could not say
+    at all: it only knew about muscles with history. The two lines underneath
+    name the extremes, because a map is read in seconds and a figure is not.
+  </p>
+
+  <h2>B · Rest axis</h2>
+  <div class="card">
+    <div class="card-head">
+      <span class="caps">Last trained</span>
+    </div>
+    <div class="axis">
+      <div class="axis-line">
+        <i class="tick" style="left:0"></i><i class="tick" style="left:33%"></i>
+        <i class="tick" style="left:66%"></i><i class="tick" style="left:calc(100% - 1px)"></i>
+        <span class="tick-l" style="left:0">today</span>
+        <span class="tick-l" style="left:33%">5d</span>
+        <span class="tick-l" style="left:66%">10d</span>
+        <span class="tick-l" style="left:100%">2w+</span>
+      </div>
+      <div class="strip">
+        <span class="dot late" style="left:100%;top:0"><i></i><b>Hamstrings</b></span>
+        <span class="dot late" style="left:60%;top:24px"><i></i><b>Lats</b></span>
+        <span class="dot late" style="left:60%;top:48px"><i></i><b>Traps</b></span>
+        <span class="dot" style="left:40%;top:72px"><i></i><b>Chest</b></span>
+        <span class="dot" style="left:20%;top:96px"><i></i><b>Shoulders</b></span>
+        <span class="dot" style="left:6%;top:120px"><i></i><b>Quads</b></span>
+      </div>
+    </div>
+  </div>
+  <p class="desc">
+    Position carries the magnitude here, so the dots stay one colour — colouring
+    them by the same value the axis already shows would spend a channel twice.
+    It is the most truthful of the three: you can see at a glance that everything
+    is bunched at one end on a week you trained every day. It is also the one
+    that runs out of room, since two muscles trained on the same day need two
+    lines.
+  </p>
+
+  <h2>C · Ranked rows</h2>
+  <div class="card">
+    <div class="card-head">
+      <span class="caps">Last trained</span>
+      <span class="caps">longest rested first</span>
+    </div>
+    <div class="rows">
+      <div class="row"><span class="row-k">Hamstrings</span><span class="track"><i class="fill" style="width:100%"></i></span><span class="row-v num">16d</span></div>
+      <div class="row"><span class="row-k">Lats</span><span class="track"><i class="fill" style="width:56%"></i></span><span class="row-v num">9d</span></div>
+      <div class="row"><span class="row-k">Traps</span><span class="track"><i class="fill" style="width:56%"></i></span><span class="row-v num">9d</span></div>
+      <div class="row"><span class="row-k">Chest</span><span class="track"><i class="fill" style="width:31%"></i></span><span class="row-v num">5d</span></div>
+      <div class="row"><span class="row-k">Shoulders</span><span class="track"><i class="fill" style="width:19%"></i></span><span class="row-v num">3d</span></div>
+      <div class="row fresh"><span class="row-k">Quads</span><span class="track"><i class="fill" style="width:6%"></i></span><span class="row-v num">1d</span></div>
+    </div>
+  </div>
+  <p class="desc">
+    The chip list with a magnitude channel added, and the cheapest of the three
+    to build. Accurate and dull: it reads as a table, which is the one thing the
+    Today screen does not want to be. Rows for fourteen muscles would also take
+    the whole screen, so it needs a cut-off the other two do not.
+  </p>
+</div>`
+
+const FRONT = document.getElementById('front').innerHTML
+const BACK = document.getElementById('back').innerHTML
+document.body.insertAdjacentHTML('beforeend', PANEL('light') + PANEL('dark'))
+</script>
+</body>
+</html>

@@ -72,7 +72,7 @@ describe('swapping an exercise mid-workout', () => {
     expect(await screen.findByText('Dumbbell Bench Press')).toBeInTheDocument()
   })
 
-  it('keeps logged sets on the original and continues below it', async () => {
+  it('takes the logged sets with it instead of adding a second card', async () => {
     const user = userEvent.setup()
 
     const sessionId = await startEmptySession('Push A')
@@ -83,23 +83,18 @@ describe('swapping an exercise mid-workout', () => {
     expect(await screen.findByText('Bench Press')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /bench press options/i }))
-    expect(await screen.findByText(/keeps your 1 logged set here/i)).toBeInTheDocument()
+    expect(await screen.findByText(/1 logged set moves with it/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /swap for another exercise/i }))
     await user.click(await screen.findByRole('button', { name: /^dumbbell bench press/i }))
 
-    // Both exercises are now on screen, in that order, and the set stayed with
-    // the exercise it was performed on.
+    // One card, now the new exercise — the set came along with it.
     expect(await screen.findByText('Dumbbell Bench Press')).toBeInTheDocument()
-    expect(screen.getByText('Bench Press')).toBeInTheDocument()
+    expect(screen.queryByText('Bench Press')).not.toBeInTheDocument()
 
     await waitFor(async () => {
       const rows = await listSessionExercises(sessionId)
-      expect(rows.map((row) => row.exerciseId)).toEqual([
-        'ex_bench-press',
-        'ex_dumbbell-bench-press',
-      ])
+      expect(rows.map((row) => row.exerciseId)).toEqual(['ex_dumbbell-bench-press'])
       expect(await listSets(rows[0]!.id)).toHaveLength(1)
-      expect(await listSets(rows[1]!.id)).toHaveLength(0)
     })
   })
 })

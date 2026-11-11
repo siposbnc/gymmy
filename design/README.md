@@ -55,6 +55,7 @@ components/numeric-input.html    stepper + the custom numeric pad
 components/rest-timer.html       the sticky rail, plus why it survives sleep
 components/explainer-sheet.html  the four-part "how this is worked out" sheet
 components/data-display.html     stat tiles, PR board, estimate-vs-record, ghost line
+components/last-trained.html     three ways to show what to train today, with the rest ramp
 screens/active-session.html      the full screen, light and dark
 ```
 

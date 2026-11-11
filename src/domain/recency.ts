@@ -170,6 +170,33 @@ export function describeAge(at: number, now: number = Date.now()): string {
 }
 
 /**
+ * Which step of the rest ramp a muscle sits on.
+ *
+ * Five bands and an absence. The boundaries are reading distinctions, not
+ * physiology: a band is "how long ago, roughly", and the app has no business
+ * claiming a muscle is recovered at 48 hours. They are spaced the way training
+ * weeks are — what you did today, the day before that, earlier this week, last
+ * week, longer — so a normal split lands across the whole ramp instead of
+ * bunching in one colour.
+ *
+ * `none` is not the far end of the ramp. A muscle you have never trained is a
+ * missing measurement rather than a long rest, which is why it takes a
+ * colourless fill and sorts separately.
+ */
+export type RestBand = 'fresh' | 'recent' | 'few' | 'week' | 'long' | 'none'
+
+export function restBand(entry: MuscleRecency | undefined): RestBand {
+  if (entry == null) return 'none'
+  // Beyond the window: longer than the query can see, so the longest band.
+  if (entry.daysSince == null) return 'long'
+  if (entry.daysSince <= 1) return 'fresh'
+  if (entry.daysSince <= 3) return 'recent'
+  if (entry.daysSince <= 6) return 'few'
+  if (entry.daysSince <= 13) return 'week'
+  return 'long'
+}
+
+/**
  * `today` · `yesterday` · `5d ago` — a routine's last run, as a label.
  *
  * "ago" is added only where it reads: "5d ago" needs it and "today ago" is not

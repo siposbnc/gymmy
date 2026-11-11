@@ -60,13 +60,15 @@ user-facing explanation cannot drift from the maths.
   write, never by a caller, which is why the ribbon, the session header and
   the weekly set counts never had to learn ladders exist. A ladder whose rungs
   are identical is not stored — that is straight sets.
-- **A swap carries the shape, never the load — and never a logged set.**
-  Replacing an exercise mid-session moves its place, its superset group and its
-  rep prescription; absolute weights are stripped, because 80 kg of bench press
-  is not 80 kg of dumbbell press. If sets are already logged, the original
-  keeps them and the replacement is inserted below it: a set logged under Bench
-  Press is a bench press, and relabelling it would falsify history, the volume
-  split and the records path.
+- **A swap carries the shape, never the load.** Replacing an exercise
+  mid-session keeps its place, its superset group and its rep prescription;
+  absolute weights are stripped, because 80 kg of bench press is not 80 kg of
+  dumbbell press and prefill's plan tier would offer it as your opening set.
+  **Sets travel with the row**, which is a decision about history and not only
+  about convenience: two sets logged on the bench become two sets of whatever
+  you swapped to, in the volume split, the charts and the records path. It was
+  made deliberately — the alternative, stranding them under an exercise you are
+  no longer doing, reads as an add rather than a swap.
 - **Goals report, they do not score.** A missed volume goal is a number beside
   another number: no red state, no failure copy, no broken streak. And a goal is
   never invented — the first run of a routine has nothing to beat, so it shows

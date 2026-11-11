@@ -54,6 +54,15 @@
   /* The status rail */
   --color-rail: var(--rail-empty);
 
+  /* The rest ramp. Named steps rather than computed ones, so every fill in
+     the body map is a token someone validated. */
+  --color-rest-0: var(--rest-0);
+  --color-rest-1: var(--rest-1);
+  --color-rest-2: var(--rest-2);
+  --color-rest-3: var(--rest-3);
+  --color-rest-4: var(--rest-4);
+  --color-rest-5: var(--rest-5);
+
   /* Type */
   --font-ui: 'Archivo Variable', 'Helvetica Neue', Arial, sans-serif;
   --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;

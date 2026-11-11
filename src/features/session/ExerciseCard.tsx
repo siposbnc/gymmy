@@ -529,9 +529,10 @@ export function ExerciseCard({
             {/* The substitution is a normal part of training — the rack is
                 taken, the machine is broken — and the alternative without it is
                 delete-and-re-add, which costs the exercise its place, its
-                superset grouping and its targets. The sub-label states the
-                consequence before the picker opens, because what happens to
-                sets you have already logged is the one thing worth knowing. */}
+                superset grouping and its targets. The sub-label states what
+                happens to sets already logged before the picker opens: they
+                come along, which is to say they end up counted as the new
+                exercise. */}
             <button
               type="button"
               onClick={() => {
@@ -545,7 +546,7 @@ export function ExerciseCard({
                 <span className="block text-[0.75rem] text-ink-muted">
                   {sets.length === 0
                     ? 'Keeps its place and its rep targets'
-                    : `Keeps your ${sets.length} logged set${sets.length === 1 ? '' : 's'} here and continues below`}
+                    : `Your ${sets.length} logged set${sets.length === 1 ? '' : 's'} move${sets.length === 1 ? 's' : ''} with it`}
                 </span>
               </span>
             </button>
