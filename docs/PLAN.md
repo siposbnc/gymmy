@@ -700,6 +700,46 @@ the cards ask it to open. A picker per card would mean a live query over the
 exercise library per exercise in the workout, for a sheet that is shut almost
 always.
 
+### 20. The session card — shipped post-v1
+
+A square image of a finished workout, made on the device and copied to the
+clipboard. Reached from the session options menu, so it is available for every
+past session and not only the one you just finished — the same screen serves
+both, since finishing lands you there.
+
+**Copy, not share.** No share sheet, no upload, no link. A share sheet on iOS
+reports nothing back and puts the file somewhere nobody can find; an image on
+the clipboard goes straight into whatever app the person already has open. The
+card is also rendered full-size in the sheet, because press-and-hold is a
+gesture an iPhone user already has — and it is the fallback for when the
+Clipboard API is missing or refuses the write.
+
+**Canvas, not a screenshot of the DOM.** An SVG `foreignObject` renders
+inconsistently in Safari and a DOM-to-image library is a dependency for twenty
+lines of layout. Canvas also produces an exact 1080×1080 whatever the phone's
+pixel ratio, which is the point of an image meant to leave the device. The one
+tax is that webfonts must be loaded explicitly before the first `fillText`, or
+the card silently comes out in Arial.
+
+**The colours are read from the live theme**, never copied into the drawing
+code. `styles/tokens.css` is the source of truth; a card holding its own hexes
+would be a second one, and it would drift. The card therefore follows light and
+dark like everything else.
+
+**What it says, and what it does not.** Routine name, date, duration, working
+sets, volume, and the top set of each exercise — the heaviest, not the last,
+because a back-off set is not the number you would tell anyone about. Five rows
+then `+2 more`, in the order the workout was done rather than ranked by weight,
+which would turn the card into a leaderboard of your own session. Records are
+starred. Body weight, notes, RPE and settings are not on it, for the same
+reason they are not in a share code: a picture that leaves the phone is a
+decision about what leaves the phone.
+
+The contents are a pure function in `domain/session-card`; the drawing is
+pixels and gets no unit tests, which is exactly why `npm run shots` captures
+the sheet in both themes. That screenshot is the only verification the layout
+has.
+
 ### Agreed backlog — from the gap review of 2026-11-08
 
 A feature-by-feature comparison against Strong, Hevy, Boostcamp, Alpha Progression, JEFIT and
@@ -775,7 +815,8 @@ Gymmy should dilute the loop it is built around.
   the repositories. Worth doing only once you want multi-device — note this is also the point at which
   "one user per device" stops being an assumption.
 - **Apple Health / Google Health Connect** workout export.
-- **Shareable session card** rendered to an image.
+- ~~**Shareable session card** rendered to an image.~~ **Shipped post-v1** —
+  see §20. Copied to the clipboard rather than shared, and drawn on a canvas.
 - **Deload detection** from volume/RPE trends.
 - **Watch companion** — big ask, big payoff for rest timers.
 - **Exercise demo media.** Note: decent exercise animations are a licensing cost, not a coding task.

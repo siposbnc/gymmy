@@ -506,6 +506,31 @@ for (const theme of ['light', 'dark']) {
     })),
   )
 
+  // The card is drawn on a canvas, which means nothing about it is checkable
+  // from a test: fonts, truncation, the baseline grid and whether the thing
+  // looks like something you would actually post are all visual. This is the
+  // only verification it gets, so it is not optional.
+  allErrors.push(
+    ...(await shoot('session-card', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await page.getByRole('link', { name: 'History' }).click()
+        await page.waitForTimeout(300)
+        await page
+          .getByRole('button', { name: /Lower A/ })
+          .first()
+          .click()
+        await page.waitForTimeout(400)
+        await tap(page, /session options/i)
+        await page.waitForTimeout(300)
+        await tap(page, /make a card/i)
+        // The canvas waits on webfonts before it draws anything.
+        await page.waitForTimeout(900)
+      },
+    })),
+  )
+
   // Turning a logged workout into a plan. The numbers in the preview are
   // derived, so this is the shot that proves the derived line reads sensibly.
   allErrors.push(

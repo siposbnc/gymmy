@@ -120,6 +120,24 @@ const SCREENS = [
       await page.waitForTimeout(400)
     },
   ],
+  // The card sheet: an image and a copy button over a dimmed screen. Worth
+  // auditing because the image is the entire content, so its alternative text
+  // is the only thing a screen reader has to go on.
+  [
+    'Session card',
+    '/history',
+    async (page) => {
+      await page
+        .getByRole('button', { name: /Lower A/ })
+        .first()
+        .click()
+      await page.waitForTimeout(350)
+      await page.getByRole('button', { name: /session options/i }).click()
+      await page.waitForTimeout(250)
+      await page.getByRole('button', { name: /make a card/i }).click()
+      await page.waitForTimeout(900)
+    },
+  ],
   // Last, because it starts a workout and the others would then be looking at
   // an app with a session in progress. The third element is optional setup:
   // this one is a sheet, so there is no URL that reaches it.

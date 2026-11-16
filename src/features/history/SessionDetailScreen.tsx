@@ -1,5 +1,5 @@
-import { ChevronLeft, ListPlus, MoreVertical, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { ChevronLeft, ImageDown, ListPlus, MoreVertical, Plus, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { useSessionDetail, useSettings } from '~/db/hooks'
@@ -20,6 +20,8 @@ import {
 import { BackupPrompt } from '~/features/backup/BackupPrompt'
 import { ExercisePickerSheet } from '~/features/exercises/ExercisePickerSheet'
 import { SaveAsRoutineSheet } from '~/features/history/SaveAsRoutineSheet'
+import { SessionCardSheet } from '~/features/history/SessionCardSheet'
+import { buildSessionCard } from '~/domain/session-card'
 import { describeVolumeGoal, resolveVolumeGoal, type VolumeGoalResult } from '~/domain/goals'
 import { totalVolume } from '~/domain/metrics'
 import { describeRecordKind } from '~/domain/records'
@@ -68,6 +70,7 @@ export function SessionDetailScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [savingAsRoutine, setSavingAsRoutine] = useState(false)
+  const [sharingCard, setSharingCard] = useState(false)
   const [picking, setPicking] = useState(false)
   const [movingSet, setMovingSet] = useState<SetEntry | null>(null)
   const [editingDuration, setEditingDuration] = useState(false)
@@ -77,6 +80,26 @@ export function SessionDetailScreen() {
     name: string
     sets: SetEntry[]
   } | null>(null)
+
+  /**
+   * What the shareable card would say.
+   *
+   * Memoised because it is an effect dependency in the sheet: a fresh object
+   * every render would redraw a 1080×1080 canvas on every keystroke in the
+   * numeric pad. Above the guards below, because a hook after an early return
+   * is a hook that sometimes does not run.
+   */
+  const card = useMemo(
+    () =>
+      detail == null
+        ? null
+        : buildSessionCard({
+            session: detail.session,
+            exercises: detail.exercises,
+            recordExerciseIds: detail.records.map((record) => record.exerciseId),
+          }),
+    [detail],
+  )
 
   /**
    * Append a set, seeded from the last one logged for that exercise.
@@ -132,6 +155,12 @@ export function SessionDetailScreen() {
   }
 
   const padSet = pad ? allSets.find((set) => set.id === pad.setId) : undefined
+
+  const cardDate = new Date(session.startedAt).toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
 
   return (
     <>
@@ -310,6 +339,24 @@ export function SessionDetailScreen() {
             type="button"
             onClick={() => {
               setMenuOpen(false)
+              setSharingCard(true)
+            }}
+            className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
+          >
+            <span className="text-accent-ink">
+              <ImageDown size={18} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.95rem] font-medium">Make a card</span>
+              <span className="block text-[0.75rem] leading-relaxed text-ink-muted">
+                A square image of this workout, to copy wherever you like
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false)
               setSavingAsRoutine(true)
             }}
             className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
@@ -344,6 +391,14 @@ export function SessionDetailScreen() {
           </button>
         </div>
       </Sheet>
+
+      <SessionCardSheet
+        open={sharingCard}
+        onOpenChange={setSharingCard}
+        data={card}
+        unit={settings.units}
+        dateLabel={cardDate}
+      />
 
       <SaveAsRoutineSheet
         sessionId={sessionId}
