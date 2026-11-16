@@ -425,6 +425,48 @@ for (const theme of ['light', 'dark']) {
     })),
   )
 
+  // Planned at home, not started. The whole feature is the chrome around an
+  // otherwise ordinary session, so these two shots are its real verification:
+  // if either reads as a workout in progress, it has failed.
+  const intoPlan = async (page) => {
+    await seedHistory(page)
+    await buildRoutine(page)
+    await page.getByRole('link', { name: 'Today' }).click()
+    await page.waitForTimeout(250)
+    await page
+      .getByRole('button', { name: /to start later/i })
+      .first()
+      .click()
+    await page.waitForTimeout(400)
+  }
+
+  // The launch screen as a regular user sees it: routines to start, each
+  // paired with the narrow button that plans it instead.
+  allErrors.push(
+    ...(await shoot('today-routines', {
+      theme,
+      steps: async (page) => {
+        await seedHistory(page)
+        await buildRoutine(page)
+        await page.getByRole('link', { name: 'Today' }).click()
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
+  allErrors.push(...(await shoot('session-planned', { theme, steps: intoPlan })))
+
+  allErrors.push(
+    ...(await shoot('today-planned', {
+      theme,
+      steps: async (page) => {
+        await intoPlan(page)
+        await page.getByRole('button', { name: /back to today/i }).click()
+        await page.waitForTimeout(350)
+      },
+    })),
+  )
+
   // The progression nudge needs a previous session that actually cleared the
   // routine's rep range, so it only exists with history behind it.
   allErrors.push(

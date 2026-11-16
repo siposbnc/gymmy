@@ -151,6 +151,28 @@ const SCREENS = [
       await page.waitForTimeout(350)
     },
   ],
+  // A workout set up but not started. New surface — an accent eyebrow, a
+  // secondary icon button on the start row, a header with no clock — so it is
+  // audited like everything else. The workout left running above has to go
+  // first: a plan and a session in progress cannot coexist.
+  [
+    'Planned session',
+    '/session',
+    async (page) => {
+      await page.getByRole('button', { name: 'Finish', exact: true }).click()
+      await page.waitForTimeout(300)
+      await page.getByRole('button', { name: /discard workout/i }).click()
+      await page.waitForTimeout(400)
+      await page
+        .getByRole('button', { name: /to start later/i })
+        .first()
+        .click()
+      await page.waitForTimeout(400)
+    },
+  ],
+  // The plan waiting on the launch screen — the card the session bar is
+  // deliberately not showing.
+  ['Today with a plan', '/'],
 ]
 
 let total = 0

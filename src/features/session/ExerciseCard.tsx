@@ -22,6 +22,7 @@ import {
   totalWeightKg,
   usesMachineWeight,
 } from '~/domain/machines'
+import { describeTarget } from '~/domain/routine-draft'
 import { describePlannedSet, setPlanUnitSuffix } from '~/domain/set-plan'
 import {
   calculatePlates,
@@ -59,6 +60,15 @@ interface ExerciseCardProps {
   view: SessionExerciseView
   settings: Settings
   active?: boolean
+  /**
+   * The session has not started yet.
+   *
+   * Everything about *choosing* the work stays — the picker, the swap, the rest
+   * length, the machine weight, what you did last time. What goes is everything
+   * about *doing* it: no row to log, no plate maths for a set nobody is about to
+   * lift, no progression advice for a first set that is still hours away.
+   */
+  planning?: boolean
   /** Shares a superset group with the exercise above it. */
   groupedWithPrevious?: boolean
   /**
@@ -75,6 +85,7 @@ export function ExerciseCard({
   view,
   settings,
   active = false,
+  planning = false,
   groupedWithPrevious = false,
   onSwap,
 }: ExerciseCardProps) {
@@ -131,6 +142,28 @@ export function ExerciseCard({
 
   const ghost = useMemo(() => lastTimeSummary(previousSets, unit), [previousSets, unit])
 
+  // What this exercise is asking for, in one line — the same sentence the two
+  // routine previews use, so a plan never describes itself two ways.
+  const planLine =
+    planning && ladder.length === 0 && sessionExercise.targetSets != null
+      ? describeTarget(
+          {
+            exerciseId: sessionExercise.exerciseId,
+            order: sessionExercise.order,
+            targetSets: sessionExercise.targetSets,
+            targetRepsMin: sessionExercise.targetRepsMin ?? 1,
+            ...(sessionExercise.targetRepsMax == null
+              ? {}
+              : { targetRepsMax: sessionExercise.targetRepsMax }),
+            isAmrap: sessionExercise.isAmrap ?? false,
+            ...(sessionExercise.targetWeight == null
+              ? {}
+              : { targetWeight: sessionExercise.targetWeight }),
+          },
+          unit,
+        )
+      : null
+
   const progressionInput = useMemo(
     () => ({
       previousSessionSets: previousSets,
@@ -149,22 +182,28 @@ export function ExerciseCard({
   )
 
   // Only before the first set of this exercise: once you have logged something,
-  // what you are lifting today is settled and the advice is noise.
+  // what you are lifting today is settled and the advice is noise. And not
+  // while planning — the suggestion is answered by tapping Use, which writes a
+  // draft into a row that is not on screen yet.
   const suggestion =
-    settings.suggestProgression && sets.length === 0 ? suggestProgression(progressionInput) : null
+    settings.suggestProgression && !planning && sets.length === 0
+      ? suggestProgression(progressionInput)
+      : null
 
   const bar = useMemo(() => resolveBar(exercise, barContext(settings)), [exercise, settings])
 
+  // Plates describe the weight on the pending row, so without that row they
+  // would be loading advice for a number the card is not showing.
   const plates = useMemo(
     () =>
-      weightKg == null || !usesBar(exercise)
+      weightKg == null || planning || !usesBar(exercise)
         ? null
         : calculatePlates({
             targetKg: weightKg,
             barWeightKg: resolveBarWeight(exercise, barContext(settings)),
             inventory: settings.plateInventory,
           }),
-    [weightKg, exercise, settings],
+    [weightKg, planning, exercise, settings],
   )
 
   const activeSet: SetEntry | null = sets.find((set) => set.id === actionsFor) ?? null
@@ -301,10 +340,17 @@ export function ExerciseCard({
             </span>
           </h2>
           <span className="num shrink-0 text-[0.7rem] font-extrabold tracking-wide text-ink-faint">
-            {sessionExercise.targetSets == null
-              ? `${workingSets.length} set${workingSets.length === 1 ? '' : 's'}`
-              : `${workingSets.length} of ${sessionExercise.targetSets}`}{' '}
-            · rest {formatRestLength(restSeconds)}
+            {/* "0 of 3" is a progress count, and there is no progress to report
+                before the workout starts — the plan line below says what the
+                three sets are. */}
+            {planning
+              ? null
+              : `${
+                  sessionExercise.targetSets == null
+                    ? `${workingSets.length} set${workingSets.length === 1 ? '' : 's'}`
+                    : `${workingSets.length} of ${sessionExercise.targetSets}`
+                } · `}
+            rest {formatRestLength(restSeconds)}
           </span>
           <button
             type="button"
@@ -333,7 +379,10 @@ export function ExerciseCard({
                 {index > 0 ? <span className="text-ink-faint"> · </span> : null}
                 <span
                   className={
-                    index + 1 === nextIndex && !draftWarmup ? 'font-semibold text-ink' : undefined
+                    // Nothing is the rung you are on before the workout starts.
+                    index + 1 === nextIndex && !draftWarmup && !planning
+                      ? 'font-semibold text-ink'
+                      : undefined
                   }
                 >
                   {describePlannedSet(rung, unit)}
@@ -341,6 +390,14 @@ export function ExerciseCard({
               </span>
             ))}
             <span className="text-ink-faint">{setPlanUnitSuffix(ladder, unit)}</span>
+          </p>
+        ) : planLine ? (
+          // Straight sets normally need no plan line — the pending row and the
+          // "0 of 3" counter say it between them. With no pending row, this is
+          // the only thing on the card stating what you came to do.
+          <p className="num mb-2.5 text-meta text-ink-muted">
+            <span className="label-caps mr-1.5 text-ink-faint">plan</span>
+            {planLine}
           </p>
         ) : null}
 
@@ -394,20 +451,22 @@ export function ExerciseCard({
             />
           ))}
 
-          <PendingSetRow
-            setIndex={nextIndex}
-            weightKg={weightKg}
-            machineWeightKg={machineKg}
-            reps={reps}
-            source={prefill.source}
-            isWarmup={draftWarmup}
-            unit={unit}
-            trackingType={exercise?.trackingType ?? 'weight_reps'}
-            onEditWeight={() => setPad({ kind: 'pending-weight' })}
-            onEditReps={() => setPad({ kind: 'pending-reps' })}
-            onToggleWarmup={() => setDraftWarmup((current) => !current)}
-            onLog={() => void handleLog()}
-          />
+          {planning ? null : (
+            <PendingSetRow
+              setIndex={nextIndex}
+              weightKg={weightKg}
+              machineWeightKg={machineKg}
+              reps={reps}
+              source={prefill.source}
+              isWarmup={draftWarmup}
+              unit={unit}
+              trackingType={exercise?.trackingType ?? 'weight_reps'}
+              onEditWeight={() => setPad({ kind: 'pending-weight' })}
+              onEditReps={() => setPad({ kind: 'pending-reps' })}
+              onToggleWarmup={() => setDraftWarmup((current) => !current)}
+              onLog={() => void handleLog()}
+            />
+          )}
         </div>
 
         {plates ? (
@@ -432,7 +491,7 @@ export function ExerciseCard({
         {/* Stated once per card rather than on every row: the logged rows above
             read as plain weights, and this is the sentence that tells you what
             those weights include. */}
-        {machineKg > 0 ? (
+        {machineKg > 0 && !planning ? (
           <p className="num mt-2.5 flex flex-wrap items-center gap-x-1.5 border-t border-dashed border-line pt-2.5 text-[0.72rem] text-ink-muted">
             <span className="label-caps text-ink-faint">machine</span>
             <strong className="font-semibold text-ink">{formatWeight(machineKg, unit)}</strong>
@@ -561,7 +620,7 @@ export function ExerciseCard({
             >
               <span className="min-w-0 flex-1">
                 <span className="block text-[0.95rem] font-medium text-danger">
-                  Remove from this workout
+                  Remove from this {planning ? 'plan' : 'workout'}
                 </span>
                 <span className="block text-[0.75rem] text-ink-muted">
                   {sets.length > 0

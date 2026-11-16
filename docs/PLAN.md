@@ -740,6 +740,44 @@ pixels and gets no unit tests, which is exactly why `npm run shots` captures
 the sheet in both themes. That screenshot is the only verification the layout
 has.
 
+### 21. Planning a session before you train it — shipped post-v1
+
+Set the workout up at home; start it at the gym. The thing that made this worth
+building is that the two halves of a session — deciding what to do, and doing
+it — happen hours apart, and until now the only way to decide was to start,
+which put a clock on the sofa.
+
+**A plan is a session with `status: 'planned'`**, not a new kind of row. That
+choice is what kept the feature small: everything historical already filters on
+`completed` explicitly — prefill, records, charts, streaks, weekly set counts —
+and the recovery path asks for `active`, so a plan is invisible to all of it
+without a single extra check. No migration either; `status` was already indexed.
+
+**The clock starts when you start.** `startedAt` is provisional while a session
+is planned and rewritten the moment Start is tapped, because a duration that
+counts the evening you spent planning is a lie about the workout. `plannedAt`
+keeps the provenance, which is what lets the card say how old the plan is.
+
+**The snapshot moves earlier, deliberately.** A session copies its routine at
+creation, so planning is now that moment: edit "Push A" after planning it and
+the plan does not follow, exactly as editing it mid-workout does not reach the
+sets you have left. What you built is what you walk in with.
+
+**One screen, not two.** A planned session renders through the same screen as a
+live one, which is what makes it editable at all — add, remove, swap, rest
+lengths, machine weights, supersets, all of it, for free. The differences are
+removals: no elapsed time, no progress rail, no rest timer, no pending row to
+log into, no plate maths and no progression nudge, since all of those describe a
+set somebody is about to lift. In their place each card states its plan in the
+same sentence the routine previews use.
+
+**At most one session in hand**, counting a plan. Starting a second workout on
+top of a plan, or planning one while training, both resolve to the session that
+already exists rather than creating another — and the Routines screen says which
+it is. Changing your mind at the gym costs one tap on Discard, which removes the
+plan and nothing else: no training history exists to lose, and the routine it
+came from is untouched.
+
 ### Agreed backlog — from the gap review of 2026-11-08
 
 A feature-by-feature comparison against Strong, Hevy, Boostcamp, Alpha Progression, JEFIT and

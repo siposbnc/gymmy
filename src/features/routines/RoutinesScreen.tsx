@@ -2,7 +2,7 @@ import { Archive, ClipboardPaste, Copy, Pencil, Play, Plus, Share2 } from 'lucid
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { useActiveSession, useRoutines, type RoutineSummary } from '~/db/hooks'
+import { useCurrentSession, useRoutines, type RoutineSummary } from '~/db/hooks'
 import {
   archiveRoutine,
   createRoutine,
@@ -20,12 +20,16 @@ import { ShareRoutineSheet } from './ShareRoutineSheet'
 export function RoutinesScreen() {
   const navigate = useNavigate()
   const routines = useRoutines()
-  const active = useActiveSession()
+  const current = useCurrentSession()
   const [menuFor, setMenuFor] = useState<RoutineSummary | null>(null)
   const [sharing, setSharing] = useState<RoutineSummary | null>(null)
   const [importing, setImporting] = useState(false)
 
-  const hasActiveSession = active != null
+  // A plan blocks starting for the same reason a workout in progress does:
+  // there is one session in hand, and starting a second would either lose it or
+  // leave two. Today's plan card is where it gets started or thrown away.
+  const hasActiveSession = current != null
+  const isPlan = current?.session.status === 'planned'
 
   async function create() {
     const id = await createRoutine()
@@ -69,7 +73,9 @@ export function RoutinesScreen() {
 
         {hasActiveSession && routines && routines.length > 0 ? (
           <p className="px-2 text-center text-[0.78rem] leading-relaxed text-ink-muted">
-            A workout is already in progress. Finish or discard it before starting another.
+            {isPlan
+              ? 'A workout is already planned. Start it from Today, or discard it there to plan a different one.'
+              : 'A workout is already in progress. Finish or discard it before starting another.'}
           </p>
         ) : null}
 

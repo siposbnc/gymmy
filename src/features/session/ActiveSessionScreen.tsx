@@ -1,12 +1,13 @@
-import { ChevronLeft, Plus } from 'lucide-react'
+import { CalendarClock, ChevronLeft, Play, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { useActiveSession, useSettings } from '~/db/hooks'
+import { useCurrentSession, useSettings } from '~/db/hooks'
 import { completeSession } from '~/db/repositories/history'
 import {
   addExerciseToSession,
   discardSession,
+  startPlannedSession,
   swapSessionExercise,
 } from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
@@ -27,9 +28,17 @@ type PickerMode =
   /** Replacing one exercise: the row being swapped, and its name for the title. */
   | { kind: 'swap'; sessionExerciseId: string; name: string }
 
+/**
+ * One screen for a workout and for a plan.
+ *
+ * A planned session is the same rows, the same cards and the same exercise
+ * picker — it differs only in that nothing has happened yet, so there is no
+ * clock, no rest timer and nothing to log. Rendering it anywhere else would
+ * mean a second editor to keep in step with this one.
+ */
 export function ActiveSessionScreen() {
   const navigate = useNavigate()
-  const active = useActiveSession()
+  const active = useCurrentSession()
   const settings = useSettings()
 
   // One picker for both jobs. Adding and swapping differ only in what happens
@@ -58,21 +67,37 @@ export function ActiveSessionScreen() {
   }
 
   const { session, views } = active
+  const planned = session.status === 'planned'
   const allSets = views.flatMap((view) => view.sets)
   const workingSets = allSets.filter((set) => set.type !== 'warmup')
   const volume = totalVolume({ sets: allSets })
 
   return (
     <>
-      <SessionHeader
-        name={session.name}
-        startedAt={session.startedAt}
-        setCount={workingSets.length}
-        onBack={() => void navigate('/')}
-        onFinish={() => setFinishing(true)}
-      />
+      {planned ? (
+        <PlanHeader
+          name={session.name}
+          exerciseCount={views.length}
+          plannedSets={views.reduce(
+            (total, view) => total + (view.sessionExercise.targetSets ?? 0),
+            0,
+          )}
+          onBack={() => void navigate('/')}
+          onStart={() => void startPlannedSession(session.id)}
+        />
+      ) : (
+        <SessionHeader
+          name={session.name}
+          startedAt={session.startedAt}
+          setCount={workingSets.length}
+          onBack={() => void navigate('/')}
+          onFinish={() => setFinishing(true)}
+        />
+      )}
 
-      <ProgressRibbon views={views} />
+      {/* Nothing is logged and nothing is "now", so a progress rail would be
+          six empty ticks claiming to mean something. */}
+      {planned ? null : <ProgressRibbon views={views} />}
 
       <div className="grid gap-3 px-4 pt-3.5 pb-6">
         {views.map((view, index) => {
@@ -83,8 +108,12 @@ export function ActiveSessionScreen() {
               key={view.sessionExercise.id}
               view={view}
               settings={settings}
+              planning={planned}
               // The first exercise with an unfinished set is the one in hand.
-              active={index === views.findIndex((candidate) => candidate.sets.length === 0)}
+              // Before the workout starts, none of them is.
+              active={
+                !planned && index === views.findIndex((candidate) => candidate.sets.length === 0)
+              }
               groupedWithPrevious={
                 group != null && group === previous?.sessionExercise.supersetGroup
               }
@@ -110,11 +139,25 @@ export function ActiveSessionScreen() {
 
         {views.length === 0 ? (
           <p className="px-6 pt-4 text-center text-[0.85rem] leading-relaxed text-ink-muted">
-            An empty workout. Add whatever you feel like doing — nothing here has to come from a
-            plan.
+            {planned
+              ? 'An empty plan. Add the exercises you intend to do — you can still change all of it at the gym.'
+              : 'An empty workout. Add whatever you feel like doing — nothing here has to come from a plan.'}
           </p>
         ) : null}
       </div>
+
+      {planned ? (
+        <div className="px-4 pb-6">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={() => setFinishing(true)}
+          >
+            Discard this plan
+          </Button>
+        </div>
+      ) : null}
 
       <ExercisePickerSheet
         open={picking !== null}
@@ -132,7 +175,37 @@ export function ActiveSessionScreen() {
       />
 
       <Sheet
-        open={finishing}
+        open={finishing && planned}
+        onOpenChange={setFinishing}
+        eyebrow={session.name}
+        title="Discard this plan?"
+        footer={
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setFinishing(false)}>
+              Keep it
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                setFinishing(false)
+                void discardSession(session.id).then(() => navigate('/'))
+              }}
+            >
+              Discard plan
+            </Button>
+          </div>
+        }
+      >
+        <p className="px-5 py-4 text-[0.9rem] leading-relaxed text-ink-muted">
+          Nothing has been logged, so there is no training history to lose — this just removes the
+          plan. The routine it came from is untouched.
+        </p>
+      </Sheet>
+
+      <Sheet
+        open={finishing && !planned}
         onOpenChange={setFinishing}
         eyebrow={session.name}
         title={workingSets.length === 0 ? 'Nothing logged yet' : 'Finish this workout?'}
@@ -198,6 +271,55 @@ function Summary({ label, value }: { label: string; value: React.ReactNode }) {
 
 function Elapsed({ startedAt }: { startedAt: number }) {
   return <>{formatDuration(useElapsed(startedAt))}</>
+}
+
+/**
+ * The header of a workout that has not started.
+ *
+ * Same shape as the live one so the screen does not jump when it does start,
+ * with the two things that make a clock meaningless swapped out: no elapsed
+ * time, and Start where Finish lives. The counts describe the plan rather than
+ * progress — "6 exercises · 21 sets" is what you are about to walk in and do.
+ */
+function PlanHeader({
+  name,
+  exerciseCount,
+  plannedSets,
+  onBack,
+  onStart,
+}: {
+  name: string
+  exerciseCount: number
+  plannedSets: number
+  onBack: () => void
+  onStart: () => void
+}) {
+  return (
+    <header className="flex items-center gap-3 border-b border-line bg-canvas px-4 pt-3 pb-3">
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Back to Today"
+        className="grid size-[2.375rem] shrink-0 cursor-pointer place-items-center rounded-full border border-line bg-surface"
+      >
+        <ChevronLeft size={18} aria-hidden />
+      </button>
+
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate font-display text-[1.375rem] leading-tight font-normal">{name}</h1>
+        <p className="num flex items-center gap-1.5 text-[0.7rem] text-ink-muted">
+          <CalendarClock size={12} aria-hidden className="shrink-0" />
+          Planned · {exerciseCount} exercise{exerciseCount === 1 ? '' : 's'}
+          {plannedSets > 0 ? ` · ${plannedSets} sets` : null}
+        </p>
+      </div>
+
+      <Button variant="success" size="xs" onClick={onStart}>
+        <Play size={13} fill="currentColor" aria-hidden />
+        Start
+      </Button>
+    </header>
+  )
 }
 
 function SessionHeader({

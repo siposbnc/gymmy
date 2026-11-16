@@ -46,8 +46,14 @@ user-facing explanation cannot drift from the maths.
   An estimated 1RM can never produce a record — there are tests asserting this
   specifically, and they are not incidental.
 - **Sessions snapshot their routine.** Name, order, rest, targets and the volume
-  goal are copied at start. Editing a routine must never rewrite training
-  history — including turning a session you beat into one you missed.
+  goal are copied when the session is created — which, for one planned ahead, is
+  when you planned it. Editing a routine must never rewrite training history —
+  including turning a session you beat into one you missed.
+- **The clock starts when you start.** A planned session carries a provisional
+  `startedAt` that is rewritten the moment it begins, so the hours between
+  planning a workout and training it are never part of its duration. A plan is
+  a session with `status: 'planned'`: history filters on `completed` and
+  recovery asks for `active`, so nothing that reads training data can see it.
 - **History outranks the plan, on weight.** A routine is a group of exercises
   with some useful defaults attached: it seeds an exercise with no history and
   then gets out of the way, because what you can lift is a fact about your

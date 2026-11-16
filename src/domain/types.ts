@@ -197,20 +197,45 @@ export interface RoutineExercise {
 // Sessions — one actual workout
 // ---------------------------------------------------------------------------
 
-export type SessionStatus = 'active' | 'completed'
+/**
+ * `planned` is a workout set up ahead of time and not yet begun.
+ *
+ * It is a real session row, which is what makes it cheap: everything
+ * historical — prefill, records, charts, streaks, weekly set counts — filters
+ * on `completed` explicitly, and the active-session recovery path asks for
+ * `active`, so a plan is invisible to all of it without a single extra check.
+ */
+export type SessionStatus = 'planned' | 'active' | 'completed'
 
 export interface Session {
   id: Id
   /** Kept for navigation only. The name below is the historical truth. */
   routineId?: Id
   /**
-   * Snapshotted at start. Editing "Push A" next month must not rewrite what
-   * you did in March — the most common data bug in workout apps.
+   * Snapshotted when the session is created. Editing "Push A" next month must
+   * not rewrite what you did in March — the most common data bug in workout
+   * apps. For a planned session that moment is when you planned it, so the plan
+   * you walk into the gym with is the one you built, not whatever the routine
+   * has become since.
    */
   routineNameSnapshot?: string
   name: string
+  /**
+   * When the workout began.
+   *
+   * A planned session carries a provisional value — it has to, everything that
+   * sorts sessions reads this — and it is **rewritten the moment you tap
+   * Start**. The clock measures the workout, never the wait between planning it
+   * and doing it.
+   */
   startedAt: number
   endedAt?: number
+  /**
+   * When the plan was made. Present only on sessions that were planned ahead,
+   * and kept after they start: it is the only record of a `startedAt` that was
+   * once provisional, and it is what lets a plan say how old it is.
+   */
+  plannedAt?: number
   status: SessionStatus
   /**
    * The routine's volume goal, copied at session start.

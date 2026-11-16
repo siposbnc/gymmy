@@ -19,7 +19,7 @@ import type {
 import { newId } from '~/lib/uuid'
 
 import { db } from '../schema'
-import { getActiveSession, listSessionExercises, listSets } from './sessions'
+import { getCurrentSession, listSessionExercises, listSets } from './sessions'
 
 /**
  * Routines — reusable training plans.
@@ -472,13 +472,34 @@ export async function toggleSupersetWithPrevious(routineExerciseId: string): Pro
  * summary — never as the source of truth for what you were asked to lift.
  */
 export async function startSessionFromRoutine(routineId: string): Promise<string> {
-  const existing = await getActiveSession()
+  return sessionFromRoutine(routineId, 'active')
+}
+
+/**
+ * Set up a routine now and train it later.
+ *
+ * The same copy as starting one, with the clock left alone — which means the
+ * snapshot happens when you plan. That is the behaviour worth knowing: edit the
+ * routine after planning and the plan does not follow, exactly as editing it
+ * mid-session does not reach the sets you have left. What you built is what you
+ * walk in with. See {@link startPlannedSession} for the other half.
+ */
+export async function planSessionFromRoutine(routineId: string): Promise<string> {
+  return sessionFromRoutine(routineId, 'planned')
+}
+
+async function sessionFromRoutine(
+  routineId: string,
+  status: 'active' | 'planned',
+): Promise<string> {
+  const existing = await getCurrentSession()
   if (existing) return existing.id
 
   const routine = await db.routines.get(routineId)
   if (!routine) throw new Error('Routine not found')
 
   const sessionId = newId('ses')
+  const now = Date.now()
 
   // `db.exercises` is here for the machine weight: it lives on the exercise
   // rather than the plan, but like everything else below it is copied now so
@@ -495,8 +516,11 @@ export async function startSessionFromRoutine(routineId: string): Promise<string
         routineId,
         routineNameSnapshot: routine.name,
         name: routine.name,
-        startedAt: Date.now(),
-        status: 'active',
+        // Provisional while planned; `startPlannedSession` rewrites it so the
+        // duration never includes the wait.
+        startedAt: now,
+        status,
+        ...(status === 'planned' ? { plannedAt: now } : {}),
         ...(routine.volumeGoal == null ? {} : { volumeGoalSnapshot: routine.volumeGoal }),
       })
 

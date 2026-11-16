@@ -56,6 +56,7 @@ import { db } from './schema'
 import { getSettings } from './repositories/settings'
 import {
   getActiveSession,
+  getCurrentSession,
   getPreviousSets,
   listSessionExercises,
   listSets,
@@ -396,31 +397,51 @@ export interface ActiveSessionView {
   views: SessionExerciseView[]
 }
 
+/** The exercises of one session, each with its sets and its history. */
+async function sessionView(session: Session): Promise<ActiveSessionView> {
+  const sessionExercises = await listSessionExercises(session.id)
+
+  const views = await Promise.all(
+    sessionExercises.map(async (sessionExercise): Promise<SessionExerciseView> => {
+      const [exercise, sets, previousSets] = await Promise.all([
+        db.exercises.get(sessionExercise.exerciseId),
+        listSets(sessionExercise.id),
+        getPreviousSets(sessionExercise.exerciseId, session.id),
+      ])
+      return { sessionExercise, exercise, sets, previousSets }
+    }),
+  )
+
+  return { session, views }
+}
+
 /**
  * The whole active session in one query.
  *
  * One `useLiveQuery` rather than a hook per exercise: Dexie tracks every table
  * touched here, so a single set write refreshes exactly what is on screen, and
  * the component tree never has to coordinate a dozen independent subscriptions.
+ *
+ * Deliberately blind to a planned session — the running bar and the rest timer
+ * are about a workout in progress, and a plan is not one. Screens that also
+ * work on a plan use {@link useCurrentSession} and branch on `status`.
  */
 export function useActiveSession(): ActiveSessionView | null | undefined {
   return useLiveQuery(async () => {
     const session = await getActiveSession()
-    if (!session) return null
+    return session ? await sessionView(session) : null
+  }, [])
+}
 
-    const sessionExercises = await listSessionExercises(session.id)
-
-    const views = await Promise.all(
-      sessionExercises.map(async (sessionExercise): Promise<SessionExerciseView> => {
-        const [exercise, sets, previousSets] = await Promise.all([
-          db.exercises.get(sessionExercise.exerciseId),
-          listSets(sessionExercise.id),
-          getPreviousSets(sessionExercise.exerciseId, session.id),
-        ])
-        return { sessionExercise, exercise, sets, previousSets }
-      }),
-    )
-
-    return { session, views }
+/**
+ * The session the app is holding, planned or in progress.
+ *
+ * Same shape as {@link useActiveSession}, so the session screen renders either
+ * one from the same code and only the chrome around it changes.
+ */
+export function useCurrentSession(): ActiveSessionView | null | undefined {
+  return useLiveQuery(async () => {
+    const session = await getCurrentSession()
+    return session ? await sessionView(session) : null
   }, [])
 }

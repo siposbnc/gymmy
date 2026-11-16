@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { db } from '../schema'
 import { bootstrapDatabase } from '../seed'
+import { listCompletedSessions } from './history'
 import {
   addExerciseToRoutine,
   createRoutine,
+  planSessionFromRoutine,
   setRoutineSetPlan,
   startSessionFromRoutine,
   updateRoutineExercise,
@@ -15,15 +17,19 @@ import {
   discardSession,
   finishSession,
   getActiveSession,
+  getCurrentSession,
+  getPlannedSession,
   getPreviousSets,
   isStale,
   listSets,
   logSet,
   moveSetToExercise,
+  planEmptySession,
   removeSessionExercise,
   setExerciseMachineWeight,
   listSessionExercises,
   startEmptySession,
+  startPlannedSession,
   STALE_SESSION_MS,
   swapSessionExercise,
   toggleWarmup,
@@ -75,6 +81,119 @@ describe('sessions', () => {
       expect(await db.sessions.count()).toBe(0)
       expect(await db.sessionExercises.count()).toBe(0)
       expect(await db.sets.count()).toBe(0)
+    })
+  })
+
+  /**
+   * Planning a workout and starting it later.
+   *
+   * The two claims worth holding onto: a plan is not training — nothing that
+   * reads history can see it — and the clock starts when you start, so an
+   * evening on the sofa never lands in the duration of a session.
+   */
+  describe('a session planned ahead', () => {
+    it('is not an active session, but it is the one in hand', async () => {
+      const id = await planEmptySession('Push A')
+
+      expect(await getActiveSession()).toBeUndefined()
+      expect((await getPlannedSession())?.id).toBe(id)
+      expect((await getCurrentSession())?.id).toBe(id)
+    })
+
+    it('never creates a second one, and never alongside a workout', async () => {
+      const planned = await planEmptySession()
+      expect(await planEmptySession()).toBe(planned)
+
+      await startPlannedSession(planned)
+      // A workout is in progress now, so there is nothing to plan.
+      expect(await planEmptySession()).toBe(planned)
+      expect(await db.sessions.count()).toBe(1)
+    })
+
+    it('is invisible to history — it is not a workout that happened', async () => {
+      const routineId = await createRoutine('Push A')
+      await addExerciseToRoutine(routineId, 'ex_bench-press')
+      await planSessionFromRoutine(routineId)
+
+      expect(await listCompletedSessions()).toEqual([])
+      // And it cannot become the "last time" a prefill reads from.
+      expect(await getPreviousSets('ex_bench-press')).toEqual([])
+    })
+
+    it('copies the routine when you plan it, not when you start it', async () => {
+      const routineId = await createRoutine('Push A')
+      const bench = await addExerciseToRoutine(routineId, 'ex_bench-press')
+      await updateRoutineExercise(bench, { targetSets: 4, targetRepsMin: 8 })
+
+      const sessionId = await planSessionFromRoutine(routineId)
+
+      // Changing your mind about the routine afterwards must not reach the plan
+      // you are about to walk into the gym with.
+      await updateRoutineExercise(bench, { targetSets: 2, targetRepsMin: 20 })
+      await addExerciseToRoutine(routineId, 'ex_barbell-row')
+      await startPlannedSession(sessionId)
+
+      const rows = await listSessionExercises(sessionId)
+      expect(rows).toHaveLength(1)
+      expect(rows[0]?.targetSets).toBe(4)
+      expect(rows[0]?.targetRepsMin).toBe(8)
+    })
+
+    it('carries a ladder rung by rung, exactly as starting one does', async () => {
+      const routineId = await createRoutine('Squat day')
+      const squat = await addExerciseToRoutine(routineId, 'ex_squat')
+      await setRoutineSetPlan(squat, [
+        { reps: 5, weight: { kind: 'absolute', kg: 80 } },
+        { reps: 3, weight: { kind: 'absolute', kg: 100 } },
+      ])
+
+      const sessionId = await planSessionFromRoutine(routineId)
+
+      const rows = await listSessionExercises(sessionId)
+      expect(rows[0]?.setPlan).toEqual([
+        { reps: 5, weight: { kind: 'absolute', kg: 80 } },
+        { reps: 3, weight: { kind: 'absolute', kg: 100 } },
+      ])
+      // The summary travels with the ladder, planned or not.
+      expect(rows[0]?.targetSets).toBe(2)
+    })
+
+    it('starts the clock when you start, not when you planned', async () => {
+      const sessionId = await planEmptySession('Push A')
+
+      // Planned last night, started this morning.
+      const lastNight = Date.now() - 12 * 60 * 60 * 1000
+      await db.sessions.update(sessionId, { startedAt: lastNight, plannedAt: lastNight })
+
+      expect(await startPlannedSession(sessionId)).toBe(true)
+
+      const session = await db.sessions.get(sessionId)
+      expect(session?.status).toBe('active')
+      // Twelve hours of sofa are not part of the workout.
+      expect(session?.startedAt).toBeGreaterThan(lastNight)
+      expect(isStale(session!)).toBe(false)
+      // And how old the plan was is still on the record.
+      expect(session?.plannedAt).toBe(lastNight)
+    })
+
+    it('refuses to start anything that is not a plan', async () => {
+      const active = await startEmptySession()
+      expect(await startPlannedSession(active)).toBe(false)
+      expect(await startPlannedSession('ses_nonexistent')).toBe(false)
+
+      await finishSession(active)
+      expect(await startPlannedSession(active)).toBe(false)
+      expect((await db.sessions.get(active))?.status).toBe('completed')
+    })
+
+    it('is discarded with nothing left behind', async () => {
+      const sessionId = await planEmptySession()
+      await addExerciseToSession(sessionId, 'ex_squat')
+
+      await discardSession(sessionId)
+
+      expect(await getCurrentSession()).toBeUndefined()
+      expect(await db.sessionExercises.count()).toBe(0)
     })
   })
 
@@ -255,7 +374,7 @@ describe('sessions', () => {
 
   describe('swapping an exercise mid-workout', () => {
     /** A two-exercise routine, started: bench with targets, then a row. */
-    async function startPlannedSession() {
+    async function startTwoExerciseSession() {
       const routineId = await createRoutine('Push A')
       const bench = await addExerciseToRoutine(routineId, 'ex_bench-press')
       await addExerciseToRoutine(routineId, 'ex_barbell-row')
@@ -268,7 +387,7 @@ describe('sessions', () => {
     }
 
     it('replaces the exercise in place when nothing is logged yet', async () => {
-      const { benchRow } = await startPlannedSession()
+      const { benchRow } = await startTwoExerciseSession()
 
       const result = await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
 
@@ -281,7 +400,7 @@ describe('sessions', () => {
     })
 
     it('carries the rep targets and leaves the weight behind', async () => {
-      const { benchRow } = await startPlannedSession()
+      const { benchRow } = await startTwoExerciseSession()
 
       await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
 
@@ -295,7 +414,7 @@ describe('sessions', () => {
     })
 
     it('takes the rest default of the exercise arriving', async () => {
-      const { benchRow } = await startPlannedSession()
+      const { benchRow } = await startTwoExerciseSession()
       await db.exercises.update('ex_dumbbell-bench-press', { defaultRestSeconds: 90 })
 
       await swapSessionExercise(benchRow.id, 'ex_dumbbell-bench-press')
@@ -358,7 +477,7 @@ describe('sessions', () => {
     })
 
     it('takes the logged sets with it rather than adding a second exercise', async () => {
-      const { sessionId, benchRow } = await startPlannedSession()
+      const { sessionId, benchRow } = await startTwoExerciseSession()
       await logSet(benchRow.id, { weightKg: 80, reps: 8 })
       await logSet(benchRow.id, { weightKg: 80, reps: 7 })
 
@@ -381,7 +500,7 @@ describe('sessions', () => {
     })
 
     it('keeps the whole target, since the sets already done still count toward it', async () => {
-      const { benchRow } = await startPlannedSession()
+      const { benchRow } = await startTwoExerciseSession()
       await logSet(benchRow.id, { weightKg: 80, reps: 8 })
       await logSet(benchRow.id, { weightKg: 80, reps: 8 })
 
@@ -413,7 +532,7 @@ describe('sessions', () => {
     })
 
     it('does nothing when the exercise picked is the one already there', async () => {
-      const { benchRow } = await startPlannedSession()
+      const { benchRow } = await startTwoExerciseSession()
       await logSet(benchRow.id, { weightKg: 80, reps: 8 })
 
       const result = await swapSessionExercise(benchRow.id, 'ex_bench-press')

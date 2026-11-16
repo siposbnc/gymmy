@@ -1,10 +1,16 @@
-import { ArrowRight, Play } from 'lucide-react'
+import { ArrowRight, CalendarClock, Play } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { useActiveSession, useRoutines, useSettings, useTrainingRecency } from '~/db/hooks'
-import { startSessionFromRoutine } from '~/db/repositories/routines'
-import { discardSession, isStale, startEmptySession } from '~/db/repositories/sessions'
+import { useCurrentSession, useRoutines, useSettings, useTrainingRecency } from '~/db/hooks'
+import { planSessionFromRoutine, startSessionFromRoutine } from '~/db/repositories/routines'
+import {
+  discardSession,
+  isStale,
+  planEmptySession,
+  startEmptySession,
+  startPlannedSession,
+} from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
 import { MUSCLE_LABEL, MUSCLE_ORDER } from '~/domain/muscles'
 import {
@@ -28,15 +34,17 @@ import { formatDuration, useElapsed } from '~/features/session/useElapsed'
 
 export function TodayScreen() {
   const navigate = useNavigate()
-  const active = useActiveSession()
+  const current = useCurrentSession()
   const settings = useSettings()
   const routines = useRoutines()
-  const [confirmStale, setConfirmStale] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const stopRest = useRestTimer((state) => state.skip)
 
-  const session = active?.session ?? null
-  const stale = session ? isStale(session) : false
-  // Mid-workout the question this answers has already been answered.
+  const session = current?.session ?? null
+  const planned = session?.status === 'planned'
+  const stale = session && !planned ? isStale(session) : false
+  // Once a workout is under way, or a plan is sitting there, the question this
+  // answers has already been answered.
   const recency = useTrainingRecency(session == null)
 
   async function start() {
@@ -49,28 +57,63 @@ export function TodayScreen() {
     await navigate('/session')
   }
 
+  /** Into the session screen, which is also the plan editor. */
+  async function planRoutine(routineId: string) {
+    await planSessionFromRoutine(routineId)
+    await navigate('/session')
+  }
+
+  async function planEmpty() {
+    await planEmptySession('Workout')
+    await navigate('/session')
+  }
+
   return (
     <>
       <ScreenHeader
         eyebrow={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
-        title={session ? 'Pick up where you left off.' : 'Ready when you are.'}
+        title={
+          planned
+            ? 'Planned and waiting.'
+            : session
+              ? 'Pick up where you left off.'
+              : 'Ready when you are.'
+        }
       />
 
       <div className="grid gap-3 px-4 pb-6">
-        {session ? (
+        {planned && session ? (
+          <PlannedCard
+            name={session.name}
+            exerciseCount={current?.views.length ?? 0}
+            plannedSets={
+              current?.views.reduce(
+                (total, view) => total + (view.sessionExercise.targetSets ?? 0),
+                0,
+              ) ?? 0
+            }
+            preview={(current?.views ?? [])
+              .slice(0, 3)
+              .map((view) => view.exercise?.name ?? 'Unknown')}
+            plannedAt={session.plannedAt}
+            onStart={() => void startPlannedSession(session.id).then(() => navigate('/session'))}
+            onEdit={() => void navigate('/session')}
+            onDiscard={() => setConfirmDiscard(true)}
+          />
+        ) : session ? (
           <ResumeCard
             name={session.name}
             startedAt={session.startedAt}
             setCount={
-              active?.views.flatMap((v) => v.sets).filter((s) => s.type !== 'warmup').length ?? 0
+              current?.views.flatMap((v) => v.sets).filter((s) => s.type !== 'warmup').length ?? 0
             }
             volume={formatVolume(
-              totalVolume({ sets: active?.views.flatMap((v) => v.sets) ?? [] }),
+              totalVolume({ sets: current?.views.flatMap((v) => v.sets) ?? [] }),
               settings.units,
             )}
             stale={stale}
             onResume={() => void navigate('/session')}
-            onDiscard={() => setConfirmStale(true)}
+            onDiscard={() => setConfirmDiscard(true)}
           />
         ) : (
           <>
@@ -86,46 +129,84 @@ export function TodayScreen() {
                 const lastRun = describeLastRun(recency?.routineLastRunAt.get(summary.routine.id))
 
                 return (
-                  <button
-                    key={summary.routine.id}
-                    type="button"
-                    onClick={() => void startRoutine(summary.routine.id)}
-                    className="flex h-16 cursor-pointer items-center gap-3 rounded-xl bg-accent px-5 text-on-accent shadow-(--shadow-md) transition-transform duration-(--dur-fast) active:scale-[0.98]"
-                  >
-                    <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
-                    <span className="min-w-0 flex-1 text-left">
-                      <span className="label-caps block">
-                        {summary.exerciseCount} exercise{summary.exerciseCount === 1 ? '' : 's'}
-                        {lastRun ? ` · ${lastRun}` : null}
+                  // Two targets, one row: the big one starts the workout now,
+                  // and the narrow one sets it up to start later. Planning is a
+                  // decision made on this screen — at home, hours before the
+                  // gym — so burying it in a menu would be hiding it from the
+                  // moment it is taken.
+                  <div key={summary.routine.id} className="flex items-stretch gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void startRoutine(summary.routine.id)}
+                      className="flex h-16 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl bg-accent px-5 text-on-accent shadow-(--shadow-md) transition-transform duration-(--dur-fast) active:scale-[0.98]"
+                    >
+                      <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
+                      <span className="min-w-0 flex-1 text-left">
+                        <span className="label-caps block">
+                          {summary.exerciseCount} exercise{summary.exerciseCount === 1 ? '' : 's'}
+                          {lastRun ? ` · ${lastRun}` : null}
+                        </span>
+                        <span className="block truncate text-[1.1rem] font-bold tracking-tight">
+                          {summary.routine.name}
+                        </span>
                       </span>
-                      <span className="block truncate text-[1.1rem] font-bold tracking-tight">
-                        {summary.routine.name}
+                      <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => void planRoutine(summary.routine.id)}
+                      aria-label={`Plan ${summary.routine.name} to start later`}
+                      className="flex h-16 w-[3.75rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-line-strong bg-surface text-ink-muted shadow-(--shadow-sm) transition-transform duration-(--dur-fast) active:scale-[0.98]"
+                    >
+                      <CalendarClock size={18} aria-hidden />
+                      <span className="label-caps text-[0.6rem]" aria-hidden>
+                        Plan
                       </span>
-                    </span>
-                    <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
-                  </button>
+                    </button>
+                  </div>
                 )
               })}
 
-            <button
-              type="button"
-              onClick={() => void start()}
-              className={cn(
-                'flex h-16 cursor-pointer items-center gap-3 rounded-xl px-5 transition-transform duration-(--dur-fast) active:scale-[0.98]',
-                (routines ?? []).some((summary) => summary.exerciseCount > 0)
-                  ? 'border border-line-strong bg-surface text-ink shadow-(--shadow-sm)'
-                  : 'bg-accent text-on-accent shadow-(--shadow-md)',
-              )}
-            >
-              <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
-              <span className="flex-1 text-left">
-                <span className="label-caps block">No plan needed</span>
-                <span className="block text-[1.1rem] font-bold tracking-tight">
-                  Empty workout
+            <div className="flex items-stretch gap-2">
+              <button
+                type="button"
+                onClick={() => void start()}
+                className={cn(
+                  'flex h-16 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-5 transition-transform duration-(--dur-fast) active:scale-[0.98]',
+                  (routines ?? []).some((summary) => summary.exerciseCount > 0)
+                    ? 'border border-line-strong bg-surface text-ink shadow-(--shadow-sm)'
+                    : 'bg-accent text-on-accent shadow-(--shadow-md)',
+                )}
+              >
+                <Play size={20} fill="currentColor" aria-hidden className="shrink-0" />
+                <span className="flex-1 text-left">
+                  <span className="label-caps block">No plan needed</span>
+                  <span className="block text-[1.1rem] font-bold tracking-tight">
+                    Empty workout
+                  </span>
                 </span>
-              </span>
-              <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
-            </button>
+                <ArrowRight size={20} aria-hidden className="shrink-0 opacity-85" />
+              </button>
+
+              {/* A session you want to set up that is not one of your routines
+                  — and the only way to build a plan on a fresh install. */}
+              <button
+                type="button"
+                onClick={() => void planEmpty()}
+                // Deliberately not "plan an empty workout": that phrase is the
+                // button beside it, and two controls whose names contain the
+                // same words are two controls a screen reader cannot tell
+                // apart.
+                aria-label="Plan a workout from scratch to start later"
+                className="flex h-16 w-[3.75rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-line-strong bg-surface text-ink-muted shadow-(--shadow-sm) transition-transform duration-(--dur-fast) active:scale-[0.98]"
+              >
+                <CalendarClock size={18} aria-hidden />
+                <span className="label-caps text-[0.6rem]" aria-hidden>
+                  Plan
+                </span>
+              </button>
+            </div>
           </>
         )}
 
@@ -140,12 +221,12 @@ export function TodayScreen() {
       </div>
 
       <Sheet
-        open={confirmStale}
-        onOpenChange={setConfirmStale}
-        title="Discard this workout?"
+        open={confirmDiscard}
+        onOpenChange={setConfirmDiscard}
+        title={planned ? 'Discard this plan?' : 'Discard this workout?'}
         footer={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setConfirmStale(false)}>
+            <Button variant="secondary" size="sm" onClick={() => setConfirmDiscard(false)}>
               Keep it
             </Button>
             <Button
@@ -156,7 +237,7 @@ export function TodayScreen() {
                 if (session) void discardSession(session.id)
                 // Same reasoning as finishing: no session, no rest.
                 stopRest()
-                setConfirmStale(false)
+                setConfirmDiscard(false)
               }}
             >
               Discard
@@ -165,8 +246,9 @@ export function TodayScreen() {
         }
       >
         <p className="px-5 py-4 text-[0.9rem] leading-relaxed text-ink-muted">
-          This removes the session and every set logged in it. There is no undo — but you can finish
-          it instead and edit or delete it later from History.
+          {planned
+            ? 'Nothing has been logged, so this only removes the plan. The routine it came from is untouched.'
+            : 'This removes the session and every set logged in it. There is no undo — but you can finish it instead and edit or delete it later from History.'}
         </p>
       </Sheet>
     </>
@@ -280,6 +362,85 @@ function Readout({ swatch, name, value }: { swatch: string; name: string; value:
       </span>
       <span className="num mt-0.5 block text-[0.75rem] text-ink-muted">{value}</span>
     </p>
+  )
+}
+
+/**
+ * A workout that is set up and waiting.
+ *
+ * Shaped like the resume card on purpose — this is the same "there is a session
+ * here" slot — but it reports the plan rather than progress, and it has no
+ * clock, because nothing has started. Starting it goes straight to the session
+ * screen: you are standing in the gym by then, and the next thing you want is
+ * the first set.
+ */
+function PlannedCard({
+  name,
+  exerciseCount,
+  plannedSets,
+  preview,
+  plannedAt,
+  onStart,
+  onEdit,
+  onDiscard,
+}: {
+  name: string
+  exerciseCount: number
+  plannedSets: number
+  preview: string[]
+  plannedAt: number | undefined
+  onStart: () => void
+  onEdit: () => void
+  onDiscard: () => void
+}) {
+  const age = describeLastRun(plannedAt)
+
+  return (
+    <Card active className="p-0">
+      <button
+        type="button"
+        onClick={onEdit}
+        className="w-full cursor-pointer px-4 pt-4 pb-3 text-left"
+      >
+        <p className="label-caps flex items-center gap-1.5 text-accent-ink">
+          <CalendarClock size={12} aria-hidden />
+          Planned{age ? ` ${age}` : null}
+        </p>
+        <p className="mt-1 font-display text-[1.6rem] leading-tight">{name}</p>
+        <p className="num mt-1.5 text-[0.8rem] text-ink-muted">
+          {exerciseCount === 0
+            ? 'No exercises yet — tap to add them'
+            : `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}${plannedSets > 0 ? ` · ${plannedSets} sets` : ''}`}
+        </p>
+        {/* What is actually in it. The counts say how much work; this is the
+            line that lets you recognise the plan without opening it. */}
+        {preview.length > 0 ? (
+          <p className="mt-1 truncate text-[0.78rem] text-ink-faint">
+            {preview.join(' · ')}
+            {exerciseCount > preview.length ? ' · …' : null}
+          </p>
+        ) : null}
+      </button>
+
+      <div className="flex items-center gap-2 border-t border-line px-4 py-3">
+        <Button size="sm" className="flex-1" onClick={onStart}>
+          <Play size={15} fill="currentColor" aria-hidden />
+          Start
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onEdit}>
+          Edit
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onDiscard}>
+          Discard
+        </Button>
+      </div>
+
+      {/* The one thing a plan has to say for itself: the clock is not running
+          and nothing is being missed by leaving it here. */}
+      <p className="border-t border-line px-4 py-2.5 text-[0.75rem] leading-relaxed text-ink-muted">
+        Nothing is being timed yet. The workout starts — and the clock with it — when you tap Start.
+      </p>
+    </Card>
   )
 }
 

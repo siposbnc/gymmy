@@ -14,6 +14,8 @@ import { db } from '../schema'
  *    number in the input goes with it.
  * 2. **At most one active session.** `status` is indexed precisely so recovery
  *    on launch is a single cheap lookup.
+ * 3. **At most one session waiting to happen**, counting a plan as well as a
+ *    workout in progress — see {@link getCurrentSession}.
  */
 
 export const STALE_SESSION_MS = 8 * 60 * 60 * 1000
@@ -22,13 +24,31 @@ export async function getActiveSession(): Promise<Session | undefined> {
   return db.sessions.where('status').equals('active').first()
 }
 
+/** A workout set up ahead of time and not yet begun. At most one exists. */
+export async function getPlannedSession(): Promise<Session | undefined> {
+  return db.sessions.where('status').equals('planned').first()
+}
+
+/**
+ * The session the app is currently holding, planned or in progress.
+ *
+ * In progress wins, though the two are not meant to coexist: every path that
+ * creates one checks this first, so planning while training and starting a
+ * second workout on top of a plan both resolve to the session that already
+ * exists rather than making another. A backup merge is the one way to end up
+ * with two plans, and `first()` picks one rather than breaking.
+ */
+export async function getCurrentSession(): Promise<Session | undefined> {
+  return (await getActiveSession()) ?? (await getPlannedSession())
+}
+
 /** True when an active session is old enough that the user probably forgot it. */
 export function isStale(session: Session, now = Date.now()): boolean {
   return now - session.startedAt > STALE_SESSION_MS
 }
 
 export async function startEmptySession(name = 'Workout'): Promise<string> {
-  const existing = await getActiveSession()
+  const existing = await getCurrentSession()
   if (existing) return existing.id
 
   const id = newId('ses')
@@ -39,6 +59,53 @@ export async function startEmptySession(name = 'Workout'): Promise<string> {
     status: 'active',
   })
   return id
+}
+
+/**
+ * Set up an empty workout to start later.
+ *
+ * The same row an empty workout would create, minus the clock: you add the
+ * exercises on the sofa and the session begins when you tap Start at the gym.
+ */
+export async function planEmptySession(name = 'Workout'): Promise<string> {
+  const existing = await getCurrentSession()
+  if (existing) return existing.id
+
+  const now = Date.now()
+  const id = newId('ses')
+  await db.sessions.add({
+    id,
+    name,
+    // Provisional — `startPlannedSession` overwrites it. Set rather than left
+    // out because every query that sorts sessions reads it.
+    startedAt: now,
+    plannedAt: now,
+    status: 'planned',
+  })
+  return id
+}
+
+/**
+ * Begin a workout that was planned earlier.
+ *
+ * **The clock starts here**, not when the plan was made: `startedAt` is
+ * rewritten, so an hour on the sofa and a drive to the gym never land in the
+ * duration of the session. Nothing else about the row changes — the routine
+ * snapshot, the exercises and their targets are already exactly as planned.
+ *
+ * Returns false when there is nothing to start, or when a workout is somehow
+ * already in progress; the caller has navigated somewhere by then and the
+ * screen it lands on reads the database rather than a return value.
+ */
+export async function startPlannedSession(sessionId: string): Promise<boolean> {
+  return db.transaction('rw', db.sessions, async () => {
+    const session = await db.sessions.get(sessionId)
+    if (!session || session.status !== 'planned') return false
+    if (await getActiveSession()) return false
+
+    await db.sessions.update(sessionId, { status: 'active', startedAt: Date.now() })
+    return true
+  })
 }
 
 export async function renameSession(sessionId: string, name: string): Promise<void> {
