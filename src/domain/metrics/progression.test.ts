@@ -75,6 +75,21 @@ describe('suggestProgression', () => {
     ).toBe(80)
   })
 
+  it('ignores a dropset, so stripping the bar does not cost you the suggestion', () => {
+    // Every working set cleared the range, then the last one was dropped twice.
+    // Counted as sets, those drops would read as an exercise taken at mixed
+    // weights — and the suggestion would go quiet on a range you did clear.
+    const dropped: ProgressionSet[] = [
+      ...sets(3, 80, 8),
+      { type: 'dropset', weightKg: 60, reps: 6 },
+      { type: 'dropset', weightKg: 40, reps: 10 },
+    ]
+
+    expect(
+      suggestProgression({ previousSessionSets: dropped, target: range, stepKg: 2.5 }),
+    ).toMatchObject({ fromKg: 80, toKg: 82.5, sets: 3 })
+  })
+
   it('treats a single rep target as linear progression', () => {
     // No range given: hitting the number IS clearing it.
     const result = suggestProgression({

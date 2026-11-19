@@ -201,6 +201,7 @@ export async function allSetsForExport(): Promise<CsvSetRow[]> {
   const sessionById = new Map(sessions.map((session) => [session.id, session]))
   const linkById = new Map(links.map((link) => [link.id, link]))
   const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]))
+  const setById = new Map(sets.map((set) => [set.id, set]))
 
   const rows = sets.flatMap((set): CsvSetRow[] => {
     const link = linkById.get(set.sessionExerciseId)
@@ -208,13 +209,19 @@ export async function allSetsForExport(): Promise<CsvSetRow[]> {
     const session = sessionById.get(link.sessionId)
     if (!session || session.status !== 'completed') return []
 
+    // A drop reports its parent's set number and its own position in the chain,
+    // so a spreadsheet sorted by set keeps a dropset together under the set it
+    // came off. See `CsvSetRow.dropIndex`.
+    const parent = set.parentSetId == null ? undefined : setById.get(set.parentSetId)
+
     return [
       {
         sessionId: session.id,
         sessionName: session.name,
         startedAt: session.startedAt,
         exerciseName: exerciseById.get(link.exerciseId)?.name ?? 'Unknown exercise',
-        setIndex: set.setIndex,
+        setIndex: parent?.setIndex ?? set.setIndex,
+        ...(parent == null ? {} : { dropIndex: set.setIndex }),
         setType: set.type,
         weightKg: set.weightKg,
         reps: set.reps,
@@ -228,7 +235,8 @@ export async function allSetsForExport(): Promise<CsvSetRow[]> {
     (a, b) =>
       a.startedAt - b.startedAt ||
       a.exerciseName.localeCompare(b.exerciseName) ||
-      a.setIndex - b.setIndex,
+      a.setIndex - b.setIndex ||
+      (a.dropIndex ?? 0) - (b.dropIndex ?? 0),
   )
 }
 

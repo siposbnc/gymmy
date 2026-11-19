@@ -31,6 +31,21 @@ function build(
 }
 
 describe('buildSessionCard', () => {
+  it('counts a dropset as one set but keeps every drop in the volume', () => {
+    const card = build([
+      {
+        exerciseId: 'ex_bench',
+        name: 'Bench Press',
+        sets: [set(60, 8), set(60, 8), set(45, 6, 'dropset'), set(30, 9, 'dropset')],
+      },
+    ])
+
+    expect(card.workingSets).toBe(2)
+    expect(card.volumeKg).toBe(480 + 480 + 270 + 270)
+    // The top set, so the drops cannot become the number on the card.
+    expect(card.lines[0]).toMatchObject({ weightKg: 60, reps: 8 })
+  })
+
   it('shows the top set of each exercise, not the last one', () => {
     const card = build([
       {

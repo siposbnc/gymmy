@@ -8,6 +8,7 @@ import {
   removeSessionExercise,
   setExerciseMachineWeight,
   setExerciseRest,
+  toggleDrop,
   toggleWarmup,
   updateSet,
 } from '~/db/repositories/sessions'
@@ -24,10 +25,12 @@ import {
 } from '~/domain/machines'
 import { describeTarget } from '~/domain/routine-draft'
 import { describePlannedSet, setPlanUnitSuffix } from '~/domain/set-plan'
+import { countsAsSet, dropParentOf, dropsOf, isDrop } from '~/domain/sets'
 import {
   calculatePlates,
   formatPlates,
   lastTimeSummary,
+  resolveDropPrefill,
   resolvePrefill,
   smallestStepKg,
   suggestProgression,
@@ -101,12 +104,31 @@ export function ExerciseCard({
   const [draftWeight, setDraftWeight] = useState<number | null>(null)
   const [draftReps, setDraftReps] = useState<number | null>(null)
   const [draftWarmup, setDraftWarmup] = useState(false)
+  /**
+   * The pending row will log a drop off the last working set.
+   *
+   * Sticky across a log, unlike the warm-up flag: the next thing you do after a
+   * drop is nearly always another drop, and the row says plainly which mode it
+   * is in — indented, labelled D, with the chip lit — so staying is not a trap.
+   */
+  const [draftDrop, setDraftDrop] = useState(false)
 
-  const workingSets = sets.filter((set) => set.type !== 'warmup')
+  const workingSets = sets.filter(countsAsSet)
   const warmupSets = sets.filter((set) => set.type === 'warmup')
   const nextIndex = draftWarmup ? warmupSets.length + 1 : workingSets.length + 1
 
-  const prefill = useMemo(
+  // Drops hang off the last working set — the one you just finished and are
+  // stripping the weight off. There is nothing to drop off before that.
+  const dropParent = workingSets.at(-1) ?? null
+  const canDrop = dropParent != null && !planning
+  const dropping = draftDrop && canDrop
+  const dropIndex = dropParent == null ? 1 : dropsOf(sets, dropParent.id).length + 1
+
+  // What the swap and remove labels count. Rows, minus the drops — "your 4
+  // logged sets move with it" would be two sets and two drops.
+  const loggedSets = sets.filter((set) => !isDrop(set)).length
+
+  const setPrefill = useMemo(
     () =>
       resolvePrefill({
         setIndex: nextIndex,
@@ -129,6 +151,22 @@ export function ExerciseCard({
       sessionExercise.setPlan,
     ],
   )
+
+  // A drop answers to the chain it is part of rather than to the set chain, and
+  // never to the routine: no plan describes a dropset, by design.
+  const dropPrefill = useMemo(
+    () =>
+      dropParent == null
+        ? null
+        : resolveDropPrefill({
+            parentSetId: dropParent.id,
+            currentSessionSets: sets,
+            previousSessionSets: previousSets,
+          }),
+    [dropParent, sets, previousSets],
+  )
+
+  const prefill = dropping && dropPrefill ? dropPrefill : setPrefill
 
   // Drafts, prefill and everything downstream deal in the TOTAL load, exactly
   // as `SetEntry.weightKg` does. The machine weight is subtracted at the one
@@ -224,16 +262,23 @@ export function ExerciseCard({
       // A set with a weight but no rep count is a set you did once — logging
       // it as zero would quietly drop it out of volume and records.
       reps: reps != null && reps > 0 ? reps : 1,
-      type: draftWarmup ? 'warmup' : 'normal',
+      ...(dropping && dropParent
+        ? { parentSetId: dropParent.id }
+        : { type: draftWarmup ? ('warmup' as const) : ('normal' as const) }),
     })
 
     // Auto-start removes a tap from a loop that repeats thirty times a session.
-    if (settings.autoStartRest && restSeconds > 0) {
+    //
+    // Never after a drop: going straight to the next weight without resting is
+    // what makes a dropset a dropset, and a timer counting down over it would be
+    // telling you to do the one thing you are deliberately not doing.
+    if (!dropping && settings.autoStartRest && restSeconds > 0) {
       startRest(restSeconds, exercise?.name ?? 'Rest')
     }
 
     // Clear the overrides so the next row follows the chain again — which now
-    // carries forward what was just logged.
+    // carries forward what was just logged. Drop mode is deliberately left on;
+    // see `draftDrop`.
     setDraftWeight(null)
     setDraftReps(null)
     setDraftWarmup(false)
@@ -244,6 +289,13 @@ export function ExerciseCard({
   // Only reps-only work may be logged weightless; everywhere else a zero is a
   // set that silently vanishes from volume and records.
   const weightRequired = (exercise?.trackingType ?? 'weight_reps') !== 'reps_only'
+
+  /** What the pad calls the row it is editing. The eyebrow is the only context it has. */
+  const pendingLabel = dropping
+    ? `drop ${dropIndex} of set ${dropParent?.setIndex ?? ''}`.trim()
+    : draftWarmup
+      ? 'warm-up'
+      : `set ${nextIndex}`
 
   const padConfig = (() => {
     if (!pad) return null
@@ -262,8 +314,8 @@ export function ExerciseCard({
         requirePositive: weightRequired && machineKg <= 0,
         eyebrow:
           machineKg > 0
-            ? `${exercise?.name ?? 'Exercise'} · set ${nextIndex} · weight you add`
-            : `${exercise?.name ?? 'Exercise'} · set ${nextIndex} · weight`,
+            ? `${exercise?.name ?? 'Exercise'} · ${pendingLabel} · weight you add`
+            : `${exercise?.name ?? 'Exercise'} · ${pendingLabel} · weight`,
         commit: (value: number) =>
           setDraftWeight(totalWeightKg(fromDisplayUnit(value, unit), machineKg) ?? 0),
       }
@@ -273,7 +325,7 @@ export function ExerciseCard({
         value: reps ?? 0,
         increment: 1,
         allowDecimal: false,
-        eyebrow: `${exercise?.name ?? 'Exercise'} · set ${nextIndex} · reps`,
+        eyebrow: `${exercise?.name ?? 'Exercise'} · ${pendingLabel} · reps`,
         commit: (value: number) => setDraftReps(Math.round(value)),
       }
     }
@@ -379,8 +431,9 @@ export function ExerciseCard({
                 {index > 0 ? <span className="text-ink-faint"> · </span> : null}
                 <span
                   className={
-                    // Nothing is the rung you are on before the workout starts.
-                    index + 1 === nextIndex && !draftWarmup && !planning
+                    // Nothing is the rung you are on before the workout starts,
+                    // and a drop is not on the ladder at all.
+                    index + 1 === nextIndex && !draftWarmup && !dropping && !planning
                       ? 'font-semibold text-ink'
                       : undefined
                   }
@@ -445,6 +498,7 @@ export function ExerciseCard({
               set={set}
               unit={unit}
               trackingType={exercise?.trackingType ?? 'weight_reps'}
+              parentSetIndex={dropParentOf(sets, set.id)?.setIndex}
               onEditWeight={() => setPad({ kind: 'set-weight', setId: set.id })}
               onEditReps={() => setPad({ kind: 'set-reps', setId: set.id })}
               onOpenActions={() => setActionsFor(set.id)}
@@ -459,11 +513,21 @@ export function ExerciseCard({
               reps={reps}
               source={prefill.source}
               isWarmup={draftWarmup}
+              isDrop={dropping}
+              dropIndex={dropIndex}
+              canDrop={canDrop}
               unit={unit}
               trackingType={exercise?.trackingType ?? 'weight_reps'}
               onEditWeight={() => setPad({ kind: 'pending-weight' })}
               onEditReps={() => setPad({ kind: 'pending-reps' })}
               onToggleWarmup={() => setDraftWarmup((current) => !current)}
+              onToggleDrop={() => {
+                // Leaving drop mode has to drop the overrides too, or set three
+                // opens at the 30 kg you stripped the bar to.
+                setDraftWeight(null)
+                setDraftReps(null)
+                setDraftDrop((current) => !current)
+              }}
               onLog={() => void handleLog()}
             />
           )}
@@ -517,10 +581,22 @@ export function ExerciseCard({
           set={activeSet}
           open={actionsFor !== null}
           onOpenChange={(open) => !open && setActionsFor(null)}
+          dropParentIndex={activeSet ? dropParentOf(sets, activeSet.id)?.setIndex : undefined}
+          dropCount={activeSet ? dropsOf(sets, activeSet.id).length : 0}
           onToggleWarmup={() => {
             if (activeSet) void toggleWarmup(activeSet.id)
             setActionsFor(null)
           }}
+          // Offered only where the write would succeed — which is exactly where
+          // there is a set above to attach to.
+          {...(activeSet && dropParentOf(sets, activeSet.id) != null
+            ? {
+                onToggleDrop: () => {
+                  void toggleDrop(activeSet.id)
+                  setActionsFor(null)
+                },
+              }
+            : {})}
           onEditRpe={() => {
             if (activeSet) setPad({ kind: 'set-rpe', setId: activeSet.id })
             setActionsFor(null)
@@ -603,9 +679,9 @@ export function ExerciseCard({
               <span className="min-w-0 flex-1">
                 <span className="block text-[0.95rem] font-medium">Swap for another exercise</span>
                 <span className="block text-[0.75rem] text-ink-muted">
-                  {sets.length === 0
+                  {loggedSets === 0
                     ? 'Keeps its place and its rep targets'
-                    : `Your ${sets.length} logged set${sets.length === 1 ? '' : 's'} move${sets.length === 1 ? 's' : ''} with it`}
+                    : `Your ${loggedSets} logged set${loggedSets === 1 ? '' : 's'} move${loggedSets === 1 ? 's' : ''} with it`}
                 </span>
               </span>
             </button>
@@ -623,8 +699,8 @@ export function ExerciseCard({
                   Remove from this {planning ? 'plan' : 'workout'}
                 </span>
                 <span className="block text-[0.75rem] text-ink-muted">
-                  {sets.length > 0
-                    ? `Deletes ${sets.length} logged set${sets.length === 1 ? '' : 's'}`
+                  {loggedSets > 0
+                    ? `Deletes ${loggedSets} logged set${loggedSets === 1 ? '' : 's'}`
                     : 'Nothing logged yet'}
                 </span>
               </span>

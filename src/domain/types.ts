@@ -294,12 +294,24 @@ export interface SessionExercise {
 /**
  * `warmup` is excluded from volume, records and 1RM estimates — but kept, since
  * it is real data about how you ramp.
+ *
+ * A `dropset` row is the opposite case: it counts everywhere work is measured
+ * and nowhere sets are counted. See {@link SetEntry.parentSetId}.
  */
 export type SetType = 'normal' | 'warmup' | 'dropset' | 'failure'
 
 export interface SetEntry {
   id: Id
   sessionExerciseId: Id
+  /**
+   * Position within its own run, counting from one.
+   *
+   * There are three kinds of run and they are numbered independently: warm-ups,
+   * working sets, and the drops hanging off a single working set. So the rows
+   * read W, W, 1, 2, D, D, 3 — which is how lifters count them. For a drop that
+   * run is its parent's chain, so this is its position in the chain rather than
+   * its parent's number.
+   */
   setIndex: number
   /** Canonical kilograms. Always. */
   weightKg?: number
@@ -310,6 +322,27 @@ export interface SetEntry {
   rpe?: number
   type: SetType
   completedAt: number
+
+  /**
+   * The working set this drop hangs off.
+   *
+   * Present on a `dropset` row and nowhere else — the two are written together
+   * and never apart. It is the structural half of the invariant dropsets add:
+   * **a dropset is one set that logged several rows.** Stripping the weight and
+   * carrying on is real work, so every row counts toward volume; but 60 × 8 then
+   * 45 × 6 then 30 × 8 is one set of work, so everything that counts *sets*
+   * counts the parent alone. See `countsAsSet` in `domain/sets.ts`, which is the
+   * only place that distinction is made.
+   *
+   * Child rows rather than a list nested inside the parent, deliberately. Volume,
+   * records, the charts and the CSV export all already walk set rows, so a drop's
+   * work lands in every total without any of them learning that drops exist —
+   * whereas a nested list would have to be unpacked by each of them in turn.
+   *
+   * Absent on every row written before drops existed, which is the correct value
+   * for all of them. Hence no migration.
+   */
+  parentSetId?: Id
 }
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import { countsAsSet } from '../sets'
 import type { SetEntry } from '../types'
 import { formatVolume } from '../units'
 import type { Metric } from './types'
@@ -6,6 +7,10 @@ import type { Metric } from './types'
  * Warm-ups are kept in history but excluded from every total. Otherwise ramping
  * up with the empty bar drags the volume chart down and clutters records with
  * weights the user was not trying hard on.
+ *
+ * Note that this excludes warm-ups and nothing else — a dropset's drops are
+ * work, and all of it counts. That is deliberately *not* the same question as
+ * `countsAsSet`, which asks whether a row is a set of its own.
  */
 export function countsTowardVolume(set: Pick<SetEntry, 'type'>): boolean {
   return set.type !== 'warmup'
@@ -50,6 +55,7 @@ export const volumeMetric: Metric<VolumeInput, number> = {
     caveats: [
       'It treats all weight as equal, so it says a heavy squat session and a long dumbbell session are comparable when they are not. Use it to compare a lift against itself over time, not across different exercises.',
       'Warm-up sets are excluded.',
+      'Every drop of a dropset is counted in full, because stripping the weight and carrying on is real work. Your set count is the one place it stays a single set.',
     ],
   },
 
@@ -57,10 +63,15 @@ export const volumeMetric: Metric<VolumeInput, number> = {
     const counted = sets.filter(countsTowardVolume)
     if (counted.length === 0) return null
     const excluded = sets.length - counted.length
+    // Drops are counted but are not sets, so saying "five working sets" of a
+    // three-set exercise that was dropped twice would contradict every set
+    // count in the app.
+    const proper = counted.filter(countsAsSet).length
+    const drops = counted.length - proper
     return {
-      given: `${counted.length} working set${counted.length === 1 ? '' : 's'}${
-        excluded > 0 ? ` (${excluded} warm-up excluded)` : ''
-      }`,
+      given: `${proper} working set${proper === 1 ? '' : 's'}${
+        drops > 0 ? ` + ${drops} drop${drops === 1 ? '' : 's'}` : ''
+      }${excluded > 0 ? ` (${excluded} warm-up excluded)` : ''}`,
       substitution: counted
         .slice(0, 3)
         .map((s) => `${s.weightKg ?? 0} × ${s.reps ?? 0}`)

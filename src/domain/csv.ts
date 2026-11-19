@@ -20,6 +20,15 @@ export interface CsvSetRow {
   readonly exerciseName: string
   readonly setIndex: number
   readonly setType: string
+  /**
+   * Which drop of its set this row is, for a dropset.
+   *
+   * A drop carries its PARENT's number in `setIndex` and its own position here,
+   * which is what makes the file group correctly: sort by set and a dropset's
+   * rows stay together under the set they belong to, rather than appearing as
+   * set 1 of some run of its own.
+   */
+  readonly dropIndex?: number | undefined
   readonly weightKg?: number | undefined
   readonly reps?: number | undefined
   readonly rpe?: number | undefined
@@ -30,6 +39,7 @@ const COLUMNS = [
   'session',
   'exercise',
   'set',
+  'drop',
   'type',
   'weight_kg',
   'weight',
@@ -70,6 +80,7 @@ export function toCsv(rows: readonly CsvSetRow[], unit: WeightUnit): string {
       row.sessionName,
       row.exerciseName,
       String(row.setIndex),
+      row.dropIndex == null ? '' : String(row.dropIndex),
       row.setType,
       row.weightKg == null ? '' : String(round(row.weightKg)),
       row.weightKg == null ? '' : String(round(toDisplayUnit(row.weightKg, unit))),

@@ -14,6 +14,7 @@ import {
   logSet,
   moveSetToExercise,
   removeSessionExercise,
+  toggleDrop,
   toggleWarmup,
   updateSet,
 } from '~/db/repositories/sessions'
@@ -25,6 +26,7 @@ import { buildSessionCard } from '~/domain/session-card'
 import { describeVolumeGoal, resolveVolumeGoal, type VolumeGoalResult } from '~/domain/goals'
 import { totalVolume } from '~/domain/metrics'
 import { describeRecordKind } from '~/domain/records'
+import { countsAsSet, dropParentOf, dropsOf } from '~/domain/sets'
 import type { SetEntry } from '~/domain/types'
 import {
   formatVolume,
@@ -108,7 +110,9 @@ export function SessionDetailScreen() {
    * copying the previous values means the usual case needs no editing at all.
    */
   async function addForgottenSet(sessionExerciseId: string, existing: SetEntry[]) {
-    const last = [...existing].filter((set) => set.type !== 'warmup').at(-1)
+    // The last working set, not the last row: seeding a forgotten set from the
+    // 30 kg a dropset finished on is never what was forgotten.
+    const last = [...existing].filter(countsAsSet).at(-1)
     await logSet(sessionExerciseId, {
       weightKg: last?.weightKg,
       reps: last?.reps ?? 1,
@@ -132,7 +136,7 @@ export function SessionDetailScreen() {
 
   const { session, exercises, records, previousKg } = detail
   const allSets = exercises.flatMap((entry) => entry.sets)
-  const workingSets = allSets.filter((set) => set.type !== 'warmup')
+  const workingSets = allSets.filter(countsAsSet)
   const volume = totalVolume({ sets: allSets })
   const duration = session.endedAt ? (session.endedAt - session.startedAt) / 1000 : null
 
@@ -155,6 +159,18 @@ export function SessionDetailScreen() {
   }
 
   const padSet = pad ? allSets.find((set) => set.id === pad.setId) : undefined
+
+  /**
+   * The sets of the exercise the open actions sheet belongs to.
+   *
+   * A set's relationship to a dropset is a question about its siblings, so the
+   * sheet needs the row's neighbours rather than the whole session.
+   */
+  const actionsSiblings = actionsFor
+    ? (exercises.find((entry) => entry.sessionExerciseId === actionsFor.sessionExerciseId)
+        ?.sets ?? [])
+    : []
+  const actionsDropParent = actionsFor ? dropParentOf(actionsSiblings, actionsFor.id) : null
 
   const cardDate = new Date(session.startedAt).toLocaleDateString(undefined, {
     weekday: 'long',
@@ -291,6 +307,7 @@ export function SessionDetailScreen() {
                     set={set}
                     unit={settings.units}
                     trackingType="weight_reps"
+                    parentSetIndex={dropParentOf(entry.sets, set.id)?.setIndex}
                     onEditWeight={() => setPad({ kind: 'weight', setId: set.id })}
                     onEditReps={() => setPad({ kind: 'reps', setId: set.id })}
                     onOpenActions={() => setActionsFor(set)}
@@ -534,6 +551,19 @@ export function SessionDetailScreen() {
         set={actionsFor}
         open={actionsFor !== null}
         onOpenChange={(open) => !open && setActionsFor(null)}
+        dropParentIndex={actionsDropParent?.setIndex}
+        dropCount={actionsFor ? dropsOf(actionsSiblings, actionsFor.id).length : 0}
+        // The repair path for a dropset logged as separate sets — including
+        // every one logged before Gymmy could record a dropset at all. Offered
+        // only where the write would succeed.
+        {...(actionsFor && actionsDropParent != null
+          ? {
+              onToggleDrop: () => {
+                void toggleDrop(actionsFor.id).then(resettle)
+                setActionsFor(null)
+              },
+            }
+          : {})}
         onToggleWarmup={() => {
           if (actionsFor) {
             void toggleWarmup(actionsFor.id).then(resettle)

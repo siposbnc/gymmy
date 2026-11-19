@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { lastTimeSummary, resolvePrefill, type PrefillSet } from './prefill'
+import {
+  lastTimeSummary,
+  resolveDropPrefill,
+  resolvePrefill,
+  type PrefillSet,
+} from './prefill'
 
 const working = (setIndex: number, weightKg: number, reps: number): PrefillSet => ({
   setIndex,
@@ -13,6 +18,28 @@ const warmup = (setIndex: number, weightKg: number, reps: number): PrefillSet =>
   weightKg,
   reps,
   type: 'warmup',
+})
+
+/** A working set with an identity, so drops can hang off it. */
+const parent = (
+  id: string,
+  setIndex: number,
+  weightKg: number,
+  reps: number,
+): PrefillSet => ({ ...working(setIndex, weightKg, reps), id })
+
+const drop = (
+  parentSetId: string,
+  setIndex: number,
+  weightKg: number,
+  reps: number,
+): PrefillSet => ({
+  id: `${parentSetId}_d${setIndex}`,
+  parentSetId,
+  setIndex,
+  weightKg,
+  reps,
+  type: 'dropset',
 })
 
 describe('resolvePrefill — the fallback chain', () => {
@@ -426,5 +453,166 @@ describe('lastTimeSummary — the ghost line', () => {
   it('returns null when there is nothing to show', () => {
     expect(lastTimeSummary([])).toBeNull()
     expect(lastTimeSummary([warmup(1, 20, 12)])).toBeNull()
+  })
+
+  it('names a dropset rather than spelling its drops out', () => {
+    expect(
+      lastTimeSummary([
+        parent('s1', 1, 100, 5),
+        parent('s2', 2, 100, 5),
+        drop('s2', 1, 70, 8),
+        drop('s2', 2, 50, 10),
+      ]),
+    ).toBe('100 kg × 5, 5 + dropset')
+  })
+
+  it('counts the chains when more than one set was dropped', () => {
+    expect(
+      lastTimeSummary([
+        parent('s1', 1, 100, 5),
+        drop('s1', 1, 70, 8),
+        parent('s2', 2, 100, 5),
+        drop('s2', 1, 70, 7),
+      ]),
+    ).toBe('100 kg × 5, 5 + 2 dropsets')
+  })
+
+  it('does not let a drop make a uniform load look varied', () => {
+    // The drops are at 70 and the sets at 100. Counted as sets, the line would
+    // spell out every pairing and bury the one weight that matters.
+    expect(
+      lastTimeSummary([parent('s1', 1, 100, 5), parent('s2', 2, 100, 5), drop('s2', 1, 70, 8)]),
+    ).toBe('100 kg × 5, 5 + dropset')
+  })
+})
+
+describe('resolvePrefill — dropsets are never offered back', () => {
+  it('does not carry a drop forward into the next set', () => {
+    // The bug this exists to stop: you finish a dropset at 30 kg, and set 3
+    // opens at 30 kg because 30 kg is the last thing you logged.
+    const result = resolvePrefill({
+      setIndex: 3,
+      currentSessionSets: [
+        parent('s1', 1, 60, 8),
+        parent('s2', 2, 60, 8),
+        drop('s2', 1, 45, 6),
+        drop('s2', 2, 30, 8),
+      ],
+    })
+    expect(result).toEqual({ weightKg: 60, reps: 8, source: 'carried_forward' })
+  })
+
+  it('does not let last session’s drops stand in for its sets', () => {
+    const result = resolvePrefill({
+      setIndex: 2,
+      previousSessionSets: [parent('s1', 1, 80, 8), drop('s1', 1, 60, 6)],
+    })
+    // Set 2 last time does not exist, so the last SET ever — not the last row.
+    expect(result).toEqual({ weightKg: 80, reps: 8, source: 'last_set_ever' })
+  })
+
+  it('does not read a drop chain as a climb to repeat', () => {
+    // 60/45/30 is a chain, not a ramp: offering 45 for set two would be reading
+    // a dropset as a programme.
+    const result = resolvePrefill({
+      setIndex: 2,
+      currentSessionSets: [parent('c1', 1, 60, 8)],
+      previousSessionSets: [
+        parent('s1', 1, 60, 8),
+        drop('s1', 1, 45, 6),
+        drop('s1', 2, 30, 8),
+      ],
+    })
+    expect(result).toEqual({ weightKg: 60, reps: 8, source: 'carried_forward' })
+  })
+})
+
+describe('resolveDropPrefill — the next rung of a chain', () => {
+  it('offers the weight you are dropping from, with no opinion about how far', () => {
+    const result = resolveDropPrefill({
+      parentSetId: 's1',
+      currentSessionSets: [parent('s1', 1, 60, 8)],
+    })
+    expect(result).toEqual({ weightKg: 60, reps: 8, source: 'dropping_from' })
+  })
+
+  it('offers the last drop once a chain is under way', () => {
+    const result = resolveDropPrefill({
+      parentSetId: 's1',
+      currentSessionSets: [parent('s1', 1, 60, 8), drop('s1', 1, 45, 6)],
+    })
+    expect(result).toEqual({ weightKg: 45, reps: 6, source: 'dropping_from' })
+  })
+
+  it('repeats last session’s chain, rung by rung', () => {
+    const previous = [parent('p1', 1, 60, 8), drop('p1', 1, 45, 6), drop('p1', 2, 30, 9)]
+
+    const first = resolveDropPrefill({
+      parentSetId: 's1',
+      currentSessionSets: [parent('s1', 1, 60, 8)],
+      previousSessionSets: previous,
+    })
+    expect(first).toEqual({ weightKg: 45, reps: 6, source: 'same_drop_last_time' })
+
+    const second = resolveDropPrefill({
+      parentSetId: 's1',
+      currentSessionSets: [parent('s1', 1, 60, 8), drop('s1', 1, 45, 6)],
+      previousSessionSets: previous,
+    })
+    expect(second).toEqual({ weightKg: 30, reps: 9, source: 'same_drop_last_time' })
+  })
+
+  it('moves the whole chain by whatever you opened the set at', () => {
+    // 60 → 45 → 30 last week, opened at 62.5 today: the same dropset, heavier.
+    const result = resolveDropPrefill({
+      parentSetId: 's1',
+      currentSessionSets: [parent('s1', 1, 62.5, 8)],
+      previousSessionSets: [parent('p1', 1, 60, 8), drop('p1', 1, 45, 6), drop('p1', 2, 30, 9)],
+    })
+    expect(result).toEqual({ weightKg: 47.5, reps: 6, source: 'same_drop_last_time' })
+  })
+
+  it('goes quiet when the shift is as wide as the chain’s own step', () => {
+    // 60 → 45 → 30 steps by 15. Opening at 80 is a 20 kg move, so where you
+    // would drop to from there is a guess, and Gymmy does not make it.
+    const result = resolveDropPrefill({
+      parentSetId: 's1',
+      currentSessionSets: [parent('s1', 1, 80, 5)],
+      previousSessionSets: [parent('p1', 1, 60, 8), drop('p1', 1, 45, 6), drop('p1', 2, 30, 9)],
+    })
+    expect(result).toEqual({ weightKg: 80, reps: 5, source: 'dropping_from' })
+  })
+
+  it('prefers the chain you did four minutes ago to the one you did last week', () => {
+    const result = resolveDropPrefill({
+      parentSetId: 's2',
+      currentSessionSets: [
+        parent('s1', 1, 60, 8),
+        drop('s1', 1, 40, 7),
+        parent('s2', 2, 60, 8),
+      ],
+      previousSessionSets: [parent('p1', 1, 60, 8), drop('p1', 1, 45, 6), drop('p1', 2, 30, 9)],
+    })
+    expect(result).toEqual({ weightKg: 40, reps: 7, source: 'same_drop_this_session' })
+  })
+
+  it('matches last session on the set number, not on the first chain it finds', () => {
+    const result = resolveDropPrefill({
+      parentSetId: 's2',
+      currentSessionSets: [parent('s1', 1, 60, 8), parent('s2', 2, 50, 10)],
+      previousSessionSets: [
+        parent('p1', 1, 60, 8),
+        drop('p1', 1, 45, 6),
+        parent('p2', 2, 50, 10),
+        drop('p2', 1, 35, 9),
+      ],
+    })
+    expect(result).toEqual({ weightKg: 35, reps: 9, source: 'same_drop_last_time' })
+  })
+
+  it('says nothing for a parent that is gone', () => {
+    expect(
+      resolveDropPrefill({ parentSetId: 'missing', currentSessionSets: [parent('s1', 1, 60, 8)] }),
+    ).toEqual({ source: 'empty' })
   })
 })

@@ -1,4 +1,5 @@
 import { setVolume } from './metrics/volume'
+import { countsAsSet } from './sets'
 import type { SetEntry } from './types'
 
 /**
@@ -73,7 +74,8 @@ export interface SessionCardInput {
  * Warm-ups are excluded, exactly as they are from volume and records — a ramp
  * is real data about how you got there, not a thing to show. An exercise with
  * nothing but warm-ups contributes no row at all rather than a row saying
- * nothing.
+ * nothing. A dropset's drops are left out of the set count and the top set but
+ * kept in the volume, which is the one rule they follow everywhere.
  *
  * Exercises keep the order they were trained in. Sorting by weight would make
  * the card a leaderboard of your own session and lose the shape of the workout.
@@ -87,11 +89,14 @@ export function buildSessionCard(input: SessionCardInput): SessionCardData {
   let volumeKg = 0
 
   for (const exercise of exercises) {
-    const working = exercise.sets.filter(
-      (set) => set.type !== 'warmup' && (set.reps ?? 0) > 0,
-    )
+    const working = exercise.sets.filter((set) => countsAsSet(set) && (set.reps ?? 0) > 0)
     workingSets += working.length
-    for (const set of working) volumeKg += setVolume(set)
+
+    // Volume over every set rather than over `working`: the two counts differ by
+    // a dropset's drops, which are not sets but are unquestionably work, and a
+    // card claiming less volume than the session screen would be a card you
+    // could not trust.
+    for (const set of exercise.sets) volumeKg += setVolume(set)
 
     const top = working.reduce<SetEntry | null>((best, set) => {
       if (best == null) return set

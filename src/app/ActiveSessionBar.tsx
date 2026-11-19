@@ -2,6 +2,7 @@ import { ChevronRight } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { useActiveSession } from '~/db/hooks'
+import { countsAsSet } from '~/domain/sets'
 import { formatDuration, useElapsed } from '~/features/session/useElapsed'
 
 /**
@@ -22,7 +23,7 @@ export function ActiveSessionBar() {
     <SessionBarContent
       name={active.session.name}
       startedAt={active.session.startedAt}
-      setCount={active.views.flatMap((view) => view.sets).filter((s) => s.type !== 'warmup').length}
+      setCount={active.views.flatMap((view) => view.sets).filter(countsAsSet).length}
       onOpen={() => void navigate('/session')}
     />
   )

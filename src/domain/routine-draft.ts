@@ -16,6 +16,7 @@
  */
 
 import { describeSetPlan, isUniform } from './set-plan'
+import { countsAsSet } from './sets'
 import type { Id, PlannedSet, RoutineExercise, SetEntry } from './types'
 import { formatWeight, type WeightUnit } from './units'
 
@@ -73,7 +74,13 @@ export function deriveRoutineDraft(input: {
   for (const source of input.exercises) {
     // Warm-ups are excluded here for the same reason they are excluded from
     // volume and records: ramping up to the work is not the work.
-    const working = source.sets.filter((set) => set.type !== 'warmup')
+    //
+    // A dropset's drops are excluded too, and that one matters more than it
+    // looks: counted as sets they would turn three sets of 60 into a 60/45/30
+    // ladder, so the routine would ask you to *open* at 60 and work down — a
+    // plan describing a workout nobody did. The dropset survives as the three
+    // sets it was, and doing one again stays your decision in the moment.
+    const working = source.sets.filter(countsAsSet)
 
     // An exercise that was added and never logged against was not part of what
     // you did, so it is not part of what you are planning to repeat.
@@ -124,7 +131,7 @@ export function deriveRoutineDraft(input: {
  * The ladder a set of logged work describes, or null for straight sets.
  *
  * **A ladder is about load, not reps.** Varying weights are a decision — a
- * ramp up to a top set, a backoff, a drop set — and worth keeping exactly.
+ * ramp up to a top set, a backoff — and worth keeping exactly.
  * Varying reps at one weight are usually just fatigue: 80 × 8, 8, 7 is three
  * straight sets where the last one ran out, and writing it down as a plan
  * would ask you to *aim* for seven next time. That case is already described

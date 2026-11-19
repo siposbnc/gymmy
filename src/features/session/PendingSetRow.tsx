@@ -1,5 +1,7 @@
+import { ArrowDown } from 'lucide-react'
+
 import { addedWeightKg, describeMachineLoad } from '~/domain/machines'
-import type { PrefillSource } from '~/domain/metrics'
+import type { DropPrefillSource, PrefillSource } from '~/domain/metrics'
 import type { TrackingType } from '~/domain/types'
 import { formatWeight, type WeightUnit } from '~/domain/units'
 import { cn } from '~/ui/cn'
@@ -17,13 +19,31 @@ interface PendingSetRowProps {
   machineWeightKg: number
   reps: number | undefined
   /** Which prefill tier produced these values — announced, not drawn. */
-  source: PrefillSource
+  source: PrefillSource | DropPrefillSource
   isWarmup: boolean
+  /**
+   * This row will log a drop off the set above rather than a set of its own.
+   *
+   * The row itself changes — indented, labelled D, numbered within the chain —
+   * because logging a drop has to look different from logging a set, in a
+   * glance, while out of breath.
+   */
+  isDrop: boolean
+  /** Which drop of the chain this will be. Only read in drop mode. */
+  dropIndex: number
+  /**
+   * Whether there is a set to drop off at all.
+   *
+   * False before the first set of an exercise is logged, where a drop chip
+   * would be an affordance for something that cannot be done yet.
+   */
+  canDrop: boolean
   unit: WeightUnit
   trackingType: TrackingType
   onEditWeight: () => void
   onEditReps: () => void
   onToggleWarmup: () => void
+  onToggleDrop: () => void
   onLog: () => void
 }
 
@@ -42,11 +62,15 @@ export function PendingSetRow({
   reps,
   source,
   isWarmup,
+  isDrop,
+  dropIndex,
+  canDrop,
   unit,
   trackingType,
   onEditWeight,
   onEditReps,
   onToggleWarmup,
+  onToggleDrop,
   onLog,
 }: PendingSetRowProps) {
   const showsWeight = trackingType !== 'reps_only'
@@ -68,24 +92,69 @@ export function PendingSetRow({
     <>
       <div
         className={cn(
-          'flex min-h-[3.25rem] items-center gap-2.5 rounded-md border-[1.5px] px-2.5 py-1.5',
+          'relative flex min-h-[3.25rem] items-center gap-2.5 rounded-md border-[1.5px] px-2.5 py-1.5',
           isWarmup ? 'border-dashed border-line-strong' : 'border-line-strong bg-raised',
+          // Indented under the set it will hang off, exactly as the logged drop
+          // rows are, so the row shows where the work is about to land.
+          isDrop && 'ml-4',
         )}
       >
+        {isDrop ? (
+          <span
+            aria-hidden
+            className="absolute -top-2 -left-3 h-[calc(50%+0.5rem)] w-2.5 rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-strong"
+          />
+        ) : null}
+
         <span aria-hidden className="h-9 w-1 shrink-0 rounded-full bg-rail" />
 
-        <button
-          type="button"
-          onClick={onToggleWarmup}
-          aria-label={isWarmup ? 'Log as a working set instead' : 'Log this as a warm-up set'}
-          aria-pressed={isWarmup}
-          className={cn(
-            'num w-5 shrink-0 cursor-pointer rounded-sm text-center text-[0.7rem] font-extrabold',
-            isWarmup ? 'text-accent-ink' : 'text-ink-faint',
-          )}
-        >
-          {isWarmup ? 'W' : setIndex}
-        </button>
+        {/* In drop mode this is a label rather than a control: a drop is never a
+            warm-up, and the chip beside it is what leaves drop mode. */}
+        {isDrop ? (
+          <span className="num w-5 shrink-0 text-center text-[0.7rem] font-extrabold text-accent-ink">
+            D
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggleWarmup}
+            aria-label={isWarmup ? 'Log as a working set instead' : 'Log this as a warm-up set'}
+            aria-pressed={isWarmup}
+            className={cn(
+              'num w-5 shrink-0 cursor-pointer rounded-sm text-center text-[0.7rem] font-extrabold',
+              isWarmup ? 'text-accent-ink' : 'text-ink-faint',
+            )}
+          >
+            {isWarmup ? 'W' : setIndex}
+          </button>
+        )}
+
+        {/* The whole gesture. You have logged the set, you are stripping the
+            weight, and one tap turns this row into the drop — same pad, same
+            prefill, same Log button where your thumb already is. Hidden before
+            the first set, when there is nothing to drop off; hidden on a
+            warm-up, which is not a set you drop from either. */}
+        {canDrop && !isWarmup ? (
+          <button
+            type="button"
+            onClick={onToggleDrop}
+            aria-label={
+              isDrop
+                ? `Log set ${setIndex} instead of a drop`
+                : `Add a drop off set ${setIndex - 1}`
+            }
+            aria-pressed={isDrop}
+            className={cn(
+              'grid size-7 shrink-0 cursor-pointer place-items-center rounded-full',
+              'transition-transform duration-(--dur-fast) active:scale-95',
+              isDrop
+                ? 'bg-accent text-on-accent'
+                : 'border border-line-strong bg-sunken text-ink-muted',
+            )}
+          >
+            <ArrowDown size={14} strokeWidth={3} aria-hidden />
+          </button>
+        ) : null}
 
         <span className="flex flex-1 items-baseline gap-0.5">
           {showsWeight ? (
@@ -136,8 +205,10 @@ export function PendingSetRow({
         </button>
 
         {/* Screen readers get the provenance that sighted users read from the
-            ghost line above. */}
+            ghost line above — and, in drop mode, the position in the chain that
+            they read from the indent. */}
         <span className="sr-only">
+          {isDrop ? `Drop ${dropIndex} off set ${setIndex - 1}. ` : ''}
           {source === 'empty'
             ? 'No previous data for this exercise.'
             : 'Pre-filled from your training history.'}
@@ -150,7 +221,7 @@ export function PendingSetRow({
           because the weight button's own label already carries both figures;
           announcing them twice is worse than not at all. */}
       {machineLine ? (
-        <p aria-hidden className="num px-2.5 text-[0.72rem] text-ink-muted">
+        <p aria-hidden className={cn('num px-2.5 text-[0.72rem] text-ink-muted', isDrop && 'ml-4')}>
           {machineLine}
         </p>
       ) : null}
@@ -158,8 +229,8 @@ export function PendingSetRow({
       {/* A disabled button with no stated reason is a dead end, and this one
           fires on the first set of every new exercise. */}
       {needsWeight ? (
-        <p className="px-2.5 text-[0.72rem] text-ink-muted">
-          Enter a weight to log this set.
+        <p className={cn('px-2.5 text-[0.72rem] text-ink-muted', isDrop && 'ml-4')}>
+          Enter a weight to log this {isDrop ? 'drop' : 'set'}.
         </p>
       ) : null}
     </>

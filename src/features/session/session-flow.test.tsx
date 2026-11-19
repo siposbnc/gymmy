@@ -437,6 +437,182 @@ describe('logging a set', () => {
   })
 })
 
+describe('logging a dropset', () => {
+  beforeEach(async () => {
+    await resetDatabase()
+    useRestTimer.setState({ endsAt: null, totalSeconds: 0, label: null, signalled: false })
+  })
+
+  /** Log one set at a given weight and rep count through the pad. */
+  async function logFirstSet(
+    user: ReturnType<typeof userEvent.setup>,
+    digits: string[],
+    reps: string,
+  ) {
+    await user.click(screen.getByRole('button', { name: /weight: not set/i }))
+    for (const digit of digits) {
+      await user.click(await screen.findByRole('button', { name: digit }))
+    }
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await user.click(await screen.findByRole('button', { name: /reps: not set/i }))
+    await user.click(await screen.findByRole('button', { name: reps }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+  }
+
+  it('logs a drop against the set above it and leaves the set count alone', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Push A')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_bench-press')
+
+    renderSession()
+    await screen.findByText('Bench Press')
+
+    // Nothing is logged, so there is nothing to drop off yet.
+    expect(screen.queryByRole('button', { name: /add a drop/i })).not.toBeInTheDocument()
+
+    await logFirstSet(user, ['6', '0'], '8')
+
+    // That working set started the rest timer, correctly. Clear it, so what is
+    // asserted below is what the DROP does.
+    await waitFor(() => expect(useRestTimer.getState().endsAt).not.toBeNull())
+    useRestTimer.setState({ endsAt: null, totalSeconds: 0, label: null, signalled: false })
+
+    // 60 × 8 is down, the chip has appeared, and tapping it turns the pending
+    // row into the drop.
+    const chip = await screen.findByRole('button', { name: /add a drop off set 1/i })
+    await user.click(chip)
+
+    // It opens on the weight you are dropping from, so the pad is already on
+    // the number you are about to change.
+    await user.click(await screen.findByRole('button', { name: /weight: 60 kg\. edit/i }))
+    // Backspace twice over the seeded 60, then type what is on the bar now.
+    await user.click(await screen.findByRole('button', { name: 'Backspace' }))
+    await user.click(screen.getByRole('button', { name: 'Backspace' }))
+    await user.click(screen.getByRole('button', { name: '4' }))
+    await user.click(screen.getByRole('button', { name: '5' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+
+    await waitFor(async () => {
+      const sets = await listSets(sessionExerciseId)
+      expect(sets).toHaveLength(2)
+      expect(sets[1]).toMatchObject({
+        weightKg: 45,
+        type: 'dropset',
+        parentSetId: sets[0]?.id,
+        // Numbered within its parent's chain, not after the working sets.
+        setIndex: 1,
+      })
+    })
+
+    // The whole point: one set, two rows. The card's counter must not read 2.
+    await waitFor(() => expect(screen.getByText(/1 set ·/)).toBeInTheDocument())
+
+    // And no rest timer — going straight to the next weight without resting is
+    // what makes a dropset a dropset.
+    expect(useRestTimer.getState().endsAt).toBeNull()
+  })
+
+  it('stays in drop mode for the next drop, and leaves when told to', async () => {
+    const user = userEvent.setup()
+
+    const sessionId = await startEmptySession('Push A')
+    const sessionExerciseId = await addExerciseToSession(sessionId, 'ex_bench-press')
+
+    renderSession()
+    await screen.findByText('Bench Press')
+
+    await logFirstSet(user, ['6', '0'], '8')
+
+    await user.click(await screen.findByRole('button', { name: /add a drop off set 1/i }))
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+
+    // Still dropping: the next thing after a drop is nearly always another one,
+    // so the row stays indented and the chip stays lit.
+    const exit = await screen.findByRole('button', { name: /log set 2 instead of a drop/i })
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+
+    await waitFor(async () => {
+      const sets = await listSets(sessionExerciseId)
+      expect(sets).toHaveLength(3)
+      expect(sets.map((set) => set.setIndex)).toEqual([1, 1, 2])
+    })
+
+    // Leaving drop mode hands back set two at the SET weight, not at whatever
+    // the chain was stripped to.
+    await user.click(exit)
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /weight: 60 kg\. edit/i })).toBeInTheDocument(),
+    )
+
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+
+    await waitFor(async () => {
+      const sets = await listSets(sessionExerciseId)
+      expect(sets).toHaveLength(4)
+      expect(sets[3]).toMatchObject({ weightKg: 60, type: 'normal', setIndex: 2 })
+    })
+  })
+
+  it('repeats last session’s chain when you drop again', async () => {
+    const user = userEvent.setup()
+
+    // Last week: 60 × 8, stripped to 45 × 6.
+    const past = await startEmptySession('Last week')
+    const pastExercise = await addExerciseToSession(past, 'ex_bench-press')
+    await db.sets.bulkAdd([
+      {
+        id: 'past_1',
+        sessionExerciseId: pastExercise,
+        setIndex: 1,
+        weightKg: 60,
+        reps: 8,
+        type: 'normal',
+        completedAt: Date.now() - 2000,
+      },
+      {
+        id: 'past_drop',
+        sessionExerciseId: pastExercise,
+        setIndex: 1,
+        parentSetId: 'past_1',
+        weightKg: 45,
+        reps: 6,
+        type: 'dropset',
+        completedAt: Date.now() - 1000,
+      },
+    ])
+    await db.sessions.update(past, { status: 'completed', endedAt: Date.now() })
+
+    const sessionId = await startEmptySession('Push A')
+    await addExerciseToSession(sessionId, 'ex_bench-press')
+
+    renderSession()
+    await screen.findByText('Bench Press')
+
+    // The ghost line names the dropset rather than spelling out its rows.
+    expect(await screen.findByText(/60 kg × 8 \+ dropset/)).toBeInTheDocument()
+
+    // Set one prefills from the working set, not from the drop.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /weight: 60 kg\. edit/i })).toBeInTheDocument(),
+    )
+    await user.click(screen.getByRole('button', { name: /^log$/i }))
+
+    await user.click(await screen.findByRole('button', { name: /add a drop off set 1/i }))
+
+    // 45 is where you dropped to last time, so it is already in the row.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /weight: 45 kg\. edit/i })).toBeInTheDocument(),
+    )
+  })
+})
+
 describe('a routine that plans a weight per set', () => {
   beforeEach(async () => {
     await resetDatabase()

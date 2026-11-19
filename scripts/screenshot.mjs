@@ -319,6 +319,27 @@ for (const theme of ['light', 'dark']) {
     })),
   )
 
+  // A dropset mid-chain: two drops logged under their set, and the pending row
+  // still in drop mode. The indent, the elbow and the lit chip are the whole
+  // feature, and whether three indented rows read as one set or as a mess is
+  // not something a passing test can tell you.
+  allErrors.push(
+    ...(await shoot('session-dropset', {
+      theme,
+      steps: async (page) => {
+        await intoSession(page)
+        await logSet(page, 80, 8)
+        await logSet(page, 80, 8)
+
+        await tap(page, /add a drop off set 2/i)
+        await page.waitForTimeout(150)
+        await logSet(page, 60, 6)
+        // Still in drop mode, so this one lands as the second drop.
+        await logSet(page, 40, 9)
+      },
+    })),
+  )
+
   // A machine that weighs something before you load it. The row shows what
   // you added and states the total underneath, and the only way to know that
   // reads clearly rather than crowding the row is to look at it.

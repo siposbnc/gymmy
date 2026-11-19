@@ -1,4 +1,5 @@
 import type { SessionExerciseView } from '~/db/hooks'
+import { countsAsSet } from '~/domain/sets'
 import { cn } from '~/ui/cn'
 
 /**
@@ -8,11 +9,12 @@ import { cn } from '~/ui/cn'
  * logged, accent on the one you are about to do. Progress readable in half a
  * second without parsing a number — which is the point, since the user is
  * breathing hard and holding a phone at arm's length.
+ *
+ * A dropset gets one tick, like any other set. Three ticks appearing for one
+ * set would make the ribbon disagree with the counter on the card it sits above.
  */
 export function ProgressRibbon({ views }: { views: readonly SessionExerciseView[] }) {
-  const ticks = views.flatMap((view) =>
-    view.sets.filter((set) => set.type !== 'warmup').map(() => 'done' as const),
-  )
+  const ticks = views.flatMap((view) => view.sets.filter(countsAsSet).map(() => 'done' as const))
 
   // One pending tick so the ribbon never reads as "finished" mid-workout, then
   // a few empties so it has somewhere to grow into.

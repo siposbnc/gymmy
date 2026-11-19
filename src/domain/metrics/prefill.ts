@@ -1,10 +1,20 @@
 import { plannedSetAt } from '../set-plan'
+import { countsAsSet, dropsOf } from '../sets'
 import type { PlannedSet, SetEntry, TargetWeight } from '../types'
 import { formatWeight } from '../units'
 import type { Metric } from './types'
 
-/** The minimum a set needs to expose for prefill to reason about it. */
-export type PrefillSet = Pick<SetEntry, 'type' | 'weightKg' | 'reps' | 'setIndex'>
+/**
+ * The minimum a set needs to expose for prefill to reason about it.
+ *
+ * `id` and `parentSetId` are optional rather than picked from `SetEntry`: only
+ * the dropset paths need them, and requiring them would mean every caller with
+ * a plain weight-and-reps pair had to invent an id to ask a question about it.
+ */
+export type PrefillSet = Pick<SetEntry, 'type' | 'weightKg' | 'reps' | 'setIndex'> & {
+  readonly id?: string | undefined
+  readonly parentSetId?: string | undefined
+}
 
 /** Which tier of the chain produced the values. Drives nothing but honesty. */
 export type PrefillSource =
@@ -45,7 +55,16 @@ export interface PrefillResult {
   readonly source: PrefillSource
 }
 
-const isWorking = (set: PrefillSet) => set.type !== 'warmup'
+/**
+ * Which sets prefill is willing to learn from.
+ *
+ * Warm-ups for the usual reason, and a dropset's drops because they are the one
+ * kind of logged work that must never be offered back: carry-forward would hand
+ * you the 30 kg you finished a dropset on as the opening weight of your next
+ * set, which is both wrong and the kind of wrong that is easy not to notice at
+ * arm's length.
+ */
+const isWorking = (set: PrefillSet) => countsAsSet(set)
 
 /** Float dust: 62.5 − 60 must be 2.5, not 2.5000000000000036. */
 const round = (value: number) => Math.round(value * 1000) / 1000
@@ -309,6 +328,12 @@ export function resolvePrefill(input: PrefillInput): PrefillResult {
  * The most-read text in the app, which is why it is never behind a tap. Weights
  * collapse to one figure when every set used the same load, because that is the
  * common case and repeating it three times is noise.
+ *
+ * A dropset is named rather than spelled out: the rows of a drop chain would
+ * double the length of the line to say something the drop row itself answers
+ * properly a second later, when it offers last session's drop weights back.
+ * Named in words rather than with an arrow because this string is read aloud as
+ * often as it is read — and a `<p>` cannot carry an `aria-label` to fix a glyph.
  */
 export function lastTimeSummary(
   sets: readonly PrefillSet[],
@@ -324,13 +349,21 @@ export function lastTimeSummary(
     .map((set) => set.weightKg)
     .filter((value): value is number => value != null)
 
-  const repsText = reps.join(', ')
+  const chains = working.filter(
+    (set) => set.id != null && sets.some((candidate) => candidate.parentSetId === set.id),
+  ).length
+  const dropped = chains === 0 ? '' : ` + ${chains === 1 ? 'dropset' : `${chains} dropsets`}`
 
-  if (weights.length === 0) return `bodyweight × ${repsText}`
+  const repsText = working
+    .filter((set) => set.reps != null)
+    .map((set) => String(set.reps))
+    .join(', ')
+
+  if (weights.length === 0) return `bodyweight × ${repsText}${dropped}`
 
   const uniform = weights.every((weight) => weight === weights[0])
   if (uniform && weights.length === working.length) {
-    return `${formatWeight(weights[0]!, unit)} × ${repsText}`
+    return `${formatWeight(weights[0]!, unit)} × ${repsText}${dropped}`
   }
 
   // Loads varied — show each pairing rather than a misleading single figure.
@@ -341,7 +374,159 @@ export function lastTimeSummary(
         : `${formatWeight(set.weightKg, unit, { withUnit: false })} × ${set.reps ?? '?'}`,
     )
     .join(', ')
-    .concat(` ${unit}`)
+    .concat(` ${unit}${dropped}`)
+}
+
+// ---------------------------------------------------------------------------
+// Dropsets
+// ---------------------------------------------------------------------------
+
+/** Where a drop row's numbers came from. Reported for the same reason as above. */
+export type DropPrefillSource =
+  | 'same_drop_this_session'
+  | 'same_drop_last_time'
+  | 'dropping_from'
+  | 'empty'
+
+export interface DropPrefillInput {
+  /** The working set this drop will hang off. */
+  readonly parentSetId: string
+  /** Every set logged for this exercise in THIS session, drops included. */
+  readonly currentSessionSets: readonly PrefillSet[]
+  /** Every set of the most recent previous session of this exercise, drops included. */
+  readonly previousSessionSets?: readonly PrefillSet[] | undefined
+}
+
+export interface DropPrefillResult {
+  readonly weightKg?: number
+  readonly reps?: number
+  readonly source: DropPrefillSource
+}
+
+/**
+ * One drop chain as a climb, so {@link resolveClimb} can read it.
+ *
+ * The parent is rung one and each drop is the next, which is exactly the shape
+ * a ladder has — a dropset is a climb that happens to go downwards and skip the
+ * rest between rungs.
+ */
+function dropChain(sets: readonly PrefillSet[], parentSetId: string): Rung[] {
+  const parent = sets.find((set) => set.id === parentSetId)
+  if (!parent) return []
+
+  const drops = dropsOf(
+    sets.filter((set): set is PrefillSet & { id: string } => set.id != null),
+    parentSetId,
+  )
+
+  return [parent, ...drops].map((set, index) => ({
+    setIndex: index + 1,
+    weightKg: set.weightKg,
+    reps: set.reps,
+  }))
+}
+
+/**
+ * Resolve what a new drop row should already contain.
+ *
+ * The same problem {@link resolvePrefill} solves, with one difference that makes
+ * it a separate function: the row being filled is not the next set, it is the
+ * next rung of a chain that is already in progress, and the strongest evidence
+ * about it is the shape of the chain rather than the last number logged.
+ *
+ * So a drop chain is handed to {@link resolveClimb} as a climb — because that is
+ * what it is, a ladder that goes downwards and skips the rest between rungs —
+ * and inherits its four refusals wholesale. The one that earns its keep here is
+ * the shift guard: drop from 60 to 45 to 30 last week and open at 62.5 today and
+ * you are offered 47.5, because that is the same dropset moved up. Open at 80
+ * and the 20 kg shift is wider than the chain's own 15 kg step, so Gymmy stays
+ * quiet rather than claiming to know where you will drop to from a weight you
+ * have never dropped from.
+ *
+ * The tiers, strongest first:
+ *
+ * 1. **The same chain, earlier in this session.** Dropset your first set and the
+ *    second one's drops are already filled in. Above last session for the reason
+ *    carry-forward sits above same-set-last-time in the main chain: what you did
+ *    four minutes ago, at this much fatigue, on these machines, is better
+ *    evidence than last week.
+ * 2. **The same chain last session**, shifted the same way.
+ * 3. **The weight you are dropping from** — the last drop, or the parent if this
+ *    is the first one. Not a guess at a percentage: how far to strip the bar is a
+ *    decision, and Gymmy does not have an opinion about it. It opens the pad on
+ *    the number you are about to change, which is the honest default.
+ */
+export function resolveDropPrefill(input: DropPrefillInput): DropPrefillResult {
+  const { parentSetId, currentSessionSets, previousSessionSets = [] } = input
+
+  const parent = currentSessionSets.find((set) => set.id === parentSetId)
+  if (!parent) return { source: 'empty' }
+
+  const today = dropChain(currentSessionSets, parentSetId)
+  // The rung being filled: rung one is the parent, so the first drop is two.
+  const rung = today.length + 1
+
+  // Today's chain, in the shape `resolveClimb` compares against. Rung numbers
+  // rather than set numbers — within a chain the parent IS set one.
+  const chainSoFar: PrefillSet[] = today.map((entry) => ({
+    type: entry.setIndex === 1 ? 'normal' : 'dropset',
+    setIndex: entry.setIndex,
+    ...(entry.weightKg == null ? {} : { weightKg: entry.weightKg }),
+    ...(entry.reps == null ? {} : { reps: entry.reps }),
+  }))
+
+  /** The most recent earlier set of this exercise today that was dropped. */
+  const earlierToday = currentSessionSets
+    .filter(
+      (set) =>
+        isWorking(set) &&
+        set.id != null &&
+        set.id !== parentSetId &&
+        set.setIndex < parent.setIndex &&
+        currentSessionSets.some((candidate) => candidate.parentSetId === set.id),
+    )
+    .sort((a, b) => a.setIndex - b.setIndex)
+    .at(-1)
+
+  const tiers: { source: DropPrefillSource; shape: Rung[] }[] = [
+    {
+      source: 'same_drop_this_session',
+      shape: earlierToday?.id == null ? [] : dropChain(currentSessionSets, earlierToday.id),
+    },
+    {
+      source: 'same_drop_last_time',
+      shape: previousChain(previousSessionSets, parent.setIndex),
+    },
+  ]
+
+  for (const tier of tiers) {
+    const repeated = resolveClimb(rung, tier.shape, chainSoFar)
+    if (repeated) {
+      return {
+        weightKg: repeated.weightKg,
+        ...(repeated.reps == null ? {} : { reps: repeated.reps }),
+        source: tier.source,
+      }
+    }
+  }
+
+  // Whatever you are dropping from. The pad opens on it, you strip the bar, and
+  // nothing has pretended to know how far.
+  const from = today.at(-1)
+  if (from?.weightKg == null && from?.reps == null) return { source: 'empty' }
+
+  return {
+    ...(from?.weightKg == null ? {} : { weightKg: from.weightKg }),
+    ...(from?.reps == null ? {} : { reps: from.reps }),
+    source: 'dropping_from',
+  }
+}
+
+/** Last session's drop chain for a given working set number. */
+function previousChain(sets: readonly PrefillSet[], workingIndex: number): Rung[] {
+  const parent = sets.find((set) => isWorking(set) && set.setIndex === workingIndex)
+  if (parent?.id == null) return []
+  return dropChain(sets, parent.id)
 }
 
 export const prefillMetric: Metric<PrefillInput, PrefillResult> = {
@@ -364,6 +549,8 @@ export const prefillMetric: Metric<PrefillInput, PrefillResult> = {
       'If last session climbed across your sets, the same climb is offered again — each set at its own weight and reps — moved by however much you changed the first set. It only follows you; it never adds weight on its own.',
       'A climb is the one case where the reps come from what you did rather than from your routine, because a routine holds a single rep figure and a climb has a different one per set.',
       'Change a set to something that is not part of last session’s climb and the climb stops being offered for the rest of that exercise. What you just did takes over again.',
+      'A dropset never fills in a normal set row. Finishing a dropset at 30 kg would otherwise offer 30 kg as the opening weight of your next set.',
+      'A drop row fills in from the same dropset — earlier today if there was one, otherwise last session — moved by whatever you opened the set at. With nothing to go on it offers the weight you are dropping from, because how far to strip the bar is your decision and Gymmy has no opinion about it.',
     ],
   },
 

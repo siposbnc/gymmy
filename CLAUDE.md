@@ -66,6 +66,17 @@ user-facing explanation cannot drift from the maths.
   write, never by a caller, which is why the ribbon, the session header and
   the weekly set counts never had to learn ladders exist. A ladder whose rungs
   are identical is not stored — that is straight sets.
+- **A dropset is one set that logged several rows.** A drop is a child row
+  carrying `parentSetId`, not a set of its own: every drop counts toward volume
+  in full, because stripping the weight and carrying on is real work, and no
+  drop counts toward a set count anywhere — the card's "3 of 4", the ribbon, the
+  session header, hard sets per muscle per week, the shareable card. That split
+  is `countsAsSet` versus `countsTowardVolume` in `domain/sets.ts`, and it is
+  made in those two places only. Three consequences worth knowing: a drop can
+  never fill in a normal set row (carry-forward would offer the 30 kg you
+  finished on as your next opening weight), a set's drops are deleted and moved
+  with it because they cannot outlive it, and saving a dropset session as a
+  routine keeps the sets it was rather than writing a ladder down from them.
 - **A swap carries the shape, never the load.** Replacing an exercise
   mid-session keeps its place, its superset group and its rep prescription;
   absolute weights are stripped, because 80 kg of bench press is not 80 kg of

@@ -32,6 +32,7 @@ import {
   startPlannedSession,
   STALE_SESSION_MS,
   swapSessionExercise,
+  toggleDrop,
   toggleWarmup,
   updateSet,
 } from './sessions'
@@ -324,6 +325,215 @@ describe('sessions', () => {
       await removeSessionExercise(sexId)
 
       expect(await db.sets.count()).toBe(0)
+    })
+  })
+
+  describe('dropsets — one set, several rows', () => {
+    /** 60 × 8, strip to 45 × 6, strip to 30 × 8. */
+    async function logDropset() {
+      const sessionId = await startEmptySession()
+      const sexId = await addExerciseToSession(sessionId, 'ex_bench-press')
+      const first = await logSet(sexId, { weightKg: 60, reps: 8 })
+      const second = await logSet(sexId, { weightKg: 60, reps: 8 })
+      const dropA = await logSet(sexId, { weightKg: 45, reps: 6, parentSetId: second })
+      const dropB = await logSet(sexId, { weightKg: 30, reps: 8, parentSetId: second })
+      return { sessionId, sexId, first, second, dropA, dropB }
+    }
+
+    it('numbers a chain within its parent and leaves the set count alone', async () => {
+      const { sexId, second } = await logDropset()
+
+      const sets = await listSets(sexId)
+      expect(sets.map((s) => [s.type, s.setIndex])).toEqual([
+        ['normal', 1],
+        ['normal', 2],
+        ['dropset', 1],
+        ['dropset', 2],
+      ])
+      expect(sets.filter((s) => s.parentSetId === second)).toHaveLength(2)
+    })
+
+    it('keeps a drop under the set it came off, not at the end of the exercise', async () => {
+      const { sexId, second } = await logDropset()
+      // A third set, logged after the dropset.
+      await logSet(sexId, { weightKg: 60, reps: 6 })
+
+      const sets = await listSets(sexId)
+      expect(sets.map((s) => s.weightKg)).toEqual([60, 60, 45, 30, 60])
+      expect(sets[2]?.parentSetId).toBe(second)
+    })
+
+    it('lands the next working set at the right number despite the drops', async () => {
+      const { sexId } = await logDropset()
+      const third = await logSet(sexId, { weightKg: 60, reps: 6 })
+
+      expect((await db.sets.get(third))?.setIndex).toBe(3)
+    })
+
+    it('takes the drops with the set when it is deleted', async () => {
+      const { sexId, second } = await logDropset()
+
+      await deleteSet(second)
+
+      const sets = await listSets(sexId)
+      // The drops cannot outlive the set they came off, or they would go on
+      // counting as work the user just said never happened.
+      expect(sets).toHaveLength(1)
+      expect(sets[0]?.weightKg).toBe(60)
+    })
+
+    it('renumbers a chain when one drop is deleted out of the middle', async () => {
+      const sessionId = await startEmptySession()
+      const sexId = await addExerciseToSession(sessionId, 'ex_squat')
+      const parent = await logSet(sexId, { weightKg: 100, reps: 5 })
+      const middle = await logSet(sexId, { weightKg: 80, reps: 6, parentSetId: parent })
+      await logSet(sexId, { weightKg: 60, reps: 8, parentSetId: parent })
+
+      await deleteSet(middle)
+
+      const sets = await listSets(sexId)
+      expect(sets.map((s) => [s.type, s.setIndex, s.weightKg])).toEqual([
+        ['normal', 1, 100],
+        ['dropset', 1, 60],
+      ])
+    })
+
+    it('refuses to make a dropset into a warm-up, from either end', async () => {
+      const { second, dropA } = await logDropset()
+
+      await toggleWarmup(second)
+      await toggleWarmup(dropA)
+
+      expect((await db.sets.get(second))?.type).toBe('normal')
+      expect((await db.sets.get(dropA))?.type).toBe('dropset')
+    })
+
+    it('logs a drop as a plain set when its parent has gone', async () => {
+      const sessionId = await startEmptySession()
+      const sexId = await addExerciseToSession(sessionId, 'ex_squat')
+      const parent = await logSet(sexId, { weightKg: 100, reps: 5 })
+      await deleteSet(parent)
+
+      // The rep still happened. Filing it in the wrong place beats losing it.
+      const orphan = await logSet(sexId, { weightKg: 80, reps: 6, parentSetId: parent })
+
+      const row = await db.sets.get(orphan)
+      expect(row?.type).toBe('normal')
+      expect(row?.parentSetId).toBeUndefined()
+      expect(row?.setIndex).toBe(1)
+    })
+
+    it('will not hang a drop off a warm-up', async () => {
+      const sessionId = await startEmptySession()
+      const sexId = await addExerciseToSession(sessionId, 'ex_squat')
+      const warm = await logSet(sexId, { weightKg: 40, reps: 10, type: 'warmup' })
+
+      const id = await logSet(sexId, { weightKg: 30, reps: 10, parentSetId: warm })
+
+      expect((await db.sets.get(id))?.type).toBe('normal')
+    })
+
+    it('moves a dropset whole, chain included', async () => {
+      const sessionId = await startEmptySession()
+      const squat = await addExerciseToSession(sessionId, 'ex_squat')
+      const bench = await addExerciseToSession(sessionId, 'ex_bench-press')
+      const parent = await logSet(squat, { weightKg: 100, reps: 5 })
+      await logSet(squat, { weightKg: 80, reps: 6, parentSetId: parent })
+      await logSet(bench, { weightKg: 60, reps: 8 })
+
+      await moveSetToExercise(parent, bench)
+
+      expect(await listSets(squat)).toHaveLength(0)
+      const benchSets = await listSets(bench)
+      expect(benchSets.map((s) => [s.type, s.setIndex, s.weightKg])).toEqual([
+        ['normal', 1, 60],
+        ['normal', 2, 100],
+        ['dropset', 1, 80],
+      ])
+    })
+
+    it('refuses to move a drop away from its parent', async () => {
+      const sessionId = await startEmptySession()
+      const squat = await addExerciseToSession(sessionId, 'ex_squat')
+      const bench = await addExerciseToSession(sessionId, 'ex_bench-press')
+      const parent = await logSet(squat, { weightKg: 100, reps: 5 })
+      const drop = await logSet(squat, { weightKg: 80, reps: 6, parentSetId: parent })
+
+      await moveSetToExercise(drop, bench)
+
+      expect(await listSets(bench)).toHaveLength(0)
+      expect(await listSets(squat)).toHaveLength(2)
+    })
+  })
+
+  describe('toggleDrop — repairing a dropset logged as separate sets', () => {
+    it('turns a set into a drop of the one above it', async () => {
+      const sessionId = await startEmptySession()
+      const sexId = await addExerciseToSession(sessionId, 'ex_squat')
+      const top = await logSet(sexId, { weightKg: 100, reps: 5 })
+      const mislogged = await logSet(sexId, { weightKg: 70, reps: 8 })
+
+      await toggleDrop(mislogged)
+
+      const sets = await listSets(sexId)
+      expect(sets.map((s) => [s.type, s.setIndex])).toEqual([
+        ['normal', 1],
+        ['dropset', 1],
+      ])
+      expect(sets[1]?.parentSetId).toBe(top)
+    })
+
+    it('promotes a drop back to a set of its own', async () => {
+      const { sexId, dropA } = await (async () => {
+        const sessionId = await startEmptySession()
+        const sexId = await addExerciseToSession(sessionId, 'ex_squat')
+        const parent = await logSet(sexId, { weightKg: 100, reps: 5 })
+        const dropA = await logSet(sexId, { weightKg: 70, reps: 8, parentSetId: parent })
+        return { sexId, dropA }
+      })()
+
+      await toggleDrop(dropA)
+
+      const row = await db.sets.get(dropA)
+      expect(row?.type).toBe('normal')
+      // Gone from the row, not present and undefined: a query looking for a
+      // drop must not still find one.
+      expect(row && 'parentSetId' in row).toBe(false)
+      expect((await listSets(sexId)).map((s) => s.setIndex)).toEqual([1, 2])
+    })
+
+    it('leaves the first set of an exercise alone — there is nothing above it', async () => {
+      const sessionId = await startEmptySession()
+      const sexId = await addExerciseToSession(sessionId, 'ex_squat')
+      const only = await logSet(sexId, { weightKg: 100, reps: 5 })
+
+      await toggleDrop(only)
+
+      expect((await db.sets.get(only))?.type).toBe('normal')
+    })
+
+    it('refuses a set that has drops of its own, since drops do not nest', async () => {
+      const sessionId = await startEmptySession()
+      const sexId = await addExerciseToSession(sessionId, 'ex_squat')
+      await logSet(sexId, { weightKg: 100, reps: 5 })
+      const second = await logSet(sexId, { weightKg: 100, reps: 5 })
+      await logSet(sexId, { weightKg: 70, reps: 8, parentSetId: second })
+
+      await toggleDrop(second)
+
+      expect((await db.sets.get(second))?.type).toBe('normal')
+    })
+
+    it('attaches to the nearest set above, not the first one', async () => {
+      const sessionId = await startEmptySession()
+      const sexId = await addExerciseToSession(sessionId, 'ex_squat')
+      await logSet(sexId, { weightKg: 100, reps: 5 })
+      const second = await logSet(sexId, { weightKg: 100, reps: 5 })
+      const third = await logSet(sexId, { weightKg: 70, reps: 8 })
+
+      await toggleDrop(third)
+
+      expect((await db.sets.get(third))?.parentSetId).toBe(second)
     })
   })
 

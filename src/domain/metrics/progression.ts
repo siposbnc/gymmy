@@ -1,3 +1,4 @@
+import { countsAsSet } from '../sets'
 import type { PlatePair, SetEntry } from '../types'
 import { formatWeight } from '../units'
 import type { Metric } from './types'
@@ -33,7 +34,13 @@ export interface ProgressionSuggestion {
   readonly clearedReps: number
 }
 
-const isWorking = (set: ProgressionSet) => set.type !== 'warmup'
+/**
+ * Warm-ups are not work, and a dropset's drops are not sets — so neither can
+ * clear a rep range. Without this, stripping the bar to 30 kg for a last set of
+ * twelve would read as the whole exercise having been taken at mixed weights,
+ * and the suggestion would go quiet for an exercise you had in fact cleared.
+ */
+const isWorking = (set: ProgressionSet) => countsAsSet(set)
 
 /**
  * When to add weight — double progression.
@@ -135,6 +142,7 @@ export const progressionMetric: Metric<ProgressionInput, ProgressionSuggestion |
       'It needs a rep range, which comes from a routine. Freestyle work gets no suggestion rather than a made-up range.',
       'It does not read RPE, so it cannot tell a comfortable set at the top of the range from one that nearly buried you.',
       'If your sets last time were at different weights, there is no single weight to add to, so nothing is suggested.',
+      'Dropsets are ignored, both the drops themselves and the fact that you did one. Clearing your range and then stripping the bar still earns the suggestion.',
       'Accepting it does not rewrite your routine — the plan still says what it said.',
     ],
   },

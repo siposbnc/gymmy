@@ -37,6 +37,33 @@ describe('deriveRoutineDraft', () => {
     expect(draft.exercises[0]?.targetSets).toBe(4)
   })
 
+  it('keeps a dropset as the set it was, not as a ladder down from it', () => {
+    // Three sets of 60 with the last one dropped. Counting the drops as sets
+    // would write a plan that opens at 60 and works down to 30 — a workout
+    // nobody did, and one you could not repeat from the routine.
+    const draft = deriveRoutineDraft({
+      name: 'Push A',
+      exercises: [
+        source({
+          sets: [
+            set(60, 8),
+            set(60, 8),
+            set(60, 7),
+            set(45, 6, 'dropset'),
+            set(30, 9, 'dropset'),
+          ],
+        }),
+      ],
+    })
+
+    const entry = draft.exercises[0]
+    expect(entry?.targetSets).toBe(3)
+    expect(entry?.setPlan).toBeUndefined()
+    expect(entry?.targetWeight).toEqual({ kind: 'absolute', kg: 60 })
+    expect(entry?.targetRepsMin).toBe(7)
+    expect(entry?.targetRepsMax).toBe(8)
+  })
+
   it('excludes warm-ups from the set count and the rep range', () => {
     const draft = deriveRoutineDraft({
       name: 'Push A',

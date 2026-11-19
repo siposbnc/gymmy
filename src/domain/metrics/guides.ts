@@ -100,11 +100,13 @@ export const warmupVsWorkingGuide: Explainable = {
   shortLabel: 'set types',
   explainer: {
     whatItIs:
-      'A working set is a real set at your training weight, and it is what Gymmy counts. A warm-up is a lighter set ramping up to it. A dropset is an extra set done immediately after a working set with the weight reduced, taken without resting.',
+      'A working set is a real set at your training weight, and it is what Gymmy counts. A warm-up is a lighter set ramping up to it. A dropset is a working set you carried on with after stripping the weight, without resting — each drop is logged as its own row, hanging off the set it came from.',
     whyUseful:
-      'Separating them keeps your totals honest. Warm-ups would otherwise inflate your set count and drag your average weight down, while dropsets are genuine extra work and should count.',
+      'Separating them keeps your totals honest. Warm-ups would otherwise inflate your set count and drag your average weight down, while dropsets are genuine extra work that would overstate how many sets you did.',
     caveats: [
-      'Only warm-ups are excluded from volume, records and estimated one-rep max. Dropsets and sets taken to failure all count as real work.',
+      'Only warm-ups are excluded from volume, records and estimated one-rep max. Drops and sets taken to failure all count as real work.',
+      'A dropset is one set however many drops it took. Every drop adds to your volume, and none of them adds to your set count — so three sets of bench with a dropset on the last one is three hard sets, not five.',
+      'Deleting a working set deletes the drops hanging off it. They are part of that set, not sets of their own.',
       'Nothing is deleted either way — a warm-up stays visible in the session so you can see how you worked up to your top set.',
     ],
   },

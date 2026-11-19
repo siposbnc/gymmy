@@ -194,16 +194,33 @@ describe('weeklySets', () => {
     expect(weeks[0]?.total).toBe(1)
   })
 
-  it('counts dropsets and sets to failure as real work', () => {
+  it('counts a set taken to failure — it is a working set that happened to end', () => {
+    const weeks = weeklySets([set('s1', 'ex_squat', MONDAY, 100, 5, 'failure')], muscles, 1)
+    expect(weeks[0]?.byMuscle.quads).toBe(1)
+  })
+
+  it('counts a dropset once, however many drops it took', () => {
+    // 100 × 5, strip to 70, strip to 50. One hard set, three rows.
     const weeks = weeklySets(
       [
-        set('s1', 'ex_squat', MONDAY, 100, 5, 'failure'),
+        set('s1', 'ex_squat', MONDAY, 100, 5),
         set('s1', 'ex_squat', MONDAY + 1000, 70, 8, 'dropset'),
+        set('s1', 'ex_squat', MONDAY + 2000, 50, 10, 'dropset'),
       ],
       muscles,
       1,
     )
-    expect(weeks[0]?.byMuscle.quads).toBe(2)
+    expect(weeks[0]?.byMuscle.quads).toBe(1)
+    expect(weeks[0]?.total).toBe(1)
+  })
+
+  it('still counts every drop toward volume — the whole point of counting sets separately', () => {
+    const sets = [
+      set('s1', 'ex_squat', MONDAY, 100, 5),
+      set('s1', 'ex_squat', MONDAY + 1000, 70, 8, 'dropset'),
+    ]
+    expect(weeklySets(sets, muscles, 1)[0]?.total).toBe(1)
+    expect(weeklyVolume(sets, muscles, 1)[0]?.totalKg).toBe(500 + 560)
   })
 
   it('ignores a logged set with no reps in it', () => {

@@ -143,9 +143,10 @@ SessionExercise
   id, sessionId, exerciseId, order, restSeconds?, supersetGroup?, notes
 
 SetEntry
-  id, sessionExerciseId, setIndex
+  id, sessionExerciseId, setIndex   // numbered per run: warm-ups, sets, drops
   weightKg?, reps?, durationSeconds?, distanceM?
   rpe?, type: normal|warmup|dropset|failure
+  parentSetId?                      // a drop hangs off a working set
   completedAt
 
 PersonalRecord                 // ONLY from logged work — never from an estimate
@@ -906,6 +907,8 @@ Unit tests concentrate on `domain/`:
   function. A single test iterating the registry prevents a metric shipping undocumented.
 - **Plate decomposition** — exact loads, unloadable targets, an incomplete inventory, non-standard bar.
 - **Prefill chain** — each fallback tier, and an exercise with no history at all.
+- **Dropsets** — one set however many drops it took: every drop in the volume, none of them in a set
+  count, and never offered back as the prefill for a normal set.
 - **Volume aggregation** and **kg↔lb display rounding**.
 
 One Playwright flow proves the critical path end-to-end with the network off: start a routine, log every

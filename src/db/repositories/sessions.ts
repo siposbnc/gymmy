@@ -1,4 +1,13 @@
 import { isUniform, stripPlanWeights, summariseSetPlan } from '~/domain/set-plan'
+import {
+  countsAsSet,
+  dropParentOf,
+  dropsOf,
+  hasDrops,
+  isDrop,
+  orderSets,
+  renumberSets,
+} from '~/domain/sets'
 import type { Session, SessionExercise, SetEntry, SetType } from '~/domain/types'
 import { newId } from '~/lib/uuid'
 
@@ -324,46 +333,66 @@ export interface LogSetInput {
   readonly reps?: number | undefined
   readonly rpe?: number | undefined
   readonly type?: SetType
+  /**
+   * Log this as a drop off an existing working set rather than as a set.
+   *
+   * Sets `type` to `dropset` on its own — the two always travel together, so
+   * the caller never has to state both and cannot state them inconsistently.
+   */
+  readonly parentSetId?: string | undefined
 }
 
 /**
- * Sets in display order: warm-ups first, then working sets, each run by index.
+ * Sets in display order: warm-ups, then working sets, each trailed by its drops.
  *
- * Sorting on `setIndex` alone is wrong, because the two runs are numbered
- * independently — it interleaves them as W1, 1, W2, 2. Grouping also means a
- * warm-up added after the fact still appears where it belongs rather than
- * stranded at the bottom.
+ * The rule itself lives in `domain/sets.ts` so it can be tested without a
+ * database open. Every read of one exercise's sets comes through here, which is
+ * why no screen has to sort them and no screen can sort them differently.
  */
 export async function listSets(sessionExerciseId: string): Promise<SetEntry[]> {
   const rows = await db.sets.where('sessionExerciseId').equals(sessionExerciseId).toArray()
-  const rank = (set: SetEntry) => (set.type === 'warmup' ? 0 : 1)
-  return rows.sort((a, b) => rank(a) - rank(b) || a.setIndex - b.setIndex)
+  return orderSets(rows)
 }
 
 /**
- * Append a set.
+ * Append a set, or a drop off one.
  *
- * `setIndex` numbers working sets independently of warm-ups, so the row labels
- * read W, W, 1, 2, 3 — which is how lifters actually count them.
+ * `setIndex` numbers each run independently — warm-ups, working sets, and the
+ * drops of a single set — so the rows read W, W, 1, 2, D, D, 3, which is how
+ * lifters actually count them.
  */
 export async function logSet(
   sessionExerciseId: string,
   input: LogSetInput,
 ): Promise<string> {
   const id = newId('set')
-  const type = input.type ?? 'normal'
 
   await db.transaction('rw', db.sets, async () => {
     const existing = await listSets(sessionExerciseId)
-    const sameKind = existing.filter((set) =>
-      type === 'warmup' ? set.type === 'warmup' : set.type !== 'warmup',
+
+    // A drop needs a working set of this exercise to hang off. If it has none —
+    // the parent was deleted on another tab mid-dropset, say — the rep still
+    // happened, so it is logged as a set of its own rather than discarded.
+    // Losing work is the one outcome worse than filing it in the wrong place.
+    const parent = existing.find(
+      (set) => set.id === input.parentSetId && countsAsSet(set),
     )
+    const requested = input.type ?? 'normal'
+    // A `dropset` with no parent is a row nothing can render in its right place,
+    // so it is not a state this function will write.
+    const type: SetType = parent ? 'dropset' : requested === 'dropset' ? 'normal' : requested
+
+    const run = parent
+      ? dropsOf(existing, parent.id)
+      : existing.filter((set) => (type === 'warmup' ? set.type === 'warmup' : countsAsSet(set)))
+
     await db.sets.add({
       id,
       sessionExerciseId,
-      setIndex: sameKind.length + 1,
+      setIndex: run.length + 1,
       type,
       completedAt: Date.now(),
+      ...(parent ? { parentSetId: parent.id } : {}),
       ...(input.weightKg == null ? {} : { weightKg: input.weightKg }),
       ...(input.reps == null ? {} : { reps: input.reps }),
       ...(input.rpe == null ? {} : { rpe: input.rpe }),
@@ -380,24 +409,24 @@ export async function updateSet(
   await db.sets.update(setId, patch)
 }
 
-/** Deletes a set and renumbers its siblings so indices stay contiguous. */
+/**
+ * Deletes a set and renumbers its siblings so indices stay contiguous.
+ *
+ * **A set's drops go with it.** They are part of that set rather than sets of
+ * their own, so leaving them behind would strand 45 × 6 and 30 × 8 under an
+ * exercise with nothing above them to explain where they came from — and they
+ * would go on counting toward volume as work you had just said never happened.
+ */
 export async function deleteSet(setId: string): Promise<void> {
   await db.transaction('rw', db.sets, async () => {
     const set = await db.sets.get(setId)
     if (!set) return
-    await db.sets.delete(setId)
 
-    const remaining = await listSets(set.sessionExerciseId)
-    let working = 0
-    let warmup = 0
-    await Promise.all(
-      remaining.map((row) => {
-        const nextIndex = row.type === 'warmup' ? ++warmup : ++working
-        return row.setIndex === nextIndex
-          ? Promise.resolve(0)
-          : db.sets.update(row.id, { setIndex: nextIndex })
-      }),
-    )
+    const siblings = await listSets(set.sessionExerciseId)
+    const doomed = [setId, ...dropsOf(siblings, setId).map((drop) => drop.id)]
+    await db.sets.bulkDelete(doomed)
+
+    await renumber(set.sessionExerciseId)
   })
 }
 
@@ -405,9 +434,13 @@ export async function deleteSet(setId: string): Promise<void> {
  * Move a set to a different exercise.
  *
  * For the case where a set was logged against the wrong exercise — which is
- * easy to do mid-workout and currently only fixable by deleting and retyping
+ * easy to do mid-workout and otherwise only fixable by deleting and retyping
  * it. Both the old and new homes are renumbered, so neither is left with a
  * gap or a duplicate index.
+ *
+ * A dropset moves whole: the drops follow their parent, keeping the chain
+ * intact. A drop cannot be moved on its own, because a drop that is not hanging
+ * off anything is not a thing — the actions sheet does not offer it.
  */
 export async function moveSetToExercise(
   setId: string,
@@ -416,55 +449,107 @@ export async function moveSetToExercise(
   await db.transaction('rw', db.sets, async () => {
     const set = await db.sets.get(setId)
     if (!set || set.sessionExerciseId === targetSessionExerciseId) return
+    if (isDrop(set)) return
 
     const from = set.sessionExerciseId
+    const siblings = await listSets(from)
+    const chain = dropsOf(siblings, setId)
+
     const target = await listSets(targetSessionExerciseId)
     const sameKind = target.filter((candidate) =>
-      set.type === 'warmup' ? candidate.type === 'warmup' : candidate.type !== 'warmup',
+      set.type === 'warmup' ? candidate.type === 'warmup' : countsAsSet(candidate),
     )
 
     await db.sets.update(setId, {
       sessionExerciseId: targetSessionExerciseId,
       setIndex: sameKind.length + 1,
     })
+    await Promise.all(
+      chain.map((drop) =>
+        db.sets.update(drop.id, { sessionExerciseId: targetSessionExerciseId }),
+      ),
+    )
 
     await renumber(from)
+    await renumber(targetSessionExerciseId)
   })
 }
 
-/** Rewrite set indices so warm-ups and working sets each count from one. */
+/**
+ * Rewrite set indices so every run counts from one.
+ *
+ * One function rather than the copy that used to sit inside each caller: with
+ * three runs to keep straight instead of two, three near-identical loops is
+ * three chances to number drops differently depending on how you got there.
+ */
 async function renumber(sessionExerciseId: string): Promise<void> {
-  const remaining = await listSets(sessionExerciseId)
-  let working = 0
-  let warmup = 0
+  const ordered = await listSets(sessionExerciseId)
   await Promise.all(
-    remaining.map((row) => {
-      const nextIndex = row.type === 'warmup' ? ++warmup : ++working
-      return row.setIndex === nextIndex
-        ? Promise.resolve(0)
-        : db.sets.update(row.id, { setIndex: nextIndex })
-    }),
+    renumberSets(ordered).map((row) => db.sets.update(row.id, { setIndex: row.setIndex })),
   )
 }
 
-/** Flip a set between warm-up and working, renumbering both runs. */
+/**
+ * Flip a set between warm-up and working, renumbering both runs.
+ *
+ * Refused for anything to do with a dropset. A drop is not a warm-up by
+ * definition — it is the heaviest thing you could still move — and a set with
+ * drops hanging off it cannot become a ramp-up without taking real work out of
+ * every total with it. The actions sheet hides the option in both cases; this
+ * is the guard behind it.
+ */
 export async function toggleWarmup(setId: string): Promise<void> {
   await db.transaction('rw', db.sets, async () => {
     const set = await db.sets.get(setId)
-    if (!set) return
-    await db.sets.update(setId, { type: set.type === 'warmup' ? 'normal' : 'warmup' })
+    if (!set || isDrop(set)) return
 
-    const remaining = await listSets(set.sessionExerciseId)
-    let working = 0
-    let warmup = 0
-    await Promise.all(
-      remaining.map((row) => {
-        const nextIndex = row.type === 'warmup' ? ++warmup : ++working
-        return row.setIndex === nextIndex
-          ? Promise.resolve(0)
-          : db.sets.update(row.id, { setIndex: nextIndex })
-      }),
-    )
+    const siblings = await listSets(set.sessionExerciseId)
+    if (hasDrops(siblings, setId)) return
+
+    await db.sets.update(setId, { type: set.type === 'warmup' ? 'normal' : 'warmup' })
+    await renumber(set.sessionExerciseId)
+  })
+}
+
+/**
+ * Turn a logged set into a drop of the one above it, or back into a set.
+ *
+ * The repair path, and the reason it exists: a dropset logged before Gymmy could
+ * record one is sitting in history as three separate sets, and so is one logged
+ * by someone who forgot to tap the drop chip. Both read as more hard sets than
+ * were done, and there was no way to say so without deleting and retyping the
+ * work.
+ *
+ * The parent is the nearest working set above it, which is the only candidate
+ * that means anything: a drop follows the set it came off.
+ *
+ * Refused for a set that has drops of its own, because a drop of a drop is not
+ * a shape this model has — or anything the gym has either.
+ */
+export async function toggleDrop(setId: string): Promise<void> {
+  await db.transaction('rw', db.sets, async () => {
+    const set = await db.sets.get(setId)
+    if (!set) return
+
+    const siblings = await listSets(set.sessionExerciseId)
+
+    if (isDrop(set)) {
+      // `put` rather than `update`: `parentSetId` has to be gone from the row,
+      // not present and undefined, or the row stays a drop as far as every
+      // query that looks for one is concerned.
+      const { parentSetId: _promoted, ...rest } = set
+      await db.sets.put({ ...rest, type: 'normal' })
+      await renumber(set.sessionExerciseId)
+      return
+    }
+
+    // The same rule the actions sheet reads to name the set in its label, so
+    // what it says is what this writes.
+    const above = dropParentOf(siblings, setId)
+    if (!above) return
+
+    await db.sets.update(setId, { type: 'dropset', parentSetId: above.id })
+    await renumber(set.sessionExerciseId)
   })
 }
 
@@ -493,7 +578,12 @@ export async function discardSession(sessionId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * The working sets of the most recent *other* session containing this exercise.
+ * Every set of the most recent *other* session containing this exercise.
+ *
+ * Warm-ups and drops included — the callers filter. Prefill wants the working
+ * sets, the drop row wants last session's chain, and handing each of them the
+ * whole picture is what lets both read the same history rather than two
+ * different queries that can disagree.
  *
  * Deliberately excludes the current session: prefill's carry-forward tier
  * already handles "what you just did", and mixing the two here would make this

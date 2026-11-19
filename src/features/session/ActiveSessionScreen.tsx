@@ -11,6 +11,7 @@ import {
   swapSessionExercise,
 } from '~/db/repositories/sessions'
 import { totalVolume } from '~/domain/metrics'
+import { countsAsSet } from '~/domain/sets'
 import { formatVolume } from '~/domain/units'
 import { useRestTimer } from '~/features/rest/restTimer'
 import { Button } from '~/ui/Button'
@@ -69,7 +70,7 @@ export function ActiveSessionScreen() {
   const { session, views } = active
   const planned = session.status === 'planned'
   const allSets = views.flatMap((view) => view.sets)
-  const workingSets = allSets.filter((set) => set.type !== 'warmup')
+  const workingSets = allSets.filter(countsAsSet)
   const volume = totalVolume({ sets: allSets })
 
   return (

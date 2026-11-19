@@ -1,5 +1,6 @@
 import { estimateOneRepMax } from './metrics/one-rep-max'
 import { setVolume } from './metrics/volume'
+import { countsAsSet } from './sets'
 import type { MuscleGroup, SetType } from './types'
 
 /**
@@ -47,6 +48,11 @@ export interface ExercisePoint {
  * `estimatedOneRepMax` is null whenever no set in the session was in the
  * 1–12 rep range. Null rather than zero, and rather than carrying the previous
  * value forward: a gap in the line is honest, a flat line is a lie.
+ *
+ * A dropset's drops are kept here, unlike in {@link weeklySets}: they are work,
+ * so they belong in the volume, and the other two figures take a maximum, which
+ * a lighter fatigued set cannot win. Excluding them would understate the volume
+ * of a session and change nothing else.
  */
 export function exerciseSeries(
   exerciseId: string,
@@ -177,9 +183,15 @@ export interface WeeklySets {
  * a set regardless of the load on the bar, which makes it the sturdier thing
  * to aim at.
  *
- * "Hard" means a working set — warm-ups are excluded, dropsets and sets taken
- * to failure count. Credited to the exercise's primary mover only, matching
- * how {@link weeklyVolume} attributes.
+ * "Hard" means a working set. Warm-ups are excluded because they are not work,
+ * and a dropset's drops are excluded because they are not *sets*: 60 × 8 then
+ * 45 × 6 then 30 × 8 is one hard set, however many rows it took to log. Their
+ * work still lands in {@link weeklyVolume} in full — that is the whole
+ * difference between the two functions, and the reason both exist.
+ *
+ * A set taken to failure counts, being a working set that happened to end.
+ * Credited to the exercise's primary mover only, matching how
+ * {@link weeklyVolume} attributes.
  */
 export function weeklySets(
   sets: readonly HistorySet[],
@@ -189,7 +201,7 @@ export function weeklySets(
   const weeks = new Map<number, { byMuscle: Partial<Record<MuscleGroup, number>>; total: number }>()
 
   for (const set of sets) {
-    if (set.type === 'warmup') continue
+    if (!countsAsSet(set)) continue
     if ((set.reps ?? 0) <= 0) continue
 
     const weekStart = startOfWeek(set.completedAt, weekStartsOn)

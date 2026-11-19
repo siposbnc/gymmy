@@ -41,7 +41,7 @@ describe('toCsv', () => {
     const csv = toCsv([row(), row({ setIndex: 2, reps: 7 })], 'kg')
     const lines = csv.trim().split('\n')
 
-    expect(lines[0]).toBe('date,session,exercise,set,type,weight_kg,weight,unit,reps,rpe,volume_kg')
+    expect(lines[0]).toBe('date,session,exercise,set,drop,type,weight_kg,weight,unit,reps,rpe,volume_kg')
     expect(lines).toHaveLength(3)
   })
 
@@ -67,7 +67,7 @@ describe('toCsv', () => {
       .trim()
       .split('\n')[1]!
 
-    expect(line).toBe('2026-10-26,Push A,Bench Press,1,normal,,,kg,,,')
+    expect(line).toBe('2026-10-26,Push A,Bench Press,1,,normal,,,kg,,,')
   })
 
   it('escapes a session name containing a comma', () => {
@@ -79,9 +79,28 @@ describe('toCsv', () => {
     expect(toCsv([row({ setType: 'warmup' })], 'kg')).toContain(',warmup,')
   })
 
+  it('files a drop under its parent’s set number, numbered within the chain', () => {
+    const lines = toCsv(
+      [
+        row({ setIndex: 2, weightKg: 60, reps: 8 }),
+        row({ setIndex: 2, dropIndex: 1, setType: 'dropset', weightKg: 45, reps: 6 }),
+        row({ setIndex: 2, dropIndex: 2, setType: 'dropset', weightKg: 30, reps: 8 }),
+      ],
+      'kg',
+    )
+      .trim()
+      .split('\n')
+
+    // Sorting a spreadsheet by set keeps the dropset together under set 2,
+    // rather than scattering it into a run of its own.
+    expect(lines[1]).toContain(',2,,normal,')
+    expect(lines[2]).toContain(',2,1,dropset,')
+    expect(lines[3]).toContain(',2,2,dropset,')
+  })
+
   it('still emits a header when there is nothing to export', () => {
     expect(toCsv([], 'kg')).toBe(
-      'date,session,exercise,set,type,weight_kg,weight,unit,reps,rpe,volume_kg\n',
+      'date,session,exercise,set,drop,type,weight_kg,weight,unit,reps,rpe,volume_kg\n',
     )
   })
 

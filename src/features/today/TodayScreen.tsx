@@ -20,6 +20,7 @@ import {
   type MuscleRecency,
   type RestBand,
 } from '~/domain/recency'
+import { countsAsSet } from '~/domain/sets'
 import type { MuscleGroup } from '~/domain/types'
 import { formatVolume } from '~/domain/units'
 import { BodyMap, RestKey } from './BodyMap'
@@ -105,7 +106,7 @@ export function TodayScreen() {
             name={session.name}
             startedAt={session.startedAt}
             setCount={
-              current?.views.flatMap((v) => v.sets).filter((s) => s.type !== 'warmup').length ?? 0
+              current?.views.flatMap((v) => v.sets).filter(countsAsSet).length ?? 0
             }
             volume={formatVolume(
               totalVolume({ sets: current?.views.flatMap((v) => v.sets) ?? [] }),
